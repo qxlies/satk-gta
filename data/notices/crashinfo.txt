@@ -1,0 +1,40 @@
+Third-party notice: CrashInfo crash list (GTA San Andreas 1.0 US, English)
+==========================================================================
+
+What: the community list "crash address -> problem -> solution" of the CrashInfo
+plugin for GTA San Andreas 1.0 US (English edition), used by `satk crash analyze`
+(keys "known" and "solution") and `satk crash known`.
+
+File in satk: data/crashlist/gta-sa-10us-en.txt (provenance: data/crashlist/source.json).
+Source: https://github.com/JuniorDjjr/CrashInfo
+        Lists/GTA-SA-10US/EN-CrashList.txt, revision
+        440f9a516b5726d89f7c2e30093f93bf6d56fae6 (2026-10-03), list dated 2026-10-02,
+        sha256 5461f5e54eb1fa145ba8664addf3bb448b6242945e88211abbe968f9e85b99be.
+Changes: none. The file is stored byte for byte; satk parses it at run time and
+        shows parts of its entries. No CrashInfo code is included in satk.
+Note: the entries are empirical community knowledge, not verified facts; links
+        of the original web page ("click here") are not part of the text file.
+
+License (verbatim):
+
+MIT License
+
+Copyright (c) 2021 Valdir da Costa Júnior
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

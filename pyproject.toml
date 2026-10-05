@@ -1,0 +1,61 @@
+# Three ways to run satk (docs/en/install.md):
+# * shims (default for development): satk.cmd / satk.sh set PYTHONPATH=<checkout>/src and run
+#   "python -X utf8 -m satk" - nothing is installed into the venv;
+# * package: "pip install <checkout>" (or "-e", or pipx) installs the "satk" console script below.
+#   data/ (manifests, exe_versions.json, rules) and vendor/ are outside src/: setup.py's build_py hook
+#   copies them into the wheel as satk/_data and satk/_vendor, and satk.core.resources reads the data
+#   from there (an editable install reads <checkout>/data in place); MANIFEST.in adds data/, vendor/
+#   and all package files to the sdist;
+# * portable zip: "satk dev release" (src/satk/release) packs the official embeddable CPython, the
+#   runtime wheels of packaging/release-lock.json and the runtime trees of the repository; it also
+#   writes the wheel and the sdist with the stdlib, following this file, setup.py and MANIFEST.in.
+# The PyPI name is satk-gta ("satk" is taken); the command and the import package stay "satk".
+# This file also records optional dependency pins (exact set: requirements.lock) and pytest settings.
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "satk-gta"
+version = "0.2.1"
+description = "San Andreas ToolKit: agent-first tools for GTA:SA engine/mod development"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = []  # the core is stdlib only
+
+[project.optional-dependencies]
+img = ["Pillow==12.3.0"]
+num = ["numpy==2.5.3"]
+mcp = ["mcp==2.3.0"]
+dev = ["pytest==8.4.2"]
+
+[project.scripts]
+satk = "satk.core.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# non-Python files inside the package (SQL schemas, engine templates) for non-editable installs;
+# MANIFEST.in ("graft src/satk", include-package-data) ships any other file under src/satk too.
+# The repository's data/ and vendor/ are not package data: setup.py copies them to satk/_data and
+# satk/_vendor (see the top).
+satk = ["**/*.sql", "engine/templates/*"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+# importlib mode: test files with the same basename in different tests/<pkg>/ dirs do not
+# clash, and tests/<pkg>/ need no __init__.py.
+addopts = "-ra --import-mode=importlib"
+markers = [
+    "game: reads the game files (gta-sa-clean / original install), read-only",
+    "viewer: needs the Ariane viewer",
+    "blender: needs Blender",
+    "engine: needs the MTA fork / build tools",
+    "slow: takes more than a few seconds",
+    "e2e: end-to-end scenario across packages",
+]

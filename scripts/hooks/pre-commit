@@ -1,0 +1,6 @@
+#!/bin/sh
+# satk pre-commit hook: refuse to commit game assets, images outside docs/img and
+# reference code (satk dev assetguard --staged). Installed by scripts/bootstrap.ps1 via
+# "git config core.hooksPath scripts/hooks". Bypassing it (--no-verify) is not allowed.
+root=$(git rev-parse --show-toplevel) || exit 1
+exec sh "$root/satk.sh" dev assetguard --staged --table

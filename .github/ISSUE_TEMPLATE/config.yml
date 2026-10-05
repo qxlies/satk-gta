@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/qxlies/satk-gta/security/advisories/new
+    about: Report vulnerabilities privately as a security advisory, never in a public issue.
+  - name: Documentation
+    url: https://github.com/qxlies/satk-gta/blob/main/docs/en/README.md
+    about: Install guide, quickstart, troubleshooting and the page of every command.

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/raycast.json",
+  "title": "raycast",
+  "x-saap": {
+    "method": "raycast",
+    "capability": "pick",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "$ref": "common.json#/$defs/Vec3"
+        },
+        "to": {
+          "$ref": "common.json#/$defs/Vec3"
+        },
+        "mode": {
+          "enum": [
+            "visible",
+            "collision"
+          ]
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ]
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "hit": {
+          "type": "boolean"
+        },
+        "pos": {
+          "$ref": "common.json#/$defs/Vec3"
+        },
+        "normal": {
+          "$ref": "common.json#/$defs/Vec3"
+        },
+        "dist": {
+          "type": "number",
+          "minimum": 0
+        },
+        "entity": {
+          "$ref": "common.json#/$defs/EntityRef"
+        }
+      },
+      "required": [
+        "hit"
+      ]
+    }
+  }
+}

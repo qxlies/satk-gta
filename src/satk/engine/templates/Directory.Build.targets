@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  satk (WP-11, SPEC 4.12.2): build shims for the MTA fork in {{WORKSPACE}}\engine\mtasa.
+
+  MSBuild imports the nearest Directory.Build.targets found walking up from each project
+  (Build\*.vcxproj -> mtasa\ -> engine\). This file lives OUTSIDE the fork repository on
+  purpose: upstream has no Directory.Build.* files, and the fork stays byte-identical to
+  upstream here. It applies only to projects under engine\mtasa\ (not to viewer\ or other trees).
+
+  1. afxres.h shim: the client .rc files include MFC's afxres.h; shims\afxres.h maps it to
+     winres.h from the Windows SDK, so the VS ATLMFC component is not needed (spike S5).
+
+  Opt out for one build: msbuild ... -p:SatkNoShims=true
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <SatkEngineRoot>$(MSBuildThisFileDirectory)</SatkEngineRoot>
+    <SatkShimDir>$(MSBuildThisFileDirectory)shims</SatkShimDir>
+    <SatkForkRoot>$(MSBuildThisFileDirectory)mtasa\</SatkForkRoot>
+    <SatkIsFork Condition="'$(SatkNoShims)' != 'true' and $([System.String]::Copy('$(MSBuildProjectDirectory)\').StartsWith('$(SatkForkRoot)', System.StringComparison.OrdinalIgnoreCase))">true</SatkIsFork>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup Condition="'$(SatkIsFork)' == 'true'">
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(SatkShimDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
+
+  <!-- Diagnostic: msbuild <proj> -t:SatkShimInfo -->
+  <Target Name="SatkShimInfo">
+    <Message Importance="high" Text="satk shims: project=$(MSBuildProjectDirectory) fork=$(SatkForkRoot) active=$(SatkIsFork) dir=$(SatkShimDir)" />
+  </Target>
+</Project>

@@ -1,0 +1,63 @@
+# CI: the checks of "satk dev gate --quick" that need no game, viewer, Blender or build tools.
+# The full gate (game-data tests, a vanilla index build with golden numbers) runs on a machine with the game.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (Windows, Python 3.12)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      PYTHONPATH: src
+      PYTHONUTF8: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.lock
+
+      # Like a development checkout: a .venv in the checkout (the satk.cmd shim and "satk mcp config" use it).
+      - name: Create .venv
+        run: |
+          python -m venv .venv
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Add-Content -Path $env:GITHUB_PATH -Value "$PWD\.venv\Scripts"
+
+      - name: Install the pinned dependencies
+        run: python -m pip install -r requirements.lock
+
+      - name: Tests (no game, viewer, Blender or engine)
+        run: python -m pytest -q -p no:cacheprovider -m "not game and not viewer and not blender and not engine and not live"
+
+      - name: Assetguard (no game assets in the repository)
+        run: python -m satk dev assetguard --all
+
+      - name: Generated docs are current
+        run: python -m satk dev gen-docs --check
+
+      - name: MCP self-test
+        run: python -m satk mcp selftest

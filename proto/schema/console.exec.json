@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/console.exec.json",
+  "title": "console.exec",
+  "x-saap": {
+    "method": "console.exec",
+    "capability": "console",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "line": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      },
+      "required": [
+        "line"
+      ]
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "output": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "accepted"
+      ]
+    }
+  }
+}

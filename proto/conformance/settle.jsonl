@@ -1,0 +1,2 @@
+{"id":"world.settle","caps":["world.settle"],"steps":[{"call":"world.settle","params":{"max_frames":120,"quiet_frames":2},"expect":{"ok":true,"result":{"settled":{"$type":"boolean"},"frames":{"$gte":0},"pending":{"$gte":0}}}}]}
+{"id":"camera.set.stream_settle","caps":["camera","world.settle"],"steps":[{"call":"camera.set","params":{"pose":{"pos":[2489.3,-1720.0,60.0],"look":[2489.3,-1668.5,12.3]},"stream":"settle"},"expect":{"ok":true,"result":{"settled":{"$type":"boolean"}}}}]}

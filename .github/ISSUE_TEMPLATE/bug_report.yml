@@ -1,0 +1,97 @@
+name: Bug report
+description: Something in satk does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        **Do not attach game files**: no `.img`, `.dff`, `.txd`, `.col`, `.ifp`, `gta_sa.exe`, textures or
+        screenshots of game assets, and no copyrighted mods. If a public mod triggers the bug, link to it.
+
+        A security problem? Report it privately instead (the **Security** tab, **Report a vulnerability**).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands (or MCP tool calls) and their output. Shorten long output.
+      placeholder: |
+        1. satk index build
+        2. satk asset find infernus
+        3. ...
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: bug-report
+    attributes:
+      label: Output of satk bug-report
+      description: |
+        Run `satk bug-report --what "<one line about the problem>"` and paste the report it shows. It hides paths,
+        user and host names and tokens and contains no game files, but read it before you post it.
+      render: markdown
+    validations:
+      required: true
+  - type: input
+    id: satk-version
+    attributes:
+      label: satk version
+      description: The `satk` and `python` fields of `satk version`.
+      placeholder: "satk 0.2.1, python 3.12.10"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Windows 11 24H2, 64-bit"
+    validations:
+      required: true
+  - type: input
+    id: game-version
+    attributes:
+      label: Game version
+      description: |
+        The `exe`, `variant` and `layout` fields of `satk game info`. You do not need to paste its list of
+        non-stock files.
+      placeholder: "exe: hoodlum-stock, variant: 1.0 US HOODLUM, layout: 1.0us"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How satk is installed
+      options:
+        - portable zip
+        - git checkout
+        - Python package (pip or pipx)
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: Used through
+      description: Where the problem shows up.
+      multiple: true
+      options:
+        - terminal (satk command)
+        - MCP server with an AI client
+        - offline catalog page
+        - Blender add-on
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I did not attach or paste game files, mod files or pictures of game assets.
+          required: true
+        - label: I searched the existing issues and the troubleshooting page (docs/en/troubleshooting.md).
+          required: true

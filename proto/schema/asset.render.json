@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/asset.render.json",
+  "title": "asset.render",
+  "x-saap": {
+    "method": "asset.render",
+    "capability": "asset.render",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "minLength": 1
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "el": {
+          "type": "number",
+          "minimum": -89,
+          "maximum": 89
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 2048
+        },
+        "bg": {
+          "type": "string",
+          "pattern": "^(transparent|#[0-9a-fA-F]{6})$"
+        },
+        "path_prefix": {
+          "$ref": "common.json#/$defs/Path"
+        }
+      },
+      "required": [
+        "model",
+        "path_prefix"
+      ]
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "common.json#/$defs/Path"
+          },
+          "minItems": 1
+        },
+        "stats": {
+          "type": "object",
+          "properties": {
+            "tris": {
+              "type": "integer"
+            },
+            "tex_missing": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "required": [
+        "files"
+      ]
+    }
+  }
+}

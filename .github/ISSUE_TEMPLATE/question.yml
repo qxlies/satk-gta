@@ -1,0 +1,29 @@
+name: Question
+description: Ask how to do something with satk.
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before asking, try `satk help` (the main tasks) or `satk help <command>`, and the guides in `docs/en/`:
+        the quickstart, the troubleshooting page and the page of each command.
+        Please do not attach game files or copyrighted mods.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What do you want to do?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried
+      description: Commands you ran and what they printed, or the page of the docs you followed.
+      render: text
+  - type: input
+    id: satk-version
+    attributes:
+      label: satk version
+      description: The `satk` and `python` fields of `satk version`, if satk is installed.
+      placeholder: "satk 0.2.1, python 3.12.10"

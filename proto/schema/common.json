@@ -1,0 +1,359 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/common.json",
+  "title": "SAAP/1 common types",
+  "$defs": {
+    "Vec3": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "[x, y, z] world units (m), Z up"
+    },
+    "Quat": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 4,
+      "maxItems": 4,
+      "description": "[x, y, z, w]"
+    },
+    "Fov": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 180,
+      "description": "horizontal field of view in degrees"
+    },
+    "Pose": {
+      "type": "object",
+      "description": "camera pose: {pos, look} or {pos, ypr}; optional fov_h_deg",
+      "properties": {
+        "pos": {
+          "$ref": "common.json#/$defs/Vec3"
+        },
+        "look": {
+          "$ref": "common.json#/$defs/Vec3"
+        },
+        "ypr": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "[yaw, pitch, roll] degrees; yaw 0 = +Y, CCW"
+        },
+        "fov_h_deg": {
+          "$ref": "common.json#/$defs/Fov"
+        }
+      },
+      "required": [
+        "pos"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "look"
+          ]
+        },
+        {
+          "required": [
+            "ypr"
+          ]
+        }
+      ]
+    },
+    "Time": {
+      "type": "string",
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "Env": {
+      "type": "object",
+      "properties": {
+        "time": {
+          "$ref": "common.json#/$defs/Time"
+        },
+        "weather": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "weather_b": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "blend": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "freeze": {
+          "type": "boolean"
+        }
+      }
+    },
+    "EntityKind": {
+      "enum": [
+        "building",
+        "object",
+        "dummy",
+        "vehicle",
+        "ped",
+        "player",
+        "marker"
+      ]
+    },
+    "Src": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "ipl_text"
+            },
+            "file": {
+              "type": "string",
+              "minLength": 1
+            },
+            "idx": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "kind",
+            "file",
+            "idx"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "ipl_bin"
+            },
+            "ipl": {
+              "type": "string",
+              "minLength": 1
+            },
+            "idx": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "kind",
+            "ipl",
+            "idx"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "model_pos"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "runtime"
+            },
+            "type": {
+              "type": "string",
+              "minLength": 1
+            },
+            "id": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "type",
+            "id"
+          ]
+        }
+      ]
+    },
+    "Sid": {
+      "type": "string",
+      "pattern": "^[a-z]+:.+$"
+    },
+    "EntityRef": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "kind": {
+          "$ref": "common.json#/$defs/EntityKind"
+        },
+        "model_id": {
+          "type": "integer"
+        },
+        "model_name": {
+          "type": "string"
+        },
+        "pos": {
+          "$ref": "common.json#/$defs/Vec3"
+        },
+        "rot": {
+          "type": "object",
+          "properties": {
+            "q_world": {
+              "$ref": "common.json#/$defs/Quat"
+            }
+          }
+        },
+        "area": {
+          "type": "integer"
+        },
+        "lod": {
+          "type": "boolean"
+        },
+        "subject": {
+          "$ref": "common.json#/$defs/Sid"
+        },
+        "src": {
+          "$ref": "common.json#/$defs/Src"
+        }
+      },
+      "required": [
+        "ref"
+      ]
+    },
+    "Path": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 1024
+    },
+    "Capability": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+    },
+    "Rev": {
+      "type": "object",
+      "properties": {
+        "scene": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "camera": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "Settle": {
+      "type": "object",
+      "properties": {
+        "max_frames": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200
+        },
+        "quiet_frames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        }
+      }
+    },
+    "ErrorCode": {
+      "enum": [
+        "AUTH",
+        "PROTOCOL",
+        "UNKNOWN_METHOD",
+        "BAD_PARAMS",
+        "UNSUPPORTED",
+        "NOT_READY",
+        "BUSY",
+        "TIMEOUT",
+        "NOT_FOUND",
+        "REVISION",
+        "INTERNAL"
+      ]
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "$ref": "common.json#/$defs/ErrorCode"
+        },
+        "message": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "data": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ]
+    },
+    "Meta": {
+      "type": "object",
+      "properties": {
+        "frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rev": {
+          "$ref": "common.json#/$defs/Rev"
+        },
+        "ms": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "Hit": {
+      "type": "object",
+      "properties": {
+        "px": {
+          "type": "number"
+        },
+        "py": {
+          "type": "number"
+        },
+        "hit": {
+          "type": "boolean"
+        },
+        "pos": {
+          "$ref": "common.json#/$defs/Vec3"
+        },
+        "normal": {
+          "$ref": "common.json#/$defs/Vec3"
+        },
+        "dist": {
+          "type": "number",
+          "minimum": 0
+        },
+        "entity": {
+          "$ref": "common.json#/$defs/EntityRef"
+        }
+      },
+      "required": [
+        "hit"
+      ]
+    }
+  }
+}

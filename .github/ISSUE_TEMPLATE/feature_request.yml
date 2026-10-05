@@ -1,0 +1,56 @@
+name: Feature request
+description: Suggest a new command, format, check or improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Describe the problem first: a good problem statement helps more than a finished design.
+        Please do not attach game files or copyrighted mods; describe them or link to public pages instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what makes it hard today?
+      placeholder: "When I make a vehicle mod I cannot tell which ... "
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What satk could do. A command line or an example of the output is welcome.
+      placeholder: "satk ... --..."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Workarounds or other tools you tried.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - game copy and setup (game, init, doctor)
+        - file formats (IMG, DFF, TXD, COL, IPL, IDE, IFP, DAT)
+        - index and search (index, asset, world)
+        - images and models (texture, map image, model)
+        - building mods (texture pack, rw, col, img)
+        - mod checks (lint, mod, id)
+        - maps and paths (map convert, ipl, paths)
+        - crashes and reverse engineering (crash, re, kb)
+        - viewer and Blender
+        - MCP server and AI clients
+        - documentation
+        - other
+    validations:
+      required: true
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I would like to work on this myself (see CONTRIBUTING.md).

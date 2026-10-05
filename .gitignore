@@ -1,0 +1,40 @@
+# satk. Game assets and generated data never go into git (see also
+# scripts/hooks/pre-commit -> satk dev assetguard).
+
+# Python / tooling
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# local configuration (satk.toml.example is committed)
+satk.toml
+
+# generated data
+work/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.log
+
+# game assets (never commit)
+*.img
+*.dff
+*.txd
+*.col
+*.ifp
+*.scm
+*.gxt
+
+# images: only docs/img/ may hold pictures
+*.png
+*.jpg
+*.jpeg
+!docs/img/**/*.png
+!docs/img/**/*.jpg
+!docs/img/**/*.jpeg

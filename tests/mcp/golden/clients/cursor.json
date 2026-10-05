@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "satk": {
+      "command": "<ROOT>/co/.venv/Scripts/python.exe",
+      "args": [
+        "-X",
+        "utf8",
+        "-m",
+        "satk.mcp"
+      ],
+      "env": {
+        "PYTHONUTF8": "1",
+        "PYTHONPATH": "<ROOT>/co/src",
+        "SATK_HOME": "<ROOT>/ws",
+        "SATK_MCP_GROUPS": "core,index,media",
+        "OTEL_SDK_DISABLED": "true"
+      }
+    }
+  }
+}

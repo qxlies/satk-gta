@@ -1,0 +1,10 @@
+{"id":"auth.bad_token","caps":["core"],"transport":"saap","hello":false,"doc":"wrong token -> AUTH and the connection is closed","steps":[{"call":"hello","params":{"token":"${bad_token}","client":{"name":"conformance"}},"expect":{"ok":false,"error":"AUTH","disconnect":true}}]}
+{"id":"auth.short_token","caps":["core"],"transport":"saap","hello":false,"doc":"token of a bad shape -> AUTH","steps":[{"call":"hello","invalid":true,"params":{"token":"short","client":{"name":"conformance"}},"expect":{"ok":false,"error":"AUTH","disconnect":true}}]}
+{"id":"auth.no_hello","caps":["core"],"transport":"saap","hello":false,"doc":"first request is not hello -> AUTH","steps":[{"call":"ping","expect":{"ok":false,"error":"AUTH","disconnect":true}}]}
+{"id":"proto.oversize","caps":["core"],"transport":"saap","doc":"frame above 1 MiB -> PROTOCOL and disconnect (payload is not read)","steps":[{"raw":{"length":1048577,"body":""},"expect":{"ok":false,"error":"PROTOCOL","disconnect":true}}]}
+{"id":"proto.oversize_body","caps":["core"],"transport":"saap","doc":"a whole frame above 1 MiB (header + body) -> the client still reads PROTOCOL, then the connection is closed (no reset)","steps":[{"raw":{"length":1048577,"body":"","fill":1048577},"expect":{"ok":false,"error":"PROTOCOL","disconnect":true}}]}
+{"id":"proto.zero_length","caps":["core"],"transport":"saap","steps":[{"raw":{"length":0,"body":""},"expect":{"ok":false,"error":"PROTOCOL","disconnect":true}}]}
+{"id":"proto.bad_json","caps":["core"],"transport":"saap","steps":[{"raw":{"length":5,"body":"{bad}"},"expect":{"ok":false,"error":"PROTOCOL","disconnect":true}}]}
+{"id":"proto.not_object","caps":["core"],"transport":"saap","steps":[{"raw":{"length":5,"body":"[1,2]"},"expect":{"ok":false,"error":"PROTOCOL","disconnect":true}}]}
+{"id":"proto.wrong_version","caps":["core"],"transport":"saap","steps":[{"send":{"saap":2,"id":"v2","method":"ping"},"expect":{"ok":false,"error":"PROTOCOL","disconnect":true}}]}
+{"id":"proto.missing_method","caps":["core"],"transport":"saap","steps":[{"send":{"saap":1,"id":"m1"},"expect":{"ok":false,"error":"PROTOCOL","disconnect":true}}]}

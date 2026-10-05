@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/world.settle.json",
+  "title": "world.settle",
+  "x-saap": {
+    "method": "world.settle",
+    "capability": "world.settle",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "max_frames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1200
+        },
+        "quiet_frames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60000
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "settled": {
+          "type": "boolean"
+        },
+        "frames": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "settled",
+        "frames",
+        "pending"
+      ]
+    }
+  }
+}

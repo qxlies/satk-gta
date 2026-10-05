@@ -1,0 +1,5 @@
+{"id":"core.hello","caps":["core"],"hello":false,"doc":"hello authenticates and lists caps","steps":[{"call":"hello","params":{"token":"${token}","client":{"name":"conformance","version":"1"}},"expect":{"ok":true,"result":{"saap":1,"caps":{"$contains":"core"},"role":{"$type":"string"},"impl":{"$type":"string"}}}}]}
+{"id":"core.hello.twice","caps":["core"],"doc":"a second hello on the same connection is allowed","steps":[{"call":"hello","params":{"token":"${token}","client":{"name":"conformance"}},"expect":{"ok":true,"result":{"saap":1}}}]}
+{"id":"core.ping","caps":["core"],"steps":[{"call":"ping","expect":{"ok":true,"result":{"t_ms":{"$type":"number"}}}}]}
+{"id":"core.status","caps":["core"],"steps":[{"call":"status","expect":{"ok":true,"result":{"frame":{"$type":"integer"},"rev":{"camera":{"$type":"integer"}}}}}]}
+{"id":"core.unknown_method","caps":["core"],"doc":"unknown method keeps the connection","steps":[{"call":"bogus.method","params":{},"expect":{"ok":false,"error":"UNKNOWN_METHOD"}},{"call":"ping","expect":{"ok":true}}]}

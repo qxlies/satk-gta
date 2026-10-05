@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/view.set.json",
+  "title": "view.set",
+  "x-saap": {
+    "method": "view.set",
+    "capability": "view",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "overlays": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "lod_mode": {
+          "enum": [
+            "normal",
+            "hd",
+            "lod"
+          ]
+        },
+        "draw_dist_mul": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 10
+        },
+        "area": {
+          "type": "integer",
+          "minimum": -1
+        },
+        "hide": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "highlight": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "wireframe": {
+          "type": "boolean"
+        },
+        "postfx": {
+          "type": "boolean"
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "applied": {
+          "type": "object",
+          "properties": {
+            "overlays": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "lod_mode": {
+              "enum": [
+                "normal",
+                "hd",
+                "lod"
+              ]
+            },
+            "draw_dist_mul": {
+              "type": "number"
+            },
+            "area": {
+              "type": "integer"
+            },
+            "hide": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "highlight": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "wireframe": {
+              "type": "boolean"
+            },
+            "postfx": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "required": [
+        "applied"
+      ]
+    }
+  }
+}

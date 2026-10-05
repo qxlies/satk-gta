@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/mem.read.json",
+  "title": "mem.read",
+  "x-saap": {
+    "method": "mem.read",
+    "capability": "mem.read",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "addr": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{1,16}$"
+            }
+          ]
+        },
+        "len": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        }
+      },
+      "required": [
+        "addr",
+        "len"
+      ]
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "hex": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{2})*$"
+        }
+      },
+      "required": [
+        "hex"
+      ]
+    }
+  }
+}

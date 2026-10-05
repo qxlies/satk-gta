@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/log.poll.json",
+  "title": "log.poll",
+  "x-saap": {
+    "method": "log.poll",
+    "capability": "log",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "streams": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "console",
+              "script",
+              "server",
+              "debug"
+            ]
+          }
+        },
+        "since": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "min_level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "seq": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "t": {
+                "type": "number"
+              },
+              "stream": {
+                "type": "string"
+              },
+              "level": {
+                "enum": [
+                  "debug",
+                  "info",
+                  "warn",
+                  "error"
+                ]
+              },
+              "msg": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              },
+              "line": {
+                "type": "integer"
+              },
+              "resource": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "seq",
+              "t",
+              "stream",
+              "level",
+              "msg"
+            ]
+          }
+        },
+        "next_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dropped": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "items",
+        "next_seq",
+        "dropped"
+      ]
+    }
+  }
+}

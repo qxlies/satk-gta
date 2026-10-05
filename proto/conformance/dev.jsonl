@@ -1,0 +1,5 @@
+{"id":"log.poll","caps":["log"],"steps":[{"call":"log.poll","params":{"since":0,"max":10},"expect":{"ok":true,"result":{"items":{"$type":"array"},"next_seq":{"$gte":0},"dropped":{"$gte":0}}}}]}
+{"id":"console.exec","caps":["console"],"steps":[{"call":"console.exec","params":{"line":"help"},"expect":{"ok":true,"result":{"accepted":{"$type":"boolean"}}}}]}
+{"id":"lua.exec","caps":["lua"],"steps":[{"call":"lua.exec","params":{"code":"return 1 + 2"},"expect":{"ok":true,"result":{"values":[3]}}}]}
+{"id":"mem.read.pe","caps":["mem.read"],"doc":"gta_sa.exe is mapped at 0x400000 (MZ)","steps":[{"call":"mem.read","params":{"addr":"0x400000","len":2},"expect":{"ok":true,"result":{"hex":"4d5a"}}}]}
+{"id":"mem.read.bad_params","caps":["mem.read"],"steps":[{"call":"mem.read","invalid":true,"params":{"addr":"0x400000","len":5000},"expect":{"ok":false,"error":"BAD_PARAMS"}}]}

@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/hello.json",
+  "title": "hello",
+  "x-saap": {
+    "method": "hello",
+    "capability": "core",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "minLength": 32,
+          "maxLength": 256,
+          "pattern": "^[^\\r\\n]*$"
+        },
+        "client": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        },
+        "want_caps": {
+          "type": "array",
+          "items": {
+            "$ref": "common.json#/$defs/Capability"
+          }
+        }
+      },
+      "required": [
+        "token",
+        "client"
+      ]
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "saap": {
+          "const": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "impl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "impl_version": {
+          "type": "string"
+        },
+        "build": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "git": {
+              "type": "string"
+            }
+          }
+        },
+        "caps": {
+          "type": "array",
+          "items": {
+            "$ref": "common.json#/$defs/Capability"
+          },
+          "minItems": 1
+        },
+        "game": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "string"
+            },
+            "root": {
+              "type": "string"
+            },
+            "exe_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "world": {
+          "type": "object",
+          "properties": {
+            "units": {
+              "const": "m"
+            },
+            "up": {
+              "const": "z"
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "max_request": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_response": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "viewport": {
+          "type": "object",
+          "properties": {
+            "w": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "h": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      },
+      "required": [
+        "saap",
+        "role",
+        "impl",
+        "caps"
+      ]
+    }
+  }
+}

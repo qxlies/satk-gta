@@ -1,0 +1,12 @@
+{
+  "_doc": "Expanded source/EXE start set at the source revisions in tests/golden/re.json. The legacy prototype metrics stay unchanged; this supplements the older golden with 16-aligned RH_Scoped*Install entries and all non-padding HOODLUM jumps. Unaligned source call-site hooks are excluded. No Ghidra input.",
+  "exact": {
+    "named_starts": 9868,
+    "named_starts_by_origin": {"hooks_json": 8025, "plugin_sdk": 1631, "gta_reversed": 212},
+    "starts_total": 20824,
+    "starts_by_origin": {"call_target": 2042, "data_ptr": 4101, "padding": 3988, "vtable": 817},
+    "thunk_scan_starts": 8,
+    "source_hook_interior_sites": 2,
+    "thunk": {"hoodlum": 500, "other_jmp": 195, "seh_push_jmp": 87}
+  }
+}

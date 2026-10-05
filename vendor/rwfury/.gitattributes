@@ -1,0 +1,2 @@
+# Vendored third-party code: keep the upstream bytes exactly (CRLF as in the sdist).
+* -text

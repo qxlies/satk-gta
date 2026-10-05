@@ -1,0 +1,20 @@
+{
+  "gta-sa-10us": {
+    "file": "gta-sa-10us-en.txt",
+    "game": "GTA San Andreas 1.0 US",
+    "lang": "en",
+    "list_date": "2026-10-02",
+    "entries_error": 335,
+    "url": "https://github.com/JuniorDjjr/CrashInfo/blob/440f9a516b5726d89f7c2e30093f93bf6d56fae6/Lists/GTA-SA-10US/EN-CrashList.txt",
+    "repository": "https://github.com/JuniorDjjr/CrashInfo",
+    "path": "Lists/GTA-SA-10US/EN-CrashList.txt",
+    "revision": "440f9a516b5726d89f7c2e30093f93bf6d56fae6",
+    "revision_date": "2026-10-03",
+    "fetched": "2026-10-05",
+    "sha256": "5461f5e54eb1fa145ba8664addf3bb448b6242945e88211abbe968f9e85b99be",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2021 Valdir da Costa Júnior",
+    "notice": "notices/crashinfo.txt",
+    "changes": "none: the file is stored byte for byte; satk parses it at run time"
+  }
+}

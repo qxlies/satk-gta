@@ -1,0 +1,4 @@
+# satk dev assetguard allowlist: synthetic fixtures that intentionally look like game assets.
+# Format: <sha256> <repo-relative path>. Honored for --staged/--all (the pre-commit hook);
+# an explicit file list is checked strictly. Never add real game files here.
+ee18455e22ae9af33e2db08229c349388ed26861a1a1a771696045235869e70d tests/core/data/fake_rw.bin

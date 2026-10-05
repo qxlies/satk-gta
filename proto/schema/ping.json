@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/ping.json",
+  "title": "ping",
+  "x-saap": {
+    "method": "ping",
+    "capability": "core",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object"
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "t_ms": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "t_ms"
+      ]
+    }
+  }
+}

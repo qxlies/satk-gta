@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/capture.json",
+  "title": "capture",
+  "x-saap": {
+    "method": "capture",
+    "capability": "capture",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "path_prefix": {
+          "$ref": "common.json#/$defs/Path"
+        },
+        "w": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 7680
+        },
+        "h": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 4320
+        },
+        "pose": {
+          "$ref": "common.json#/$defs/Pose"
+        },
+        "env": {
+          "$ref": "common.json#/$defs/Env"
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "maxItems": 8
+        },
+        "settle": {
+          "$ref": "common.json#/$defs/Settle"
+        },
+        "hide": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "hud",
+              "gui",
+              "chat",
+              "overlays"
+            ]
+          }
+        },
+        "format": {
+          "enum": [
+            "png"
+          ]
+        }
+      },
+      "required": [
+        "path_prefix"
+      ]
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "object",
+          "properties": {
+            "color": {
+              "$ref": "common.json#/$defs/Path"
+            },
+            "ids": {
+              "$ref": "common.json#/$defs/Path"
+            },
+            "depth": {
+              "$ref": "common.json#/$defs/Path"
+            }
+          },
+          "required": [
+            "color"
+          ]
+        },
+        "ids_legend": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "entity": {
+                "$ref": "common.json#/$defs/EntityRef"
+              },
+              "px": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "id",
+              "entity",
+              "px"
+            ]
+          }
+        },
+        "w": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "h": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pose": {
+          "$ref": "common.json#/$defs/Pose"
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "settled": {
+          "type": "boolean"
+        },
+        "pending": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "frames_waited": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "files",
+        "w",
+        "h",
+        "pose",
+        "settled"
+      ]
+    }
+  }
+}

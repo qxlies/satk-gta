@@ -1,0 +1,347 @@
+{
+ "profile": "vanilla",
+ "_comment": {
+  "source": "the stock 1.0 US copy (profile vanilla = <workspace>/gta-sa-clean), checked by `satk index verify`",
+  "definitions": {
+   "img.archives": "registered IMG archives (source.kind='img' with load_order)",
+   "img.entries[.<stem>]": "IMG directory entries (blobs of kind img sources), total and per archive stem",
+   "img.<stem>.<ext>": "entries of one archive by extension",
+   "img.size_in_archive_nonzero": "VER2 entries with SizeInArchive != 0",
+   "loose.<ext> / loose.total": "loose assets under models/ and anim/ (blob.ns='loose')",
+   "blobs": "all blobs = IMG entries + loose files",
+   "txd.files": "parsed TXD blobs (all versions, shadowed included)",
+   "tex.total / tex.src.<stem> / tex.fmt.<fmt> / tex.d3d8": "texture rows by source archive (loose = 'loose'), D3D format, platform 8",
+   "tex.unique_names / tex.unique_hashes": "distinct lower(texture.name) / distinct pixel hashes (image rows)",
+   "dff.files / dff.src.<stem> / dff.clumps / dff.atomics / dff.rw_0x35000": "parsed DFF blobs and their clump/atomic sums",
+   "geo.main.*": "geometries of DFFs in gta3.img + gta_int.img: count, vertices, tristrip meshes, triangles after strip expansion",
+   "ide.*": "loaded IDE files, definitions per section, txdp pairs, IDE 2dfx lines, max model ID, IDs defined more than once",
+   "ipl.*": "loaded text IPLs (+inst), binary IPLs of active blobs (+inst), LOD links (lod_idx >= 0) and unresolved ones, bnry without a text parent",
+   "col.files / col.models / col.v<N>": ".col blobs and their collision models by version (embedded DFF collisions excluded)",
+   "ifp.files / ifp.anims": "IFP blobs and animations",
+   "texref.unresolved_main": "report 14 sec. 5.5: distinct (model, material texture name) of active models whose DFF is in gta3.img/gta_int.img and whose texture is in neither the model's own TXD (by name, active blob) nor - for 'cars' - in 'vehicle'",
+   "texref.unresolved_all": "the same over every DFF of the main streaming namespace (gta3, gta_int, cutscene ...) plus textured materials whose texture name is EMPTY (counted by report 14's SQL variant; 5 in vanilla, all in gta_int; cutscene.img adds 0)",
+   "texref.missing_main / texref.missing_all": "engine-faithful model_tex rows with via='missing' (own TXD -> txdp parents -> 'vehicle' parent of every car TXD, also for tuning parts)",
+   "shadow.gta_int.txd": "TXD entries of gta_int.img shadowed by gta3.img ('first registered archive wins')",
+   "q.*": "query checks: textures named ws_rooftarmac1, DFFs referencing it, placements with centre in the Grove box",
+   "water.* / water1.polys": "schema v3: data/water.dat polygons (quads, triangles, flags 1 visible / 2 shallow); data/water1.dat polygons (configuration 1)",
+   "tcyc.*": "schema v3: data/timecyc.dat rows (weather x hour), distinct weathers and hours, lines the engine reads short (the rest repeats the previous line)",
+   "handling.<kind> / handling.cars_linked / handling.unused": "schema v3: data/handling.cfg records per type (car, bike '!', boat '%', flying '$'); active 'cars' definitions whose handling id has a car record; car records no definition uses",
+   "carcol.*": "schema v3: data/carcols.dat palette entries, models with colours, variations, 'car4' models, variations naming a colour outside the palette, colour models without an active definition",
+   "ped_rel.*": "schema v3: data/ped.dat acquaintance pairs (pedtype, rel, other) and ped types with any",
+   "object.*": "schema v3: data/object.dat lines, lines before the '*' terminator (loaded), loaded names that are active model names",
+   "view.*": "schema v3: rows of the views v_vehicle (active cars) and v_ped (active peds)"
+  },
+  "dff.atomics": "19 556 = sum of the clump Struct numAtomics = number of Atomic chunks. SPEC A.1 says 46 108: the report-14 prototype summed EVERY clump-level Struct, i.e. also the frame-index Struct in front of each Light chunk (cj_bag_reclaim.dff: 1 atomic + lights 1..10 -> 56). Corrected here.",
+  "texref": "unresolved_main (462) and unresolved_all (467) follow report 14 sec. 5.5 exactly: own TXD by name + 'vehicle' for cars, no txdp. The +5 of unresolved_all are 5 gta_int DFFs with a textured material whose texture name is EMPTY (cj_aircon2, cj_skate_wall1/2, sfmansionbits, whorefurn), which report 14's SQL variant counted; cutscene.img adds 0 (SPEC attributed the 5 to cutscene). The engine-faithful model_tex (the 'vehicle' parent of a car TXD also serves the tuning parts that share it, plus txdp parents) leaves 331 missing (metric texref.missing_main).",
+  "schema_v3": "schema v3 (M2-10): exe-loaded data files. water.dat 301 quads + 6 triangles (305 visible, 21 shallow), water1.dat 267; timecyc.dat 23 weathers x 8 hours = 184 rows, line 320 (RAINY_COUNTRYSIDE 8 PM) starts with a lone 255 so the engine reads 20 shifted values and repeats 7 PM for the rest (tcyc.short_lines 1); handling.cfg 210 standard + 13 bike + 12 boat + 24 flying records, all 212 'cars' definitions find their handling id, 6 car records are unused; carcols.dat palette 0..126 (line 127 '77.93,96' read as 77,93,96), 199 models, 1157 variations, 3 'car4' models, moonbeam names colour 227 (outside the palette); ped.dat 113 acquaintance pairs of 17 ped types (a second 'Respect' line replaces the first, as in the engine); object.dat 995 lines, the '*********melee weapons' line stops the engine before the last one (object.loaded 994)."
+ },
+ "metrics": {
+  "img.archives": 8,
+  "img.entries": 21058,
+  "img.entries.gta3": 16316,
+  "img.entries.gta_int": 2484,
+  "img.entries.player": 542,
+  "img.entries.cutscene": 634,
+  "img.entries.anim": 133,
+  "img.entries.cuts": 444,
+  "img.entries.carrec": 426,
+  "img.entries.script": 79,
+  "img.gta3.dff": 12964,
+  "img.gta3.txd": 2759,
+  "img.gta3.col": 216,
+  "img.gta3.ipl": 164,
+  "img.gta3.ifp": 149,
+  "img.gta3.dat": 64,
+  "img.size_in_archive_nonzero": 0,
+  "loose.txd": 63,
+  "loose.dff": 22,
+  "loose.col": 3,
+  "loose.ifp": 1,
+  "loose.total": 89,
+  "blobs": 21147,
+  "txd.files": 4046,
+  "tex.total": 32878,
+  "tex.src.gta3": 26004,
+  "tex.src.gta_int": 5133,
+  "tex.src.cutscene": 635,
+  "tex.src.player": 394,
+  "tex.src.loose": 712,
+  "tex.fmt.DXT1": 29260,
+  "tex.fmt.DXT3": 2265,
+  "tex.fmt.X8R8G8B8": 1061,
+  "tex.fmt.A8R8G8B8": 291,
+  "tex.fmt.PAL8": 1,
+  "tex.fmt.DXT5": 0,
+  "tex.d3d8": 23,
+  "tex.unique_names": 13757,
+  "tex.unique_hashes": 14560,
+  "dff.files": 15356,
+  "dff.src.gta3": 12964,
+  "dff.src.gta_int": 1901,
+  "dff.src.cutscene": 317,
+  "dff.src.player": 152,
+  "dff.src.loose": 22,
+  "dff.clumps": 15660,
+  "dff.atomics": 19556,
+  "dff.rw_0x35000": 16,
+  "geo.main.geoms": 18181,
+  "geo.main.verts": 7897315,
+  "geo.main.tristrip": 17843,
+  "geo.main.tris": 5634843,
+  "ide.files": 57,
+  "ide.defs": 14832,
+  "ide.objs": 14045,
+  "ide.tobj": 160,
+  "ide.anim": 54,
+  "ide.cars": 212,
+  "ide.peds": 276,
+  "ide.weap": 50,
+  "ide.hier": 35,
+  "ide.txdp": 23,
+  "ide.2dfx": 97,
+  "ide.max_id": 18630,
+  "ide.dup_ids": 0,
+  "ipl.text_files": 50,
+  "ipl.text_inst": 9268,
+  "ipl.bin_files": 190,
+  "ipl.bin_inst": 41667,
+  "ipl.inst": 50935,
+  "ipl.lod_links": 6103,
+  "ipl.lod_unresolved": 0,
+  "ipl.bin_orphans": 5,
+  "ipl.bin_orphan_inst": 166,
+  "col.files": 254,
+  "col.models": 10169,
+  "col.v3": 9270,
+  "col.v2": 885,
+  "col.v1": 14,
+  "ifp.files": 436,
+  "ifp.anims": 4484,
+  "texref.unresolved_main": 462,
+  "texref.unresolved_all": 467,
+  "shadow.gta_int.txd": 4,
+  "q.tex_named.ws_rooftarmac1": 257,
+  "q.dff_refs.ws_rooftarmac1": 470,
+  "q.box_center_all": 187,
+  "q.fts.grove.tex": 11,
+  "q.fts.grove.txd": 4,
+  "zone.titled": 378,
+  "q.fts.ganton.zone": 2,
+  "water.polys": 307,
+  "water.quads": 301,
+  "water.tris": 6,
+  "water.visible": 305,
+  "water.shallow": 21,
+  "water1.polys": 267,
+  "tcyc.rows": 184,
+  "tcyc.weathers": 23,
+  "tcyc.hours": 8,
+  "tcyc.short_lines": 1,
+  "handling.car": 210,
+  "handling.bike": 13,
+  "handling.boat": 12,
+  "handling.flying": 24,
+  "handling.cars_linked": 212,
+  "handling.unused": 6,
+  "carcol.palette": 127,
+  "carcol.models": 199,
+  "carcol.sets": 1157,
+  "carcol.car4": 3,
+  "carcol.out_of_palette": 1,
+  "carcol.unmatched": 0,
+  "ped_rel.rows": 113,
+  "ped_rel.pedtypes": 17,
+  "object.rows": 995,
+  "object.loaded": 994,
+  "object.models": 869,
+  "view.v_vehicle": 212,
+  "view.v_ped": 276
+ },
+ "examples": [
+  {
+   "get": "model:411",
+   "expect": {
+    "name": "infernus",
+    "sec": "cars",
+    "links.txd_chain": [
+     "txd:infernus",
+     "txd:vehicle"
+    ],
+    "tex.missing": 0
+   }
+  },
+  {
+   "get": "model:17613",
+   "expect": {
+    "links.dff": "dff:lae2_roads89"
+   }
+  },
+  {
+   "get": "model:300",
+   "expect": {
+    "name": "cutobj01",
+    "sec": "hier"
+   }
+  },
+  {
+   "refs": "model:17613",
+   "rel": "inst",
+   "contains": "inst:lae2_stream0#4"
+  },
+  {
+   "get": "inst:lae2_stream0#4",
+   "expect": {
+    "model": "model:17613",
+    "lod": "inst:lae2#198",
+    "pos": [
+     2489.3,
+     -1668.5,
+     12.3
+    ]
+   }
+  },
+  {
+   "get": "file:models/gta_int.img/lawest1.txd",
+   "expect": {
+    "active": false,
+    "shadowed_by": "file:models/gta3.img/lawest1.txd"
+   }
+  },
+  {
+   "find": "ws_rooftarmac1",
+   "kind": "tex",
+   "total": 257
+  },
+  {
+   "near": {
+    "box": [
+     2445,
+     -1737,
+     2545,
+     -1637
+    ],
+    "match": "center",
+    "lod": "all",
+    "area": null,
+    "limit": 500
+   },
+   "total": 187
+  },
+  {
+   "model_files": 411,
+   "expect": {
+    "dff": "infernus.dff",
+    "txd_chain": [
+     "infernus.txd",
+     "vehicle.txd"
+    ]
+   }
+  },
+  {
+   "match_runtime": [
+    17613,
+    [
+     2489.3,
+     -1668.5,
+     12.3
+    ]
+   ],
+   "expect": [
+    "inst:lae2_stream0#4"
+   ]
+  },
+  {
+   "get": "zone:gan1",
+   "expect": {
+    "title": "Ganton",
+    "label": "GAN"
+   }
+  },
+  {
+   "get": "model:411",
+   "expect": {
+    "handling.mass": 1400.0,
+    "handling.max_vel": 240.0,
+    "links.handling": "handling:infernus",
+    "colors": [
+     [
+      12,
+      1
+     ],
+     [
+      64,
+      1
+     ],
+     [
+      123,
+      1
+     ],
+     [
+      116,
+      1
+     ],
+     [
+      112,
+      1
+     ],
+     [
+      106,
+      1
+     ],
+     [
+      80,
+      1
+     ],
+     [
+      75,
+      1
+     ]
+    ],
+    "color_rgb.1": "#f5f5f5"
+   }
+  },
+  {
+   "get": "handling:infernus",
+   "expect": {
+    "car.max_vel": 240.0,
+    "car.drive": "4",
+    "models": [
+     "model:411"
+    ]
+   }
+  },
+  {
+   "refs": "handling:freiflat",
+   "rel": "models",
+   "contains": "model:590"
+  },
+  {
+   "get": "tcyc:extrasunny_la/12",
+   "expect": {
+    "far_clip": 800.0,
+    "fog_start": 10.0,
+    "sky_top": "#4475d2"
+   }
+  },
+  {
+   "get": "tcyc:rainy_countryside/20",
+   "expect": {
+    "nread": 20,
+    "far_clip": 650.0
+   }
+  },
+  {
+   "get": "water:0",
+   "expect": {
+    "kind": "quad",
+    "flags": 1,
+    "line": 2
+   }
+  },
+  {
+   "find": "infernus",
+   "kind": "handling",
+   "total": 1
+  }
+ ]
+}

@@ -1,0 +1,529 @@
+{
+  "format": "satk.lint-rules/1",
+  "_comment": [
+    "Rules of `satk asset lint` (package satk.lint). The code implements the checks; this file decides",
+    "their severity, thresholds, messages and whether they run. sev: info < warn < error < fatal;",
+    "fatal = the game crashes or cannot load the file, error = it loads but is wrong (missing collision,",
+    "garbage texture, invisible model), warn = works but breaks a budget or a convention, info = advice.",
+    "msg is a str.format template filled with the fields the check passes and the scalar params of the rule.",
+    "ref names the source: gta-reversed = src/gta-reversed/source/game_sa, plugin-sdk = src/plugin-sdk-sa/plugin_sa,",
+    "research NN = docs/research/NN-*.md of the workspace. Defaults ('game' preset) are calibrated on the",
+    "vanilla game: 0 fatal, 0 error except the files the game never loads. 'strict' tightens budgets and",
+    "conventions for new content (research 22 sec. 3). A --config file overrides on top: {\"rules\": {id: {...}}}."
+  ],
+  "classes": {
+    "_comment": "Model class for budgets: IDE section (objs/tobj -> map, or lod when the name contains lod_name or draw > lod_draw), else guessed from the DFF (skin -> peds, embedded COL -> cars).",
+    "lod_name": "lod",
+    "lod_draw": 300.0
+  },
+  "rules": {
+    "img.parse": {
+      "sev": "fatal",
+      "msg": "cannot read the IMG archive: {err}",
+      "what": "unreadable IMG archive (unknown magic, broken directory)",
+      "what_ru": "IMG-архив не читается",
+      "ref": "gta-reversed Directory.h (CDirectory::ReadDirFile)"
+    },
+    "file.name_len": {
+      "sev": "error", "params": {"max": 23},
+      "msg": "file name '{name}' is {n} chars > {max}: it does not fit an IMG directory entry",
+      "what": "IMG entry / mod file name longer than 23 characters (with extension)",
+      "what_ru": "Имя файла (с расширением) длиннее 23 символов: не помещается в запись каталога IMG",
+      "ref": "gta-reversed Directory.h:19 (CDirectory::DirectoryInfo::Name[24], NUL-terminated)"
+    },
+
+    "dff.parse": {
+      "sev": "fatal",
+      "msg": "cannot parse the DFF: {err}",
+      "what": "malformed RenderWare clump",
+      "what_ru": "DFF не разбирается (битый RenderWare-клумп)",
+      "ref": "gta-reversed FileLoader.cpp:150-172 (RpClumpStreamRead in LoadAtomicFile)"
+    },
+    "dff.native": {
+      "sev": "fatal",
+      "msg": "geometry {geom}: native (console) geometry, the PC game cannot read it",
+      "what": "PS2/Xbox native geometry",
+      "what_ru": "Нативная (консольная) геометрия: ПК-версия её не читает",
+      "ref": "RpGeometry format flag rpGEOMETRYNATIVE (0x01000000)"
+    },
+    "dff.verts_max": {
+      "sev": "fatal", "params": {"max": 65535},
+      "msg": "geometry {geom}: {verts} vertices > {max} (16-bit triangle indices)",
+      "what": "more vertices per geometry than 16-bit indices address",
+      "what_ru": "Вершин в геометрии больше, чем адресуют 16-битные индексы",
+      "ref": "plugin-sdk game_sa/rw/rpworld.h:1407-1409 (RpTriangle::vertIndex is RwUInt16)"
+    },
+    "dff.frame_name_len": {
+      "sev": "fatal", "params": {"max": 23},
+      "msg": "frame {frame} name '{name}' is {n} chars > {max}: the node-name reader overflows its 24-byte buffer",
+      "what": "frame (node) name longer than 23 characters",
+      "what_ru": "Имя фрейма длиннее 23 символов: переполнение буфера при чтении",
+      "ref": "gta-reversed Plugins/NodeNamePlugin/NodeName.cpp:5,52-55 (NodeNameStreamRead 0x72FA50 has no bound)"
+    },
+    "dff.no_atomics": {
+      "sev": "error",
+      "msg": "no atomics: nothing to render, the model never finishes loading",
+      "what": "clump without atomics",
+      "what_ru": "В клумпе нет атомиков: модель не загрузится",
+      "ref": "gta-reversed FileLoader.cpp:166-172 (LoadAtomicFile fails when GetRwObject() stays null)"
+    },
+    "dff.embedded_col": {
+      "sev": "warn",
+      "msg": "the embedded collision (0x253F2FA) does not start with COLL/COL2/COL3 (magic {magic}): the collision plugin loads nothing from it",
+      "what": "vehicle DFF whose embedded collision has no COL header",
+      "what_ru": "Встроенная коллизия DFF без заголовка COLL/COL2/COL3",
+      "ref": "gta-reversed Plugins/CollisionPlugin/CollisionPlugin.cpp:36-50 (ClumpCollisionStreamRead 0x41B1D0 switches on the fourcc)"
+    },
+    "dff.empty_geometry": {
+      "sev": "warn",
+      "msg": "geometry {geom}: {verts} vertices, 0 triangles",
+      "what": "geometry without triangles",
+      "what_ru": "Геометрия без треугольников",
+      "ref": "-"
+    },
+    "dff.uv_missing": {
+      "sev": "warn",
+      "msg": "geometry {geom}: textured material(s) {tex} but no UV set (only one texel is used)",
+      "what": "textured material on a geometry without texture coordinates",
+      "what_ru": "У геометрии с текстурой нет UV-координат (берётся один тексель)",
+      "ref": "RpGeometry flags rpGEOMETRYTEXTURED/TEXTURED2; vanilla: 22 geometries, solid-colour textures (white32, black16)"
+    },
+    "dff.uv_sets": {
+      "sev": "info", "params": {"max": 2},
+      "msg": "geometry {geom}: {n} UV sets > {max}",
+      "what": "more UV sets than the SA pipelines use",
+      "what_ru": "UV-наборов больше, чем использует рендер SA",
+      "ref": "research 14 (vanilla: 1-2 UV sets, 3 on three interiors)"
+    },
+    "dff.tex_name_len": {
+      "sev": "error", "params": {"max": 31},
+      "msg": "geometry {geom} material {idx}: texture name '{tex}' is {n} chars > {max}",
+      "what": "material texture name longer than 31 characters",
+      "what_ru": "Имя текстуры материала длиннее 31 символа",
+      "ref": "plugin-sdk game_sa/rw/rwcore.h:2356 (rwTEXTUREBASENAMELENGTH 32)"
+    },
+    "dff.prelight_missing": {
+      "sev": "warn",
+      "msg": "geometry {geom}: neither prelight (day vertex colours) nor normals; a {cls} model renders unlit",
+      "what": "map model with neither prelight nor normals (no static and no dynamic lighting)",
+      "what_ru": "Модель карты без prelight и без нормалей: не освещается никак",
+      "ref": "research 22 sec. 7.1; vanilla: 745 map geometries without prelight have normals, 59 have neither"
+    },
+    "dff.night_missing": {
+      "sev": "info",
+      "msg": "no night vertex colours: the day prelight is used at night too",
+      "what": "map model without night vertex colours",
+      "what_ru": "Модель карты без ночных цветов вершин",
+      "ref": "research 22 sec. 7.1; DFF extension 0x253F2F9"
+    },
+    "dff.prelight_black": {
+      "sev": "info",
+      "msg": "geometry {geom}: prelight is black on all {verts} vertices (a failed bake?)",
+      "what": "prelight that is black everywhere",
+      "what_ru": "Prelight чёрный на всех вершинах (неудачное запекание?)",
+      "ref": "research 22 sec. 7.1 (vanilla: 68 such geometries, mostly decals)"
+    },
+    "dff.normals_missing": {
+      "sev": "warn", "params": {"classes": ["cars", "peds"]},
+      "msg": "geometry {geom}: no normals; {cls} models are lit dynamically",
+      "what": "dynamically lit model (car, ped) without normals",
+      "what_ru": "У динамически освещаемой модели (машина, пед) нет нормалей",
+      "ref": "research 14 (normals: cars and peds)"
+    },
+    "dff.bad_vertex": {
+      "sev": "error",
+      "msg": "geometry {geom}: {what} contain NaN or infinite values",
+      "what": "NaN/inf in vertex positions or normals",
+      "what_ru": "NaN или бесконечность в позициях или нормалях вершин",
+      "ref": "-"
+    },
+    "dff.uv_range": {
+      "sev": "warn", "params": {"max_abs": 256.0},
+      "msg": "geometry {geom}: UV set {set} has {v} (NaN, inf or |uv| > {max_abs}): texture garbage or precision loss",
+      "what": "texture coordinates that are NaN/inf or far from 0..1",
+      "what_ru": "UV-координаты NaN/inf или далеко от 0..1",
+      "ref": "-"
+    },
+    "dff.bounds_size": {
+      "sev": "warn", "params": {"max_radius": 3000.0},
+      "msg": "model radius {r} m > {max_radius} m",
+      "what": "huge model (bounding radius)",
+      "what_ru": "Огромная модель (радиус охвата)",
+      "ref": "-"
+    },
+    "dff.bsphere": {
+      "sev": "warn", "params": {"tol": 0.5},
+      "msg": "geometry {geom}: a vertex lies {d} m outside the stored bounding sphere (the model pops out of view)",
+      "what": "geometry bounding sphere (frustum culling) that does not enclose the vertices",
+      "what_ru": "Сфера геометрии (для отсечения по пирамиде видимости) не охватывает вершины",
+      "ref": "RpMorphTarget boundingSphere; RpAtomic frustum test uses it"
+    },
+    "dff.tris_budget": {
+      "sev": "warn",
+      "params": {"budget": {"map": 12000, "lod": 2500, "cars": 7000, "peds": 3000, "weap": 2000, "other": 20000}},
+      "msg": "{tris} triangles > {limit} (budget of class {cls})",
+      "what": "triangle budget per model class",
+      "what_ru": "Бюджет треугольников по классу модели",
+      "ref": "research 22 sec. 3.1 (vanilla p50/p90/max per class)"
+    },
+    "dff.materials_budget": {
+      "sev": "warn",
+      "params": {"budget": {"map": 64, "lod": 64, "cars": 160, "peds": 8, "weap": 16, "other": 200}},
+      "msg": "{n} materials > {limit} (budget of class {cls})",
+      "what": "material (draw call) budget per model class",
+      "what_ru": "Бюджет материалов (draw call) по классу модели",
+      "ref": "research 22 sec. 3.1"
+    },
+    "dff.rw_version": {
+      "sev": "warn", "params": {"known": ["0x30002", "0x31001", "0x32000", "0x33002", "0x34003", "0x35000", "0x36003"]},
+      "msg": "RenderWare version {ver} is not one GTA SA reads ({known})",
+      "what": "RenderWare stream version newer or older than what SA handles",
+      "what_ru": "Версия RenderWare, которую SA не читает",
+      "ref": "research 14 (RW versions of vanilla files)"
+    },
+
+    "txd.parse": {
+      "sev": "fatal",
+      "msg": "cannot parse the TXD: {err}",
+      "what": "malformed texture dictionary",
+      "what_ru": "TXD не разбирается",
+      "ref": "RwTexDictionaryStreamRead"
+    },
+    "txd.platform": {
+      "sev": "fatal",
+      "msg": "texture '{tex}': platform {platform} native (not PC D3D8/D3D9)",
+      "what": "console texture native",
+      "what_ru": "Консольная текстура (не D3D8/D3D9)",
+      "ref": "research 14 (TextureNative platform 8/9)"
+    },
+    "txd.format": {
+      "sev": "error",
+      "params": {"formats": ["DXT1", "DXT3", "DXT5", "A8R8G8B8", "X8R8G8B8", "R5G6B5", "A1R5G5B5", "X1R5G5B5",
+                             "A4R4G4B4", "R8G8B8", "PAL8", "PAL4", "L8", "A8L8", "A8"]},
+      "msg": "texture '{tex}': format {fmt} is not one the PC game uses",
+      "what": "unusual D3D texture format",
+      "what_ru": "Формат текстуры, который ПК-игра не использует",
+      "ref": "research 22 sec. 3.3 (vanilla formats)"
+    },
+    "txd.name_empty": {
+      "sev": "error",
+      "msg": "texture #{idx}: empty name, no material can reference it",
+      "what": "texture without a name",
+      "what_ru": "Текстура без имени",
+      "ref": "-"
+    },
+    "txd.name_len": {
+      "sev": "error", "params": {"max": 31},
+      "msg": "texture '{tex}': name is {n} chars > {max} (no NUL in name[32])",
+      "what": "texture name longer than 31 characters",
+      "what_ru": "Имя текстуры длиннее 31 символа",
+      "ref": "plugin-sdk game_sa/rw/rwcore.h:2356 (rwTEXTUREBASENAMELENGTH 32)"
+    },
+    "txd.dup_name": {
+      "sev": "warn",
+      "msg": "texture '{tex}' appears {n} times; the game uses one of them",
+      "what": "duplicate texture names in one TXD",
+      "what_ru": "Повторяющиеся имена текстур в одном TXD",
+      "ref": "RwTexDictionaryFindNamedTexture"
+    },
+    "txd.count": {
+      "sev": "warn",
+      "msg": "the header says {count} textures, the file has {n}",
+      "what": "texture count in the header differs from the content",
+      "what_ru": "Число текстур в заголовке не совпадает с содержимым",
+      "ref": "-"
+    },
+    "txd.empty": {
+      "sev": "info",
+      "msg": "no textures",
+      "what": "empty texture dictionary",
+      "what_ru": "Пустой TXD",
+      "ref": "-"
+    },
+    "txd.pow2": {
+      "sev": "warn",
+      "msg": "texture '{tex}': {w}x{h} is not a power of two",
+      "what": "texture size not a power of two (mipmaps and wrapping break)",
+      "what_ru": "Размер текстуры не степень двойки",
+      "ref": "research 22 sec. 6 (lint rules)"
+    },
+    "txd.size_max": {
+      "sev": "warn", "params": {"max": 2048},
+      "msg": "texture '{tex}': {w}x{h} > {max}",
+      "what": "texture larger than the budget",
+      "what_ru": "Текстура больше бюджета",
+      "ref": "research 22 sec. 3.3 (vanilla: 4 textures of 1024, none larger)"
+    },
+    "txd.dxt_block": {
+      "sev": "error",
+      "msg": "texture '{tex}': {fmt} {w}x{h} is not a multiple of 4",
+      "what": "DXT texture whose size is not a multiple of the 4x4 block",
+      "what_ru": "DXT-текстура с размером не кратным 4",
+      "ref": "D3D9 DXTn: top level must be a multiple of 4"
+    },
+    "txd.mip_levels": {
+      "sev": "error",
+      "msg": "texture '{tex}': {levels} mip levels > {max} possible for {w}x{h}",
+      "what": "more mip levels than the size allows",
+      "what_ru": "Мип-уровней больше, чем позволяет размер",
+      "ref": "-"
+    },
+    "txd.mip_size": {
+      "sev": "error",
+      "msg": "texture '{tex}': mip {lvl} has {size} bytes, {fmt} {w}x{h} needs {need}",
+      "what": "mip level data shorter than its format and size need (empty DXT levels below one 4x4 block are tolerated: vanilla writes them)",
+      "what_ru": "Данных мип-уровня меньше, чем нужно (пустые DXT-уровни меньше блока 4x4 допустимы — так в ванили)",
+      "ref": "vanilla: 4 722 DXT1 tail levels of 0 bytes"
+    },
+    "txd.mips_missing": {
+      "sev": "info", "params": {"min_size": 64},
+      "msg": "texture '{tex}': {w}x{h} without mipmaps (shimmers at a distance)",
+      "what": "texture of 64 px or more without mipmaps",
+      "what_ru": "Текстура от 64 px без мипмапов (рябит вдали)",
+      "ref": "research 22 sec. 3.3 (79 % of vanilla textures have one level)"
+    },
+    "txd.alpha_off": {
+      "sev": "info", "params": {"formats": ["DXT3", "DXT5", "A8R8G8B8", "A4R4G4B4", "A1R5G5B5"]},
+      "msg": "texture '{tex}': {fmt} stores alpha but the alpha flag is off (no blending)",
+      "what": "alpha-capable format with the alpha flag cleared",
+      "what_ru": "Формат с альфой, но флаг альфы снят",
+      "ref": "TextureNative flags bit 1 (hasAlpha)"
+    },
+    "txd.total_size": {
+      "sev": "warn", "params": {"max_mb": 8.0},
+      "msg": "texture data {mb} MB > {max_mb} MB (streaming memory)",
+      "what": "very large TXD",
+      "what_ru": "Очень большой TXD",
+      "ref": "research 22 sec. 3.4 (streaming budget 50 MB in SA)"
+    },
+
+    "col.parse": {
+      "sev": "fatal",
+      "msg": "cannot parse the collision file: {err}",
+      "what": "malformed collision file",
+      "what_ru": "COL-файл не разбирается",
+      "ref": "gta-reversed FileLoader.cpp:490-530 (LoadCollisionFile)"
+    },
+    "col.body": {
+      "sev": "error",
+      "msg": "model #{idx}: {err}",
+      "what": "collision model whose counts/offsets overrun its record",
+      "what_ru": "Счётчики или смещения COL-модели выходят за её запись",
+      "ref": "gta-reversed FileLoader.cpp:700-760 (LoadCollisionModelVer2/3 trust the offsets)"
+    },
+    "col.name_empty": {
+      "sev": "error",
+      "msg": "model #{idx}: empty name, no model can use it",
+      "what": "collision model without a name",
+      "what_ru": "COL-модель без имени",
+      "ref": "gta-reversed FileLoader.cpp:512-515 (bound by name)"
+    },
+    "col.name_len": {
+      "sev": "error", "params": {"max": 21},
+      "msg": "model '{name}': name is {n} chars > {max} (char modelName[22])",
+      "what": "collision model name longer than 21 characters",
+      "what_ru": "Имя COL-модели длиннее 21 символа",
+      "ref": "gta-reversed Collision/ColHelpers.h:51; research 22 sec. 3.4"
+    },
+    "col.vertex_range": {
+      "sev": "error", "params": {"max": 256.0},
+      "msg": "model '{name}': vertex coordinate {v} outside +-{max} m (stored as int16/128)",
+      "what": "collision vertex outside +-256 m",
+      "what_ru": "Вершина коллизии за пределами +-256 м",
+      "ref": "gta-reversed CompressedVector.h:4 (FixedVector<int16, 128.0f>); FileLoader.cpp:674 (COLL v1 floats compressed on load)"
+    },
+    "col.empty_flag": {
+      "sev": "error",
+      "msg": "model '{name}': COL{version} has {prims} primitives but the 'not empty' flag (2) is clear: the game ignores them",
+      "what": "COL2+ model with primitives and a cleared 'not empty' flag",
+      "what_ru": "У COL2+ есть примитивы, но флаг «не пустая» (2) снят: игра их не грузит",
+      "ref": "gta-reversed FileLoader.cpp:714,787,859 (m_bHasCollisionVolumes = !IsEmpty()); ColHelpers.h (flags & 2)"
+    },
+    "col.empty": {
+      "sev": "info",
+      "msg": "model '{name}': no spheres, boxes or triangles (no collision)",
+      "what": "collision model without primitives",
+      "what_ru": "COL-модель без примитивов",
+      "ref": "-"
+    },
+    "col.box_inverted": {
+      "sev": "error",
+      "msg": "model '{name}': box {i} has min > max on {axes} (a rotated or mirrored box exported as AABB?)",
+      "what": "box with min > max: COL boxes are axis-aligned, rotation cannot be stored",
+      "what_ru": "Бокс с min > max: боксы COL — AABB, вращение не хранится",
+      "ref": "gta-reversed Collision/ColBox.h:13, Box.h:14 (CColBox = min/max); research 22 sec. 7.1 #4"
+    },
+    "col.sphere_radius": {
+      "sev": "error",
+      "msg": "model '{name}': sphere {i} radius {r} <= 0",
+      "what": "sphere with a non-positive radius",
+      "what_ru": "Сфера с радиусом <= 0",
+      "ref": "-"
+    },
+    "col.nan": {
+      "sev": "error",
+      "msg": "model '{name}': NaN or infinite values in {what}",
+      "what": "NaN/inf in bounds or primitives",
+      "what_ru": "NaN или бесконечность в границах или примитивах",
+      "ref": "-"
+    },
+    "col.outside_bounds": {
+      "sev": "warn", "params": {"tol": 0.5},
+      "msg": "model '{name}': {what} sticks out of the bounding box by {d} m (the game culls by the box)",
+      "what": "primitive outside the model bounding box",
+      "what_ru": "Примитив выходит за bounding box модели",
+      "ref": "gta-reversed Collision/Collision.cpp (ProcessColModels tests the bounding box first)"
+    },
+    "col.bsphere": {
+      "sev": "warn", "params": {"tol": 0.5},
+      "msg": "model '{name}': {what} lies {d} m outside the bounding sphere",
+      "what": "primitive outside the model bounding sphere",
+      "what_ru": "Примитив выходит за описанную сферу модели",
+      "ref": "gta-reversed Collision/Collision.cpp (bounding spheres are tested before the primitives)"
+    },
+    "col.surface": {
+      "sev": "warn", "params": {"max": 178},
+      "msg": "model '{name}': surface {mat} > {max} on {n} primitive(s)",
+      "what": "unknown surface material",
+      "what_ru": "Неизвестный материал поверхности",
+      "ref": "gta-reversed Enums/eSurfaceType.h:189 (SURFACE_RAILTRACK = 178)"
+    },
+    "col.dup_name": {
+      "sev": "warn",
+      "msg": "model '{name}' is also in {other}; the first one loaded wins",
+      "what": "the same collision model name twice",
+      "what_ru": "Одно имя COL-модели дважды",
+      "ref": "gta-reversed FileLoader.cpp:512-515 (bound by name)"
+    },
+    "col.colfile_buffer": {
+      "sev": "error", "params": {"max": 32768},
+      "msg": "model '{name}': {size} bytes > {max}: a loose .col loaded by COLFILE goes through a 32 KB buffer",
+      "what": "loose collision model larger than the COLFILE buffer",
+      "what_ru": "Модель в отдельном .col больше 32 КБ буфера COLFILE",
+      "ref": "gta-reversed FileLoader.cpp:540-552 (StaticRef<uint8[0x8000]>(0xBC40D8))"
+    },
+
+    "ide.parse": {
+      "sev": "error",
+      "msg": "line {line}: {err}",
+      "what": "malformed IDE line",
+      "what_ru": "Нераспознанная строка IDE",
+      "ref": "gta-reversed FileLoader.cpp (sscanf of each section)"
+    },
+    "ide.name_len": {
+      "sev": "fatal", "params": {"max": 23},
+      "msg": "line {line}: model {id} name '{name}' is {n} chars > {max} (read into char[24])",
+      "what": "model name longer than 23 characters",
+      "what_ru": "Имя модели длиннее 23 символов",
+      "ref": "gta-reversed FileLoader.cpp:925-931 (char modelName[24]; sscanf %s)"
+    },
+    "ide.txd_len": {
+      "sev": "fatal", "params": {"max": 23},
+      "msg": "line {line}: model {id} TXD name '{txd}' is {n} chars > {max} (read into char[24])",
+      "what": "TXD name longer than 23 characters",
+      "what_ru": "Имя TXD длиннее 23 символов",
+      "ref": "gta-reversed FileLoader.cpp:925-931 (char texName[24]; sscanf %s)"
+    },
+    "ide.id_range": {
+      "sev": "fatal", "params": {"max": 19999},
+      "msg": "line {line}: model id {id} outside 0..{max}",
+      "what": "model ID outside the model info array",
+      "what_ru": "ID модели вне массива ms_modelInfoPtrs",
+      "ref": "gta-reversed Models/ModelInfo.h:23-24 (NUM_MODEL_INFOS = 20000)"
+    },
+    "ide.dup_id": {
+      "sev": "error",
+      "msg": "line {line}: model id {id} '{name}' is already defined at {other}",
+      "what": "the same model ID defined twice",
+      "what_ru": "Один ID модели определён дважды",
+      "ref": "CModelInfo::AddAtomicModel overwrites the slot"
+    },
+    "ide.dup_name": {
+      "sev": "warn",
+      "msg": "line {line}: model name '{name}' ({id}) is also model {other_id} at {other}",
+      "what": "the same model name for two IDs",
+      "what_ru": "Одно имя у двух ID моделей",
+      "ref": "CModelInfo::GetModelInfo(name) returns one of them"
+    },
+    "ide.draw_min": {
+      "sev": "error", "params": {"min": 4.0},
+      "msg": "line {line}: model {id} '{name}': draw distance {draw} < {min}, the game re-reads the line in the old mesh-count form",
+      "what": "draw distance below 4 in the 5-field objs/tobj form",
+      "what_ru": "Дальность прорисовки < 4 в 5-польной форме objs/tobj",
+      "ref": "gta-reversed FileLoader.cpp:931 (LoadObject), 1759 (LoadTimeObject): drawDistance < 4.0f"
+    },
+
+    "link.dff_missing": {
+      "sev": "error", "params": {"placeholders": ["null", "special??", "cutobj*", "clothes*", "airtrain_vlo"]},
+      "msg": "model {id} '{name}': no DFF '{name}.dff'",
+      "what": "model definition without a DFF",
+      "what_ru": "У определения модели нет DFF",
+      "ref": "CStreaming: models are found by name in the IMG directories; placeholders (special peds, cutscene objects, clothes, null, airtrain_vlo) are loaded otherwise or never"
+    },
+    "link.txd_missing": {
+      "sev": "error", "params": {"builtin": ["generic"], "placeholders": ["null", "special??", "cutobj*", "clothes*", "airtrain_vlo"]},
+      "msg": "model {id} '{name}': TXD '{txd}' not found",
+      "what": "model definition naming a missing TXD",
+      "what_ru": "Определение модели ссылается на несуществующий TXD",
+      "ref": "CTxdStore::FindTxdSlot; 'generic' is created by the exe (gta-reversed Game.cpp:350)"
+    },
+    "link.texture_missing": {
+      "sev": "warn",
+      "msg": "model {id} '{name}': {n} texture(s) not in {chain}: {tex}",
+      "what": "material texture missing from the model's TXD chain (own TXD, txdp parents, vehicle)",
+      "what_ru": "Текстуры материала нет в цепочке TXD модели",
+      "ref": "research 14 (0.8 % of vanilla texture references dangle)"
+    },
+    "link.col_missing": {
+      "sev": "warn",
+      "msg": "model {id} '{name}' ({sec}): no collision model named '{name}'",
+      "what": "map object (not a LOD) without a collision model of the same name",
+      "what_ru": "Объект карты (не LOD) без одноимённой COL-модели",
+      "ref": "gta-reversed FileLoader.cpp:512-515, 557 (COL bound by model name)"
+    },
+    "link.col_orphan": {
+      "sev": "warn",
+      "msg": "collision model '{name}' matches no model definition (the game ignores it)",
+      "what": "collision model whose name is no model",
+      "what_ru": "COL-модель, имя которой не совпадает ни с одной моделью",
+      "ref": "gta-reversed FileLoader.cpp:512-520"
+    },
+    "link.col_offset": {
+      "sev": "warn", "params": {"min_gap": 5.0},
+      "msg": "model {id} '{name}': collision box and model box are {d} m apart (wrong pivot?)",
+      "what": "collision bounding box far from the DFF bounding box",
+      "what_ru": "Bounding box коллизии далеко от bounding box модели",
+      "ref": "-"
+    },
+    "link.dff_orphan": {
+      "sev": "info", "params": {"ignore_archives": ["player.img", "cutscene.img"]},
+      "msg": "the DFF matches no model definition",
+      "what": "DFF not used by any model definition",
+      "what_ru": "DFF не используется ни одной моделью",
+      "ref": "-"
+    },
+    "link.txd_orphan": {
+      "sev": "info", "params": {"ignore_archives": ["player.img", "cutscene.img"]},
+      "msg": "the TXD is used by no model definition or txdp",
+      "what": "TXD not used by any model definition",
+      "what_ru": "TXD не используется ни одной моделью",
+      "ref": "-"
+    }
+  },
+  "presets": {
+    "game": {},
+    "strict": {
+      "_comment": "New content (research 22 sec. 3): vanilla p90 budgets, textures <= 512, mipmaps, pow2, night colours, collision.",
+      "txd.size_max": {"params": {"max": 512}},
+      "txd.pow2": {"sev": "error"},
+      "txd.mips_missing": {"sev": "warn"},
+      "dff.night_missing": {"sev": "warn"},
+      "dff.prelight_black": {"sev": "warn"},
+      "dff.tris_budget": {"params": {"budget": {"map": 1040, "lod": 262, "cars": 3343, "peds": 1274, "weap": 600, "other": 1040}}},
+      "dff.materials_budget": {"params": {"budget": {"map": 11, "lod": 7, "cars": 110, "peds": 2, "weap": 2, "other": 11}}},
+      "link.col_missing": {"sev": "error"},
+      "link.texture_missing": {"sev": "error"},
+      "col.empty": {"sev": "warn"}
+    }
+  }
+}

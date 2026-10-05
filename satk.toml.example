@@ -1,0 +1,73 @@
+# satk configuration example (docs/en/install.md). `satk init` writes a short
+# <workspace>\satk.toml for you; copy keys from here to change more.
+#
+# Where satk.toml is looked for (first existing file wins):
+#   SATK_CONFIG=<file>|<dir>|none -> <checkout>\satk.toml -> <main checkout>\satk.toml (git worktrees)
+#   -> <workspace>\satk.toml -> %APPDATA%\satk\satk.toml (a per-user file naming paths.workspace
+#   also reads that workspace's satk.toml on top).
+# Priority: built-in defaults < satk.toml < environment SATK_<SECTION>_<KEY> < CLI flags.
+#   SATK_HOME=<dir>            sets paths.workspace (all defaults below derive from it)
+#   SATK_PATHS_GAME_ROOT=...   any key: SATK_ + section + key, upper case
+#   SATK_DETECT=0              no tool discovery (blender/msbuild/vcvars stay unset unless configured)
+# Values may reference other values as ${section.key}.
+# The active values below are exactly the built-in defaults (tests/core/test_config.py checks it);
+# commented keys have no fixed default.
+
+[paths]
+# workspace = 'C:\satk-ws'   # default: SATK_HOME, else the parent of a "tools" checkout with work\ or
+                             # satk.toml next to it (git worktrees: their main checkout), else %LOCALAPPDATA%\satk
+game      = '${paths.workspace}/gta-sa-clean'        # clean dev copy (profile vanilla); optional
+installed = '${paths.workspace}/GTA San Andreas'     # original install: READ ONLY
+game_root = '${paths.installed}'                     # YOUR game folder (profile game): READ ONLY; satk init sets it
+work      = '${paths.workspace}/work'                # everything generated
+src       = '${paths.workspace}/src'                 # reference clones: READ ONLY
+viewer    = '${paths.workspace}/viewer/ariane/bin/ariane.exe'   # optional
+engine    = '${paths.workspace}/engine/mtasa'                   # optional (MTA fork)
+premake   = '${paths.src}/mtasa-neon/utils/premake5.exe'
+# Discovered when not set here (satk doctor shows the source; cache work\cache\detect.json):
+# blender = 'C:\Program Files\Blender Foundation\Blender 5.1\blender.exe'   # registry / Program Files / PATH
+# msbuild = '<VS>\MSBuild\Current\Bin\MSBuild.exe'                          # vswhere -products * -prerelease
+# vcvars  = '<VS>\VC\Auxiliary\Build\vcvarsall.bat'                         # vswhere
+
+[safety]
+# Writes inside these roots fail with PROTECTED_PATH. Default: those of installed, src, game and
+# game_root that exist. The write guard also always protects installed, src, game_root and game
+# themselves (game is unlocked only inside game.* operations: satk.core.paths.game_writer()) and,
+# for a <workspace>\tools checkout, GTA San Andreas, src and gta-sa-clean of that workspace.
+# protected_roots = ['${paths.installed}', '${paths.src}', '${paths.game}', '${paths.game_root}']
+
+[profiles.vanilla]                                   # the clean copy; without one: alias of game
+root = '${paths.game}'
+dat = ['data/default.dat', 'data/gta.dat']
+img_order = 'engine'
+
+[profiles.installed]                                 # "not configured" when the folder is missing
+root = '${paths.installed}'
+dat = ['data/default.dat', 'data/gta.dat']
+img_order = 'engine'
+
+[profiles.samp]
+root = '${paths.installed}'
+dat = ['data/default.two', 'data/gta.two']
+img_order = 'samp'                                   # V8: samp.dll disables InitImageList
+
+[profiles.game]                                      # your game folder, any version
+root = '${paths.game_root}'
+dat = ['data/default.dat', 'data/gta.dat']
+img_order = 'engine'
+
+[index]
+default_profile = 'vanilla'                          # satk init writes 'game' when there is no clean copy
+
+[layers]                                             # file -> layer attribution (§4.3.1)
+vanilla_manifest = '${paths.game}/MANIFEST.sha256'
+rules = [
+  { glob = 'SAMP/**', layer = 'samp' },
+  { glob = 'data/*.two', layer = 'samp' },
+  { glob = 'modloader/*/**', layer = 'modloader:{1}' },
+]
+fallback = 'modded'
+
+[viewer]
+default_target = 'ariane'
+window = '1280x720'

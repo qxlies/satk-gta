@@ -1,0 +1,3 @@
+This file turns on portable mode: this folder is the satk workspace.
+satk keeps its configuration (satk.toml) and everything it generates (work\) here.
+Delete the folder to remove satk completely. Do not delete this file.

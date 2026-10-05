@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/pick.json",
+  "title": "pick",
+  "x-saap": {
+    "method": "pick",
+    "capability": "pick",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1,
+          "maxItems": 256
+        },
+        "space": {
+          "enum": [
+            "capture",
+            "window"
+          ]
+        },
+        "w": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "h": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pose": {
+          "$ref": "common.json#/$defs/Pose"
+        },
+        "mode": {
+          "enum": [
+            "visible",
+            "collision"
+          ]
+        }
+      },
+      "required": [
+        "points"
+      ]
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "hits": {
+          "type": "array",
+          "items": {
+            "$ref": "common.json#/$defs/Hit"
+          }
+        }
+      },
+      "required": [
+        "hits"
+      ]
+    }
+  }
+}

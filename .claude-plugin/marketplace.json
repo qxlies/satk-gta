@@ -1,0 +1,18 @@
+{
+  "name": "satk",
+  "owner": {
+    "name": "qxlies"
+  },
+  "metadata": {
+    "description": "satk (San Andreas ToolKit): GTA San Andreas modding, map, crash and RE tools for humans and AI agents."
+  },
+  "plugins": [
+    {
+      "name": "satk",
+      "source": "./.claude-plugin/satk",
+      "description": "The satk agent skill plus the satk MCP server (needs satk installed: the satk command on PATH).",
+      "category": "development",
+      "keywords": ["gta", "san-andreas", "modding", "mcp", "reverse-engineering"]
+    }
+  ]
+}

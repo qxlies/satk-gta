@@ -1,0 +1,8 @@
+# sdist contents beyond the setuptools defaults (pyproject.toml: include-package-data is on).
+# data/ and vendor/ are copied into the wheel as satk/_data and satk/_vendor by setup.py (build_py),
+# so a wheel built from the sdist needs them too; "graft src/satk" makes every file of the package
+# package-data. satk dev release (src/satk/release/dist.py: SDIST_TREES) follows these lines.
+graft data
+graft src/satk
+graft vendor
+global-exclude __pycache__ *.py[cod]

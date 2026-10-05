@@ -1,0 +1,8 @@
+# Line endings are fixed per type so worktrees behave the same with core.autocrlf=true.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.sh text eol=lf
+scripts/hooks/* text eol=lf
+*.bin binary

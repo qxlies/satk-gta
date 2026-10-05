@@ -1,0 +1,46 @@
+Third-party notice: gta-scout model descriptions
+=================================================
+
+What: text descriptions of GTA: San Andreas models (fields "description", "tags",
+"confidence") from the gta-scout shared annotation pack, imported by
+`satk describe import` into the local notes database (work/notes.sqlite, author
+"import:gta-scout", tag "desc") and, if notes are exported, into data/notes/*.jsonl.
+
+Source: https://github.com/Dryxio/gta-scout
+        data/annotations/sa-2026-10-03.json (format gta-scout-annotations-v1,
+        7,815 entries, pack sha256 ff923fae1836b66190521e0d0a38a599cc84a6b6136e33eb7bdbd0ab75272f94),
+        revision ab2c6f27fd03ffcb934cabfa72b3e151f4273f13 (2026-10-03).
+Changes: only the English part of FR/EN texts is kept by default (--text full keeps
+        the original); entries are bound to models only when the local DFF bytes have the
+        SHA-256 published in the pack. No gta-scout code is included in satk; the pack
+        digest format (canonical JSON, SHA-256) is reimplemented from its description.
+Note from the publisher: the descriptions were written and reviewed by AI agents from
+        rendered images; they are observations, not verified facts.
+
+License (verbatim, including the publisher's additional paragraph):
+
+MIT License
+
+Copyright (c) 2026 Dryxio
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+The license covers original code and documentation. It does not grant rights
+to Rockstar Games / Take-Two assets visible in demonstration screenshots,
+third-party dependencies, or user-provided game data.

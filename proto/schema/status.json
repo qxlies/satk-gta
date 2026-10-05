@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/status.json",
+  "title": "status",
+  "x-saap": {
+    "method": "status",
+    "capability": "core",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object"
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fps": {
+          "type": "number",
+          "minimum": 0
+        },
+        "pose": {
+          "$ref": "common.json#/$defs/Pose"
+        },
+        "env": {
+          "$ref": "common.json#/$defs/Env"
+        },
+        "streaming": {
+          "type": "object",
+          "properties": {
+            "pending": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "rev": {
+          "$ref": "common.json#/$defs/Rev"
+        },
+        "window": {
+          "type": "object",
+          "properties": {
+            "w": {
+              "type": "integer"
+            },
+            "h": {
+              "type": "integer"
+            },
+            "minimized": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "required": [
+        "frame",
+        "rev"
+      ]
+    }
+  }
+}

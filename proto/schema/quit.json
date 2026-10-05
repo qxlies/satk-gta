@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/quit.json",
+  "title": "quit",
+  "x-saap": {
+    "method": "quit",
+    "capability": "core",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object"
+    },
+    "result": {
+      "type": "object"
+    }
+  }
+}

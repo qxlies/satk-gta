@@ -1,0 +1,22 @@
+Version = 1.6-custom.00000.0.000
+Time = Sun Oct  4 14:30:00 2026
+Module = C:\Games\GTA San Andreas\gta_sa.exe
+Code = 0xC0000005
+Offset = 0x0013BF09
+
+EAX=00000000  EBX=0000000A  ECX=00B6F5F0  EDX=0177F3A8  ESI=00C8D4C0
+EDI=00000000  EBP=0177F9C8  ESP=0177F98C  EIP=0053BF09  FLG=00210246
+CS=0023   DS=002B  SS=002B  ES=002B   FS=0053  GS=002B
+
+Reason: Access violation at gta_sa.exe+0x0013E4FA (IDA: 0x0053E4FA)
+
+Stack trace:
+  gta_sa.exe+0x00007260 (IDA: 0x00407260)
+  gta_sa.exe+0x01166830
+  core.dll+0x0004A1B2
+  multiplayer_sa.dll+0x00012F00
+  game_sa.dll+0x000C1234 (IDA via game_sa.dll: 0x100C1234)
+  gta_sa.exe+0x002F4040
+
+Module = C:\Program Files (x86)\MTA San Andreas\mta\netc.dll
+Offset = 0x00001234

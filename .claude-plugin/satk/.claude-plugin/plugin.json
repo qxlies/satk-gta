@@ -1,0 +1,11 @@
+{
+  "name": "satk",
+  "description": "GTA San Andreas toolkit for agents: find models, textures and placements, look at the map, resolve crash addresses, lint and pack mods. Skill + MCP server; needs satk installed (the satk command on PATH).",
+  "author": {
+    "name": "qxlies"
+  },
+  "homepage": "https://github.com/qxlies/satk-gta",
+  "repository": "https://github.com/qxlies/satk-gta",
+  "license": "MIT",
+  "keywords": ["gta", "san-andreas", "modding", "mcp", "reverse-engineering"]
+}

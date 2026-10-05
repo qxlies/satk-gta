@@ -1,0 +1,105 @@
+{
+ "profile": "samp",
+ "_comment": {
+  "source": "the reference install with data/default.two + data/gta.two, img_order=samp (V8)",
+  "img_order": [
+   "samp/custom.img",
+   "samp/samp.img",
+   "models/gta3.img",
+   "models/gta_int.img",
+   "samp/sampcol.img",
+   "data/script/script.img",
+   "models/cutscene.img",
+   "models/player.img",
+   "anim/anim.img",
+   "anim/cuts.img"
+  ],
+  "samp.img": "1 673 entries (dff 1 462, txd 208, ifp 3), 1 065 textures; custom.img 1 txd; SAMPCOL.img 1 457 COL3 models (col.models = 10 169 + 1 457)",
+  "samp.ide": "objs 1 433 (IDs 11 682-19 999), anim 2, peds 12; dup_ids 12 = the 12 peds overriding IDs 300-311",
+  "layer samp vs vanilla": "satk index diff vanilla samp --kind model -> added 1 435 (objs 1 433 + anim 2), overridden 12 (peds 300-311, e.g. model:300 cutobj01 -> lapdna), plus 212 cars whose definitions are identical but come from DATA/VEHICLES.two (layer samp; reported as same_def_other_layer). layer.samp.models = 1 435 + 12 + 212 = 1 659.",
+  "assumption": "GTA_INT.IMG registered at its own position in default.two (V8; meta.assumptions)",
+  "schema_v3": "data-file metrics as in index_vanilla.json; v_ped 288 = 276 + the 12 SA-MP peds of samp.ide (IDs 300-311)"
+ },
+ "metrics": {
+  "img.archives": 10,
+  "img.entries.samp": 1673,
+  "img.samp.dff": 1462,
+  "img.samp.txd": 208,
+  "img.samp.ifp": 3,
+  "img.entries.custom": 1,
+  "img.custom.txd": 1,
+  "img.entries.sampcol": 1,
+  "tex.src.samp": 1065,
+  "col.models": 11626,
+  "ide.files": 59,
+  "ide.objs": 15478,
+  "ide.anim": 56,
+  "ide.peds": 288,
+  "ide.max_id": 19999,
+  "ide.dup_ids": 12,
+  "model.active": 16267,
+  "layer.samp.models": 1659,
+  "layer.samp.blobs": 1675,
+  "ipl.inst": 50935,
+  "ipl.lod_unresolved": 0,
+  "water.polys": 307,
+  "water.quads": 301,
+  "water.tris": 6,
+  "water.visible": 305,
+  "water.shallow": 21,
+  "water1.polys": 267,
+  "tcyc.rows": 184,
+  "tcyc.weathers": 23,
+  "tcyc.hours": 8,
+  "tcyc.short_lines": 1,
+  "handling.car": 210,
+  "handling.bike": 13,
+  "handling.boat": 12,
+  "handling.flying": 24,
+  "handling.cars_linked": 212,
+  "handling.unused": 6,
+  "carcol.palette": 127,
+  "carcol.models": 199,
+  "carcol.sets": 1157,
+  "carcol.car4": 3,
+  "carcol.out_of_palette": 1,
+  "carcol.unmatched": 0,
+  "ped_rel.rows": 113,
+  "ped_rel.pedtypes": 17,
+  "object.rows": 995,
+  "object.loaded": 994,
+  "object.models": 869,
+  "view.v_vehicle": 212,
+  "view.v_ped": 288
+ },
+ "examples": [
+  {
+   "get": "model:300",
+   "expect": {
+    "name": "lapdna",
+    "layer": "samp",
+    "links.overrides": [
+     "model:300@vanilla"
+    ]
+   }
+  },
+  {
+   "get": "model:300@vanilla",
+   "expect": {
+    "name": "cutobj01",
+    "active": false
+   }
+  },
+  {
+   "get": "model:411",
+   "expect": {
+    "name": "infernus",
+    "layer": "samp",
+    "links.txd_chain": [
+     "txd:infernus",
+     "txd:vehicle"
+    ]
+   }
+  }
+ ]
+}

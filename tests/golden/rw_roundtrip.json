@@ -1,0 +1,73 @@
+{
+  "_doc": "M3-B1 golden: bit-for-bit round trips of the satk RW writers on the vanilla game (gta-sa-clean, SA 1.0 US). Recompute: satk rw roundtrip --json (satk), satk rw roundtrip --engine rwfury --json (baseline). Checked by tests/rw/test_game.py. Only numbers, no assets.",
+  "dff": {
+    "files": 15356,
+    "tree_exact": 15356,
+    "typed_exact": 15356,
+    "restamp_exact": 15223,
+    "classes": {
+      "restamp:skin-used-bone-order": 116,
+      "restamp:source-not-3.6.0.3": 16,
+      "restamp:skin-used-bone-set": 1
+    },
+    "_classes": {
+      "restamp:skin-used-bone-order": "SA -> VC -> SA: the VC (RW < 3.4) Skin PLG has no used-bone list; librw rebuilds it sorted, Rockstar stored first-use order",
+      "restamp:skin-used-bone-set": "sbmost.dff lists a bone that no vertex weights",
+      "restamp:source-not-3.6.0.3": "RW 0x35000 files (models/generic, models/grass, ...): the cycle stamps them 3.6.0.3"
+    }
+  },
+  "col": {
+    "files": 254,
+    "files_exact": 254,
+    "models": 10169,
+    "typed": 10167,
+    "json": 10165,
+    "canonical": 10165,
+    "flags_rule": 10155,
+    "groups_rule": 10155,
+    "rule_models": 10155,
+    "name_garbage": 10167,
+    "pad_garbage": 934,
+    "embedded_files": 214,
+    "embedded_files_exact": 212,
+    "embedded_models": 212,
+    "embedded_typed": 212,
+    "embedded_json": 212,
+    "embedded_canonical": 212,
+    "embedded_flags_rule": 212,
+    "embedded_groups_rule": 212,
+    "embedded_rule_models": 212,
+    "embedded_name_garbage": 212,
+    "embedded_pad_garbage": 31,
+    "classes": {
+      "canonical:error": 2,
+      "embedded_split:not a collision file (no COLL/COL2/COL3/": 2,
+      "decode:COLL 133 boxes overrun the record": 1,
+      "json-error:model 'playert' face 2: vertex index 134 outside 0": 1,
+      "json-error:model 'mwat' face 8: vertex index 55 outside 0..13": 1,
+      "decode:COLL 2231369728 spheres overrun the record": 1
+    },
+    "_classes": {
+      "decode/json-error/canonical:error": "models/coll/peds.col, a Vice City leftover the game never loads: 2 records with broken bodies, 2 with faces beyond the vertex list (kept byte for byte, refused as JSON)",
+      "embedded_split": "bloodrb.dff and rccam.dff carry a CollisionModel plugin that is not a COL record",
+      "name_garbage/pad_garbage": "Rockstar's files keep junk after the name NUL (all records) and in the vertex padding; JSON export stores it under raw"
+    }
+  },
+  "rwfury_0_6_1": {
+    "dff": {
+      "files": 15356,
+      "exact": 0,
+      "classes": {
+        "Clump/GeometryList/Geometry/MaterialList/Material/Struct:data": 14000,
+        "Clump/FrameList/Struct:data": 1204,
+        "Clump/Struct:data": 152
+      }
+    },
+    "col": {
+      "files": 254,
+      "models": 10169,
+      "models_exact": 0
+    },
+    "_why": "model-rebuild writers: the material 'unused' word, frame flags, texture filter flags, atomic/geometry plugins (Breakable, MatFX/right-to-render), string garbage and the COL name garbage are not kept"
+  }
+}

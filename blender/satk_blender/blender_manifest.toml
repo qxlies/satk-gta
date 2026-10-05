@@ -1,0 +1,19 @@
+schema_version = "1.0.0"
+
+id = "satk_blender"
+version = "0.1.0"
+name = "SATK - San Andreas ToolKit"
+tagline = "GTA:SA models and areas, game shading and MTA export via satk"
+maintainer = "satk authors"
+type = "add-on"
+tags = ["Import-Export", "Game Engine"]
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+
+[permissions]
+files = "Reads GTA:SA files, writes exports to the satk work folder"
+
+[build]
+paths_exclude_pattern = ["__pycache__/", "*.pyc", "*.zip", "/.git/"]

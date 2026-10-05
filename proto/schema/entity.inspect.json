@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/entity.inspect.json",
+  "title": "entity.inspect",
+  "x-saap": {
+    "method": "entity.inspect",
+    "capability": "entity.inspect",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "ref"
+      ]
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "entity": {
+          "$ref": "common.json#/$defs/EntityRef"
+        },
+        "model": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer"
+            },
+            "name": {
+              "type": "string"
+            },
+            "txd": {
+              "type": "string"
+            },
+            "flags": {
+              "type": "integer"
+            },
+            "draw": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "lod": {
+          "type": "object",
+          "properties": {
+            "parent": {
+              "$ref": "common.json#/$defs/EntityRef"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/EntityRef"
+              }
+            }
+          }
+        },
+        "runtime": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "entity",
+        "model"
+      ]
+    }
+  }
+}

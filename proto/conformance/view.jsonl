@@ -1,0 +1,2 @@
+{"id":"view.set.overlays","caps":["view"],"steps":[{"call":"view.set","params":{"overlays":["col"]},"expect":{"ok":true,"result":{"applied":{"overlays":["col"]}}}},{"call":"view.set","params":{"overlays":[]},"expect":{"ok":true,"result":{"applied":{"overlays":[]}}}}]}
+{"id":"view.set.unsupported_overlay","caps":["view"],"steps":[{"call":"view.set","params":{"overlays":["bogus"]},"expect":{"ok":false,"error":"UNSUPPORTED"}}]}

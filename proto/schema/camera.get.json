@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/camera.get.json",
+  "title": "camera.get",
+  "x-saap": {
+    "method": "camera.get",
+    "capability": "camera",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object"
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "pose": {
+          "$ref": "common.json#/$defs/Pose"
+        },
+        "fov_h_deg": {
+          "$ref": "common.json#/$defs/Fov"
+        },
+        "near": {
+          "type": "number"
+        },
+        "far": {
+          "type": "number"
+        },
+        "rev": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "pose",
+        "rev"
+      ]
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "satk": {
+      "command": "satk",
+      "args": ["mcp"],
+      "env": {
+        "PYTHONUTF8": "1",
+        "OTEL_SDK_DISABLED": "true"
+      }
+    }
+  }
+}

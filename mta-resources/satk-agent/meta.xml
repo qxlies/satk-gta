@@ -1,0 +1,18 @@
+<meta>
+    <!-- satk-agent (MIT): in-game eyes for the satk toolkit. Protocol mta-lua/1, see
+         tools/docs/ru/mta-agent.md. Loopback-only, token-checked; for local development servers.
+         Rights (function.shutdown, HTTP access) come from the ACL that satk generates. -->
+    <info author="satk" name="satk-agent" version="1.0.0" type="script"
+          description="satk agent bridge: camera, capture, pick, env, logs and Lua over a token-checked HTTP export"/>
+
+    <script src="shared.lua" type="shared"/>
+    <script src="server.lua" type="server"/>
+    <script src="client.lua" type="client"/>
+
+    <export function="rpc" type="server" http="true"/>
+
+    <settings>
+        <!-- 64 hex chars; satk writes it into mods/deathmatch/settings.xml as @satk-agent.token -->
+        <setting name="@token" value=""/>
+    </settings>
+</meta>

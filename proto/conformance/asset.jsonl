@@ -1,0 +1,2 @@
+{"id":"asset.render.one","caps":["asset.render"],"steps":[{"call":"asset.render","params":{"model":17613,"views":[45],"size":128,"path_prefix":"${prefix}"},"expect":{"ok":true,"result":{"files":{"$len":1}}}}]}
+{"id":"asset.render.unknown","caps":["asset.render"],"steps":[{"call":"asset.render","params":{"model":"no_such_model_zz","path_prefix":"${prefix}"},"expect":{"ok":false,"error":"NOT_FOUND"}}]}

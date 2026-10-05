@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/lua.exec.json",
+  "title": "lua.exec",
+  "x-saap": {
+    "method": "lua.exec",
+    "capability": "lua",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        },
+        "side": {
+          "enum": [
+            "client",
+            "server"
+          ]
+        },
+        "resource": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60000
+        }
+      },
+      "required": [
+        "code"
+      ]
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "values": {
+          "type": "array",
+          "items": {}
+        },
+        "prints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "msg": {
+              "type": "string"
+            },
+            "file": {
+              "type": "string"
+            },
+            "line": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "msg"
+          ]
+        }
+      },
+      "required": [
+        "values",
+        "prints"
+      ]
+    }
+  }
+}

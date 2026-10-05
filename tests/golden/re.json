@@ -1,0 +1,72 @@
+{
+  "_doc": [
+    "sa-re symbol DB golden numbers (WP-09, SPEC 5.3 WP-09 / Appendix A.4), measured 2026-10-04 by `satk re build`.",
+    "'exact' is compared only while the source revisions in 'revs' are unchanged (a newer gta-reversed or Neon changes counts).",
+    "'spec' ranges from the SPEC are always checked; 'control' addresses are always checked.",
+    "Metric notes: named_starts counts hooks.json + every plugin-sdk name in .text (incl. class-method wrappers);",
+    "named_starts_proto_method is the report-10 prototype metric (hooks + addrof/META + free-function wrappers) the SPEC's 9069 refers to.",
+    "thunk counts every function start that is a thunk; thunk_hooks_json restricts to hooks.json entries (the SPEC's 360/96/60).",
+    "patch_neon.memput counts MemPut + MemPutFast + MemAdd/Sub/And/Or rows with a resolved address; neon_memput_calls_nonfast",
+    "counts MemPut<> call sites (resolved + unresolved), the quantity the SPEC's 741 measured. Trunk (engine/mtasa) is not in",
+    "'exact' because WP-11 commits there often; limits.toml-dependent numbers are not in 'exact' either."
+  ],
+  "exe_sha256": "a559aa772fd136379155efa71f00c47aad34bbfeae6196b0fe1047d0645cbd26",
+  "revs": {
+    "gta-reversed": "7f3197a0e9b49aa5e364775957df6bd44eb656d3",
+    "plugin-sdk": "b55e89b336a81448c1aa1a5b188431c9845ebaa9",
+    "neon": "8235b369c3b8df3b62369f82c1ace8f94c989a95",
+    "mta-upstream": "715ec056da6a61638bbd51c3d0d3fdc8f528a2a2"
+  },
+  "exact": {
+    "hooks_json": 8025,
+    "reversed": 7441,
+    "named_starts": 9656,
+    "named_starts_proto_method": 9081,
+    "named_starts_by_origin": {"hooks_json": 8025, "plugin_sdk": 1631},
+    "starts_total": 20809,
+    "starts_by_origin": {"call_target": 2150, "data_ptr": 4101, "padding": 4002, "vtable": 900},
+    "e8_targets": 9919,
+    "e8_starts": 8529,
+    "vtable": 385,
+    "vtable_slots": 4889,
+    "struct_size": 769,
+    "global": 2400,
+    "global_by_origin": {"gta_reversed": 2345, "plugin_sdk": 55},
+    "limit_def_gta_reversed": {"array": 435, "id_range": 9, "pool": 25, "store": 10},
+    "thunk": {"hoodlum": 491, "other_jmp": 195, "seh_push_jmp": 87},
+    "thunk_hooks_json": {"hoodlum": 360, "other_jmp": 96, "seh_push_jmp": 60},
+    "callsite": 5972,
+    "patch_neon": {"hookinstall": 566, "hookinstallcall": 84, "hookpos": 594, "memcpy": 101, "memput": 907,
+                   "memset": 190, "reloc_manifest": 2833, "total": 5296, "vtable_slot": 21},
+    "patch_upstream": {"hookinstall": 563, "hookinstallcall": 54, "hookpos": 599, "memcpy": 100, "memput": 895,
+                       "memset": 199, "total": 2421, "vtable_slot": 11},
+    "neon_memput_calls_nonfast": 717
+  },
+  "spec": {
+    "hooks_json": [8025, 8025],
+    "reversed": [7441, 7441],
+    "named_starts_proto_method": [8888, 9250],
+    "vtable": [378, 385],
+    "struct_size": [700, 800],
+    "global": [1900, null],
+    "thunk_hooks_json.hoodlum": [360, 360],
+    "neon_hookpos": [564, 624],
+    "neon_memput_calls_nonfast": [704, 778],
+    "upstream_patches": [1, null],
+    "e8_targets": [9919, null],
+    "limit_arrays_with_len": [400, null],
+    "build_seconds": [0, 60]
+  },
+  "control": {
+    "0x53bf09": {"fn": "CGame::Process", "off": "0x29", "src": "game_sa/Game.cpp:78", "confidence": "high",
+                 "patch": ["HOOKPOS_CStreaming_Update_Caller", "neon", "Client/multiplayer_sa/CMultiplayerSA.cpp:40"]},
+    "gta_sa.exe+0x13E4FA": {"fn": "Game::Render2dStuff", "off": "0x2ca"},
+    "0x407260": {"fn": "CWorld::GetSector", "thunk": {"kind": "hoodlum", "target": "0x1566820"}},
+    "0x1566830": {"fn": "CWorld::GetSector", "in_hoodlum": true},
+    "0x6f4040": {"fn": "CDoor::Process", "src": "game_sa/Door.cpp:32", "reversed": true},
+    "0x41b1d0": {"confidence_not": "high"},
+    "find:CPed::Update": "CPed::Update",
+    "src:CDoor::Process": {"file": "game_sa/Door.cpp", "line": 32},
+    "g:0xc8d4c0": {"name": "gGameState", "type": "int32"}
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "saap": 1,
+  "methods": {
+    "hello": "core",
+    "ping": "core",
+    "status": "core",
+    "quit": "core",
+    "camera.get": "camera",
+    "camera.set": "camera",
+    "camera.release": "camera",
+    "world.settle": "world.settle",
+    "capture": "capture",
+    "pick": "pick",
+    "raycast": "pick",
+    "entity.query": "entity.query",
+    "entity.inspect": "entity.inspect",
+    "env.get": "env",
+    "env.set": "env",
+    "view.set": "view",
+    "asset.render": "asset.render",
+    "log.poll": "log",
+    "console.exec": "console",
+    "lua.exec": "lua",
+    "mem.read": "mem.read"
+  }
+}

@@ -1,0 +1,29 @@
+# Files of the development repository that never go public: `satk dev export-public` leaves them out of the
+# public snapshot, and `satk dev release` leaves them out of the zip, the wheel and the sdist.
+#
+# Patterns follow .gitignore: one per line, "#" starts a comment, "!" re-includes, a "/" at the start or in
+# the middle anchors the pattern to the repository root, "*" and "?" and "[...]" match inside one name,
+# "**" matches across folders, a trailing "/" means a folder. The last matching line wins.
+#
+# Lines starting with "@allow" are audit exceptions, not patterns:
+#   @allow <rule> <path pattern> [<regex the finding's text must match>]
+# Rules: machine-path, plan-ref, email, secret, private-repo, asset, large-file, dangling-ref.
+
+# The install audit of the maintainer's own modded game folder (its file list identifies that install).
+/data/manifests/install-*.json
+
+# The CLAUDE.md of the development workspace (published only into that workspace by sync-agent-docs).
+/docs/agent/workspace-CLAUDE.md
+
+# Review notes of the development process (internal task ids, not needed by any test).
+/tests/re/DEFECT_REVIEW.md
+
+# Compares the index schema with the maintainers' design notes, which exist only in the development workspace.
+/tests/index/test_ddl_spec.py
+
+# The third-party crash list (JuniorDjjr/CrashInfo, see data/notices/crashinfo.txt) quotes its author's own
+# AppData folder in three answers; it is upstream text, kept verbatim.
+@allow machine-path /data/crashlist/*.txt ^C:.Users.JuniorDjjr$
+
+# The redaction tests of satk bug-report use made-up account folders (no real person, not this machine).
+@allow machine-path /tests/bugreport/test_bugreport.py (?i)^c:[\\/]+users[\\/]+(?:иван|someone|other|admin)$

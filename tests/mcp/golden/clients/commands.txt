@@ -1,0 +1,15 @@
+claude-code user: claude mcp add satk --scope user -e PYTHONUTF8=1 -e PYTHONPATH=<ROOT>/co/src -e SATK_HOME=<ROOT>/ws -e SATK_MCP_GROUPS=core,index,media -e OTEL_SDK_DISABLED=true -- <ROOT>/co/.venv/Scripts/python.exe -X utf8 -m satk.mcp
+claude-code project: claude mcp add satk --scope project -e PYTHONUTF8=1 -e PYTHONPATH=<ROOT>/co/src -e SATK_HOME=<ROOT>/ws -e SATK_MCP_GROUPS=core,index,media -e OTEL_SDK_DISABLED=true -- <ROOT>/co/.venv/Scripts/python.exe -X utf8 -m satk.mcp
+codex user: codex mcp add satk --env PYTHONUTF8=1 --env PYTHONPATH=<ROOT>/co/src --env SATK_HOME=<ROOT>/ws --env SATK_MCP_GROUPS=core,index,media --env OTEL_SDK_DISABLED=true -- <ROOT>/co/.venv/Scripts/python.exe -X utf8 -m satk.mcp
+codex project: (none)
+cursor user: (none)
+cursor project: (none)
+windsurf user: (none)
+vscode user: (none)
+vscode project: (none)
+claude-desktop user: (none)
+gemini user: gemini mcp add satk <ROOT>/co/.venv/Scripts/python.exe --scope user -e PYTHONUTF8=1 -e PYTHONPATH=<ROOT>/co/src -e SATK_HOME=<ROOT>/ws -e SATK_MCP_GROUPS=core,index,media -e OTEL_SDK_DISABLED=true -- -X utf8 -m satk.mcp
+gemini project: gemini mcp add satk <ROOT>/co/.venv/Scripts/python.exe --scope project -e PYTHONUTF8=1 -e PYTHONPATH=<ROOT>/co/src -e SATK_HOME=<ROOT>/ws -e SATK_MCP_GROUPS=core,index,media -e OTEL_SDK_DISABLED=true -- -X utf8 -m satk.mcp
+lmstudio user: (none)
+continue project: (none)
+generic -: (none)
