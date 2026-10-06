@@ -1,0 +1,624 @@
+{
+  "format": "satk.kit-blanks-automobile/1",
+  "_comment": [
+    "Body profiles of the automobile blank (kit.blank --kind automobile). Our own parametric construction:",
+    "proportions in fractions of the length L (t = 0 rear end .. 1 front end) and of the height H above the ground,",
+    "centred on the class medians of the style guides; no vanilla vertex, face or texture is used anywhere.",
+    "top/belt/floor are centre-line profiles [[t, h]]; crease_t lists the knots with a tangent break."
+  ],
+  "tiers": {
+    "vanilla": {
+      "cell_m": 0.62,
+      "arch_cols": 11,
+      "ring": [
+        0,
+        0.2,
+        0.55,
+        1.0
+      ],
+      "profile": {
+        "crown": 0.1,
+        "crown_roof": 0.062,
+        "pillow": 0.05,
+        "bulge": 1.09,
+        "uv_all_rings": true,
+        "uv_ring_gap": 0.0047,
+        "uv_row_gap": 0.0037,
+        "uv_row_seams": [
+          "glass_m",
+          "belt"
+        ],
+        "plan": {
+          "exp": 1.92,
+          "roof_w": 0.65
+        },
+        "detail": {
+          "well_depth": 0.22,
+          "well_segments": 2,
+          "jamb_depth": 0.0,
+          "window_depth": 0.017,
+          "lamp_depth": 0.039,
+          "lamp_len": 0.48,
+          "interior_chamfer": 0.08,
+          "underbody": [
+            "tunnel",
+            "engine"
+          ],
+          "underbody_chamfer": 0.058,
+          "interior_parts": [
+            "seat_f",
+            "back_f",
+            "seat_r",
+            "dash"
+          ]
+        }
+      }
+    },
+    "sa_plus": {
+      "cell_m": 0.74,
+      "arch_cols": 15,
+      "ring": [
+        0,
+        0.12,
+        0.4,
+        0.7,
+        1.0
+      ],
+      "profile": {
+        "crown": 0.115,
+        "crown_roof": 0.1,
+        "pillow": 0.06,
+        "bulge": 1.055,
+        "uv_all_rings": true,
+        "uv_ring_gap": 0.005,
+        "uv_row_gap": 0.0095,
+        "uv_row_seams": [
+          "glass_m",
+          "belt"
+        ],
+        "plan": {
+          "exp": 1.95,
+          "roof_w": 0.71
+        },
+        "detail": {
+          "well_depth": 0.22,
+          "well_segments": 2,
+          "jamb_depth": 0.075,
+          "window_depth": 0.03,
+          "lamp_depth": 0.025,
+          "lamp_len": 0.55,
+          "interior_chamfer": 0.05,
+          "underbody": true,
+          "underbody_chamfer": 0.075
+        }
+      }
+    }
+  },
+  "bodies": {
+    "sedan": {
+      "summary": "three-box sedan (peer set car.sedan)",
+      "dims": {
+        "L": 5.82,
+        "W": 2.27,
+        "H": 1.53,
+        "wheelbase": 3.55,
+        "track": 1.87,
+        "wheel_d": 0.7
+      },
+      "axle_rear_t": 0.23,
+      "ground_to_floor": 0.17,
+      "sill_h": 0.27,
+      "wheel_clear": 0.07,
+      "plan": {
+        "front_m": 0.95,
+        "rear_m": 0.85,
+        "belt_w": 1.0,
+        "deck_w": 0.93,
+        "exp": 2.3,
+        "roof_w": 0.74
+      },
+      "top": [
+        [
+          0.0,
+          0.585
+        ],
+        [
+          0.014,
+          0.628
+        ],
+        [
+          0.07,
+          0.656
+        ],
+        [
+          0.17,
+          0.664
+        ],
+        [
+          0.31,
+          0.962
+        ],
+        [
+          0.43,
+          1.0
+        ],
+        [
+          0.59,
+          0.968
+        ],
+        [
+          0.725,
+          0.664
+        ],
+        [
+          0.86,
+          0.636
+        ],
+        [
+          0.965,
+          0.592
+        ],
+        [
+          1.0,
+          0.54
+        ]
+      ],
+      "crease_t": [
+        0.17,
+        0.31,
+        0.59,
+        0.725
+      ],
+      "belt": [
+        [
+          0.0,
+          0.61
+        ],
+        [
+          0.5,
+          0.655
+        ],
+        [
+          1.0,
+          0.6
+        ]
+      ],
+      "stations": {
+        "boot_end": 0.07,
+        "rear_window_base": 0.17,
+        "roof_rear": 0.31,
+        "door_r_rear": 0.335,
+        "door_r_front": 0.5,
+        "door_f_rear": 0.535,
+        "roof_front": 0.59,
+        "cowl": 0.725,
+        "hood_end": 0.965,
+        "bump_rear_end": 0.075,
+        "bump_front_start": 0.925
+      },
+      "detail": {
+        "mirror": true
+      }
+    },
+    "coupe": {
+      "summary": "two-door coupe or muscle car (peer set car.coupe_muscle)",
+      "dims": {
+        "L": 5.43,
+        "W": 2.23,
+        "H": 1.47,
+        "wheelbase": 3.19,
+        "track": 1.825,
+        "wheel_d": 0.7
+      },
+      "axle_rear_t": 0.24,
+      "ground_to_floor": 0.17,
+      "sill_h": 0.27,
+      "wheel_clear": 0.07,
+      "plan": {
+        "front_m": 0.95,
+        "rear_m": 0.85,
+        "belt_w": 1.0,
+        "deck_w": 0.93,
+        "exp": 2.3,
+        "roof_w": 0.74
+      },
+      "top": [
+        [
+          0.0,
+          0.6
+        ],
+        [
+          0.014,
+          0.64
+        ],
+        [
+          0.07,
+          0.66
+        ],
+        [
+          0.2,
+          0.668
+        ],
+        [
+          0.36,
+          0.955
+        ],
+        [
+          0.46,
+          1.0
+        ],
+        [
+          0.56,
+          0.96
+        ],
+        [
+          0.7,
+          0.668
+        ],
+        [
+          0.86,
+          0.64
+        ],
+        [
+          0.965,
+          0.6
+        ],
+        [
+          1.0,
+          0.55
+        ]
+      ],
+      "crease_t": [
+        0.2,
+        0.36,
+        0.56,
+        0.7
+      ],
+      "belt": [
+        [
+          0.0,
+          0.6
+        ],
+        [
+          0.5,
+          0.64
+        ],
+        [
+          1.0,
+          0.59
+        ]
+      ],
+      "stations": {
+        "boot_end": 0.07,
+        "rear_window_base": 0.2,
+        "roof_rear": 0.36,
+        "door_r_rear": 0.44,
+        "door_r_front": 0.44,
+        "door_f_rear": 0.44,
+        "roof_front": 0.56,
+        "cowl": 0.7,
+        "hood_end": 0.965,
+        "bump_rear_end": 0.075,
+        "bump_front_start": 0.925
+      },
+      "detail": {
+        "mirror": true
+      }
+    },
+    "sports": {
+      "summary": "two-door sports car (peer set car.sports)",
+      "dims": {
+        "L": 5.26,
+        "W": 2.17,
+        "H": 1.38,
+        "wheelbase": 3.07,
+        "track": 1.808,
+        "wheel_d": 0.7
+      },
+      "axle_rear_t": 0.24,
+      "ground_to_floor": 0.17,
+      "sill_h": 0.27,
+      "wheel_clear": 0.07,
+      "plan": {
+        "front_m": 0.95,
+        "rear_m": 0.85,
+        "belt_w": 1.0,
+        "deck_w": 0.93,
+        "exp": 2.3,
+        "roof_w": 0.74
+      },
+      "top": [
+        [
+          0.0,
+          0.58
+        ],
+        [
+          0.014,
+          0.62
+        ],
+        [
+          0.07,
+          0.645
+        ],
+        [
+          0.22,
+          0.65
+        ],
+        [
+          0.38,
+          0.93
+        ],
+        [
+          0.47,
+          1.0
+        ],
+        [
+          0.56,
+          0.95
+        ],
+        [
+          0.7,
+          0.65
+        ],
+        [
+          0.86,
+          0.62
+        ],
+        [
+          0.965,
+          0.575
+        ],
+        [
+          1.0,
+          0.52
+        ]
+      ],
+      "crease_t": [
+        0.22,
+        0.38,
+        0.56,
+        0.7
+      ],
+      "belt": [
+        [
+          0.0,
+          0.6
+        ],
+        [
+          0.5,
+          0.62
+        ],
+        [
+          1.0,
+          0.57
+        ]
+      ],
+      "stations": {
+        "boot_end": 0.07,
+        "rear_window_base": 0.22,
+        "roof_rear": 0.38,
+        "door_r_rear": 0.46,
+        "door_r_front": 0.46,
+        "door_f_rear": 0.46,
+        "roof_front": 0.56,
+        "cowl": 0.7,
+        "hood_end": 0.965,
+        "bump_rear_end": 0.075,
+        "bump_front_start": 0.925
+      },
+      "detail": {
+        "mirror": true
+      }
+    },
+    "suv": {
+      "summary": "SUV or pickup cab (peer set car.suv_pickup)",
+      "dims": {
+        "L": 5.1,
+        "W": 2.24,
+        "H": 1.97,
+        "wheelbase": 3.157,
+        "track": 1.914,
+        "wheel_d": 0.8
+      },
+      "axle_rear_t": 0.2,
+      "ground_to_floor": 0.17,
+      "sill_h": 0.27,
+      "wheel_clear": 0.07,
+      "plan": {
+        "front_m": 0.95,
+        "rear_m": 0.85,
+        "belt_w": 1.0,
+        "deck_w": 0.93,
+        "exp": 2.3,
+        "roof_w": 0.74
+      },
+      "top": [
+        [
+          0.0,
+          0.7
+        ],
+        [
+          0.014,
+          0.74
+        ],
+        [
+          0.06,
+          0.76
+        ],
+        [
+          0.1,
+          0.77
+        ],
+        [
+          0.16,
+          0.97
+        ],
+        [
+          0.3,
+          1.0
+        ],
+        [
+          0.7,
+          0.99
+        ],
+        [
+          0.76,
+          0.78
+        ],
+        [
+          0.86,
+          0.76
+        ],
+        [
+          0.965,
+          0.7
+        ],
+        [
+          1.0,
+          0.64
+        ]
+      ],
+      "crease_t": [
+        0.1,
+        0.16,
+        0.7,
+        0.76
+      ],
+      "belt": [
+        [
+          0.0,
+          0.7
+        ],
+        [
+          0.5,
+          0.72
+        ],
+        [
+          1.0,
+          0.68
+        ]
+      ],
+      "stations": {
+        "boot_end": 0.06,
+        "rear_window_base": 0.1,
+        "roof_rear": 0.16,
+        "door_r_rear": 0.2,
+        "door_r_front": 0.46,
+        "door_f_rear": 0.5,
+        "roof_front": 0.7,
+        "cowl": 0.76,
+        "hood_end": 0.965,
+        "bump_rear_end": 0.07,
+        "bump_front_start": 0.925
+      },
+      "detail": {
+        "mirror": true
+      }
+    },
+    "van": {
+      "summary": "panel van or minibus (peer set car.van)",
+      "dims": {
+        "L": 5.94,
+        "W": 2.36,
+        "H": 2.64,
+        "wheelbase": 3.69,
+        "track": 1.82,
+        "wheel_d": 0.72
+      },
+      "axle_rear_t": 0.2,
+      "ground_to_floor": 0.17,
+      "sill_h": 0.27,
+      "wheel_clear": 0.07,
+      "plan": {
+        "front_m": 0.95,
+        "rear_m": 0.85,
+        "exp": 1.95,
+        "belt_w": 1.0,
+        "roof_w": 0.9,
+        "deck_w": 0.95
+      },
+      "top": [
+        [
+          0.0,
+          0.78
+        ],
+        [
+          0.012,
+          0.82
+        ],
+        [
+          0.05,
+          0.83
+        ],
+        [
+          0.1,
+          0.84
+        ],
+        [
+          0.12,
+          0.98
+        ],
+        [
+          0.35,
+          1.0
+        ],
+        [
+          0.8,
+          0.99
+        ],
+        [
+          0.86,
+          0.82
+        ],
+        [
+          0.9,
+          0.8
+        ],
+        [
+          0.965,
+          0.74
+        ],
+        [
+          1.0,
+          0.66
+        ]
+      ],
+      "crease_t": [
+        0.1,
+        0.12,
+        0.8,
+        0.86
+      ],
+      "belt": [
+        [
+          0.0,
+          0.74
+        ],
+        [
+          0.5,
+          0.76
+        ],
+        [
+          1.0,
+          0.7
+        ]
+      ],
+      "stations": {
+        "boot_end": 0.05,
+        "rear_window_base": 0.1,
+        "roof_rear": 0.12,
+        "door_r_rear": 0.4,
+        "door_r_front": 0.4,
+        "door_f_rear": 0.4,
+        "roof_front": 0.8,
+        "cowl": 0.86,
+        "hood_end": 0.965,
+        "bump_rear_end": 0.07,
+        "bump_front_start": 0.93
+      },
+      "detail": {
+        "mirror": true
+      }
+    }
+  }
+}

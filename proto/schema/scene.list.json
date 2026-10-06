@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/scene.list.json",
+  "title": "scene.list",
+  "description": "Placed entities with their files, stats and state.",
+  "x-saap": {
+    "method": "scene.list",
+    "capability": "view",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {}
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "handle": {
+                "type": "string"
+              },
+              "entity": {
+                "$ref": "common.json#/$defs/EntityRef"
+              },
+              "stats": {
+                "type": "object",
+                "properties": {
+                  "atomics": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "tris": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "textures": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "missing_textures": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "bounds": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "common.json#/$defs/Vec3"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                }
+              },
+              "vehicle": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "txd": {
+                    "type": "string"
+                  },
+                  "wheels": {
+                    "type": "object",
+                    "properties": {
+                      "from": {
+                        "type": "string"
+                      },
+                      "scale": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 2,
+                        "maxItems": 2
+                      },
+                      "count": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    }
+                  },
+                  "colors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "slot": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 4
+                        },
+                        "index": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "rgb": {
+                          "type": "string",
+                          "pattern": "^#[0-9a-f]{6}$"
+                        }
+                      },
+                      "required": [
+                        "slot",
+                        "rgb"
+                      ]
+                    }
+                  },
+                  "dirt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 15
+                  },
+                  "lights": {
+                    "type": "boolean"
+                  },
+                  "parts": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "enum": [
+                        "ok",
+                        "dam",
+                        "off"
+                      ]
+                    }
+                  },
+                  "materials": {
+                    "type": "object"
+                  }
+                }
+              },
+              "ped": {
+                "type": "object",
+                "properties": {
+                  "anim": {
+                    "type": "object",
+                    "properties": {
+                      "ifp": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "time": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "duration": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "bones": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "nodes": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    }
+                  }
+                }
+              },
+              "grounded": {
+                "type": "boolean"
+              },
+              "warn": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "reloads": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "load_ms": {
+                "type": "number",
+                "minimum": 0
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "handle",
+              "entity"
+            ]
+          }
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "items"
+      ]
+    }
+  }
+}

@@ -28,7 +28,7 @@ ROLES: tuple[str, ...] = ("ariane", "game", "client1", "client2", "server", "ble
 CAPABILITIES: tuple[str, ...] = (
     "core", "camera", "world.settle", "capture", "capture.size", "capture.ids", "capture.depth",
     "pick", "pick.visible", "entity.query", "entity.inspect", "env", "view", "asset.render",
-    "log", "console", "lua", "mem.read",
+    "log", "console", "lua", "mem.read", "author",
 )
 #: Capabilities that refine options of a method rather than add methods.
 SUB_CAPABILITIES: tuple[str, ...] = ("capture.size", "capture.ids", "capture.depth", "pick.visible")

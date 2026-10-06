@@ -248,6 +248,7 @@ bpy.ops.mesh.primitive_cylinder_add(radius=0.6, depth=1.0, location=(5, 3, -0.5)
 bpy.context.object.name = "Plinth"
 bpy.ops.mesh.primitive_plane_add(size=1, location=(20, 0, 0))
 bpy.context.object.name = "Helper"
+bpy.context.preferences.filepaths.file_preview_type = "NONE"  # no thumbnail in the user's .thumbnails
 bpy.ops.wm.save_as_mainfile(filepath=OUT)
 """
 
@@ -354,3 +355,15 @@ def test_addon_operator_and_txd_patch(live_work, tmp_path):
     assert _all_ok(man["checks"], "txd" in man["files"]), man["checks"]
     assert d["patched"] and d["txd_names"] == ["crate_px"] and d["img_name"] == "check.txd/crate_px/0"
     assert d["px"] == pytest.approx([0.6, 0.4, 0.2, 1.0], abs=0.01)
+
+
+def test_ide_text_flags_and_class_param():
+    t = G.ide_text("bin", None, 100.0, flags=132)
+    assert "-1, bin, bin, 100, 132" in t
+    from satk.core.registry import get_op
+
+    spec = get_op("blender.game_ready")
+    assert spec.param("asset_class").choices == ("prop", "building", "terrain", "vegetation", "interior_prop",
+                                                 "interior_shell", "pickup", "overlay")
+    assert spec.param("draw").default is None and spec.param("col").default is None
+    assert G.BIG_BUILDING_DRAW == 300

@@ -2,9 +2,11 @@
 
 * :func:`export` — ``glb`` | ``obj`` | ``png`` (the model's textures) | ``raw`` (DFF + TXD chain + COL as in
   the game) into ``work/out/models/<name>/`` (``raw``: ``work/cache/raw/<profile>/``);
-* :func:`image` — preview sheet of a model; backends ``soft`` (default, numpy, deterministic), ``ariane``
-  (running viewer, SAAP ``asset.render``) and ``blender`` (WP-10 runner); ``ariane``/``blender`` fall back
-  to ``soft`` with a warning when they cannot render. Cached by content:
+* :func:`image` — preview sheet of a model; backends ``soft`` (default, numpy, deterministic; the game look
+  of :mod:`satk.look.gamelook`: noon light of the profile's ``timecyc.dat``, colour filter, dirt level 2 on
+  ``vehiclegrunge256``, white lamps), ``ariane`` (running viewer, SAAP ``asset.render``) and ``blender``
+  (WP-10 runner); ``ariane``/``blender`` fall back to ``soft`` with a warning when they cannot render.
+  Cached by content:
   ``work/cache/model/<dff_hash>-<txdchain_hash>-<backend>-<views>-<size>.png`` (+ ``.json`` sidecar);
 * :func:`satk.model3d.batch.thumbnails` — the same for every model (``satk model image --all``).
 
@@ -33,7 +35,8 @@ from .mesh import ModelScene, build_scene
 from .resolve import ModelSource, open_db, resolve
 from .textures import MatInfo, TxdChain, decode, resolve_materials, vehicle_colours
 
-__all__ = ["FORMATS", "BACKENDS", "Loaded", "load", "export", "image", "cache_key", "out_dir", "render_soft_png"]
+__all__ = ["FORMATS", "BACKENDS", "Loaded", "load", "export", "image", "cache_key", "out_dir", "render_soft_png",
+           "game_env"]
 
 FORMATS = ("glb", "obj", "png", "raw")
 BACKENDS = ("auto", "soft", "ariane", "blender")
@@ -62,14 +65,31 @@ def _safe(name: str) -> str:
 
 
 def _read(db, src: ModelSource) -> tuple[bytes | None, list[tuple[str, bytes]]]:
-    dff = db.read_blob(src.dff) if src.dff is not None else None
-    txds = [(_stem(b.name), db.read_blob(b)) for b in src.txd_chain]
+    from ..index.api import read_blob_bytes
+
+    rd = db.read_blob if db is not None else read_blob_bytes  # a DFF file of one's own needs no index
+    dff = rd(src.dff) if src.dff is not None else None
+    txds = [(_stem(b.name), rd(b)) for b in src.txd_chain]
     return dff, txds
+
+
+def _db_for(ident: str, profile: str, db):
+    """The index (``None`` for a ``.dff`` path: :func:`satk.model3d.resolve.resolve_file` opens it only for
+    ``vehicle.txd``)."""
+    from .resolve import is_dff_path
+
+    if db is not None or is_dff_path(ident):
+        return db
+    return open_db(profile)
 
 
 def _colours(src: ModelSource) -> dict | None:
     if src.sec != "cars":
         return None
+    if src.model_id is None:  # a file of one's own: satk's default paint
+        from .textures import DEFAULT_CAR_COLOURS
+
+        return dict(DEFAULT_CAR_COLOURS)
     try:
         root = paths.profile_root(src.profile)
     except SatkError:
@@ -87,7 +107,7 @@ def _scene(src: ModelSource, dff: bytes) -> ModelScene:
 
 def load(ident: str, profile: str = "vanilla", *, db=None) -> Loaded:
     """Resolve ``ident`` and read/decode everything (``scene`` ``None`` when the game has no DFF)."""
-    db = db or open_db(profile)
+    db = _db_for(ident, profile, db)
     src = resolve(ident, profile, db)
     dff, txds = _read(db, src)
     chain = TxdChain(txds)
@@ -139,7 +159,7 @@ def export(ident: str, fmt: str = "glb", out: str | None = None, profile: str = 
     if fmt not in FORMATS:
         raise SatkError("BAD_PARAMS", f"unknown format {fmt!r}", did_you_mean=list(FORMATS))
     t0 = time.perf_counter()
-    db = db or open_db(profile)
+    db = _db_for(ident, profile, db)
     if fmt == "raw":
         return _export_raw(ident, out, profile, db, t0)
     L = load(ident, profile, db=db)
@@ -196,8 +216,11 @@ def _export_raw(ident: str, out: str | None, profile: str, db, t0: float) -> dic
     files: list[Path] = []
     warn = list(src.notes)
     refs = ([src.dff] if src.dff is not None else []) + list(src.txd_chain)
+    from ..index.api import read_blob_bytes
+
+    rd = db.read_blob if db is not None else read_blob_bytes
     for ref in refs:
-        data = db.read_blob(ref)
+        data = rd(ref)
         n = rw_payload_size(data)
         files.append(_write(d / _safe(ref.name), data[:n] if n else data))
     col = None
@@ -205,7 +228,7 @@ def _export_raw(ident: str, out: str | None, profile: str, db, t0: float) -> dic
         if src.col.via == "embedded":
             col = f"embedded in {src.dff.name if src.dff else src.name}"
         else:
-            data = db.read_blob(src.col.blob)
+            data = rd(src.col.blob)
             p = _write(d / _safe(src.col.blob.name), data)
             files.append(p)
             col = f"{src.col.blob.name}#{src.col.idx}"
@@ -233,14 +256,16 @@ def _bg(bg) -> tuple[int, int, int]:
 
 
 def cache_key(dff: bytes, txds: list[tuple[str, bytes]], backend: str, views: int, size: int, *,
-              el: float = 25.0, bg=None, colours: dict | None = None) -> str:
+              el: float = 25.0, bg=None, colours: dict | None = None, env: dict | None = None) -> str:
     """``<dff_hash>-<txdchain_hash>-<backend>-<views>-<size>`` (txdchain hash also covers render settings)."""
     from .softrender import RENDER_VERSION
 
     hd = hashlib.blake2b(dff, digest_size=6).hexdigest()
     h = hashlib.blake2b(digest_size=6)
+    look = json.dumps({k: (env or {}).get(k) for k in ("amb", "amb_obj", "dir", "postfx1", "postfx2", "balance")},
+                      sort_keys=True)
     h.update(f"satk-model3d/{backend}/r{RENDER_VERSION}/el{float(el):g}/bg{_bg(bg)}/c{sorted((colours or {}).items())}"
-             .encode())
+             f"/look{look}".encode())
     for name, data in txds:
         h.update(name.encode() + b"\0" + hashlib.blake2b(data, digest_size=16).digest())
     return f"{hd}-{h.hexdigest()}-{backend}-{int(views)}-{int(size)}"
@@ -250,17 +275,30 @@ def _legend(angles: list[tuple[float, float]]) -> list[list]:
     return [[i + 1, round(az, 1), round(el, 1)] for i, (az, el) in enumerate(angles)]
 
 
+def game_env(profile: str = "vanilla") -> dict:
+    """The light of the soft game look: noon of the profile's ``timecyc.dat`` (built-in vanilla table without
+    an index)."""
+    from ..look import gamelook as G
+
+    try:
+        return G.env_at("12:00", G.DEFAULT_WEATHER, profile)
+    except Exception:  # noqa: BLE001 - any index trouble: the built-in table
+        return G.default_env("12:00")
+
+
 def render_soft_png(src: ModelSource, dff: bytes, txds: list[tuple[str, bytes]], views: int, size: int, *,
-                    el: float = 25.0, bg=None) -> tuple[bytes, dict]:
-    """Render with the ``soft`` backend: ``(png_bytes, stats)``."""
+                    el: float = 25.0, bg=None, env: dict | None = None) -> tuple[bytes, dict]:
+    """Render with the ``soft`` backend: ``(png_bytes, stats)``; ``env`` = the game look's light."""
     from . import softrender as SR
+    from ..look.gamelook import DIRT_DEFAULT
 
     scene = _scene(src, dff)
     chain = TxdChain(txds)
-    mats = resolve_materials(scene.materials, chain, _colours(src))
-    prep = SR.prepare(scene, mats)
+    colours = _colours(src)
+    mats = resolve_materials(scene.materials, chain, colours)
+    prep = SR.prepare(scene, mats, dirt=DIRT_DEFAULT if colours else None)
     angles = SR.view_angles(views, el)
-    imgs, cover = SR.render(prep, angles, size, bg=_bg(bg))
+    imgs, cover = SR.render(prep, angles, size, bg=_bg(bg), env=env)
     png = SR.sheet_png(imgs, bg=_bg(bg))
     stats = {"tris": scene.tris, "drawn": prep.tris, "tex_missing": len(prep.tex_missing),
              "cover": [round(c, 3) for c in cover]}
@@ -378,7 +416,7 @@ def image(ident: str, views: int = 4, size: int = 384, backend: str = "auto", pr
     from .softrender import view_angles
 
     t0 = time.perf_counter()
-    db = db or open_db(profile)
+    db = _db_for(ident, profile, db)
     src = resolve(ident, profile, db)
     views, size = int(views), int(size)
     angles = view_angles(views, el)
@@ -393,9 +431,11 @@ def image(ident: str, views: int = 4, size: int = 384, backend: str = "auto", pr
                    warn=warn)
     dff, txds = _read(db, src)
     colours = _colours(src)
+    env = game_env(profile)
     order = ["soft"] if backend in ("auto", "soft") else [backend, "soft"]
     for used in order:
-        key = cache_key(dff, txds, used, views, size, el=el, bg=bg, colours=colours)
+        key = cache_key(dff, txds, used, views, size, el=el, bg=bg, colours=colours,
+                        env=env if used == "soft" else None)
         png_path = paths.work("cache", "model", f"{key}.png")
         side = png_path.with_suffix(".json")
         if not force and png_path.is_file() and side.is_file():
@@ -407,7 +447,7 @@ def image(ident: str, views: int = 4, size: int = 384, backend: str = "auto", pr
                 pass
         try:
             if used == "soft":
-                png, stats = render_soft_png(src, dff, txds, views, size, el=el, bg=bg)
+                png, stats = render_soft_png(src, dff, txds, views, size, el=el, bg=bg, env=env)
                 extra: list[str] = []
                 if stats.get("blank_views"):
                     empty = ", ".join(map(str, stats["blank_views"]))

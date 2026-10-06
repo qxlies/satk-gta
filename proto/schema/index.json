@@ -17,10 +17,19 @@
     "env.get": "env",
     "env.set": "env",
     "view.set": "view",
+    "scene.place": "view",
+    "scene.vehicle": "view",
+    "scene.ped": "view",
+    "scene.reload": "view",
+    "scene.remove": "view",
+    "scene.clear": "view",
+    "scene.list": "view",
     "asset.render": "asset.render",
     "log.poll": "log",
     "console.exec": "console",
     "lua.exec": "lua",
-    "mem.read": "mem.read"
+    "mem.read": "mem.read",
+    "author.call": "author",
+    "author.methods": "author"
   }
 }

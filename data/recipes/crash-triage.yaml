@@ -1,0 +1,32 @@
+# satk recipe (shipped). Run: satk recipe run crash-triage [--var crash=<dump or log>] [--var game=<game folder>]
+name: crash-triage
+summary: Triage a game crash - recent dumps and logs, the analysis (stack, known CrashInfo entry and solution, suspect mod), the modules of a dump, the game's logs and the first modloader bisection step.
+description: |
+  Read-only. Without 'crash' the newest dump or log of 'satk crash list' is analyzed.
+  With 'game' (the folder that crashed) its logs are digested and a bisection step for Mod Loader is printed.
+vars:
+  crash: {default: null, help: "minidump (.dmp) or crash log; empty = the newest one"}
+  game: {default: null, help: "the game folder that crashed"}
+steps:
+  - id: recent
+    op: crash.list
+    args: {limit: 5}
+    on_error: continue
+  - id: analyze
+    op: crash.analyze
+    args: {path: "${crash}", last: "${crash|not}", game: "${game}"}
+  - id: modules
+    op: crash.info
+    args: {path: "${steps.analyze.file}", part: modules, limit: 20}
+    when: "${steps.analyze.file|default:|ext|eq:dmp}"
+    on_error: continue
+  - id: logs
+    op: crash.logs
+    args: {game: "${game}"}
+    when: "${game}"
+    on_error: continue
+  - id: bisect
+    op: crash.bisect
+    input: ${game}
+    when: "${game}"
+    on_error: continue

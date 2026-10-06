@@ -1,4 +1,4 @@
-# `satk texture pack|replace|extract`: texture modding
+# `satk texture pack|replace|extract|finish|new`: texture modding
 
 [Русская версия](../ru/texmod.md)
 
@@ -7,8 +7,10 @@ Package: `satk.texmod`. It reads TXD through `satk.formats.txd` and checks its r
 ## What it is
 
 Texture mods without external programs: unpack the textures of a TXD to PNG, edit them, pack them back into a TXD
-(DXT1/DXT3/DXT5 or uncompressed, with mip levels) or replace a few textures in a copy of a game TXD. The game is
-only read; everything is written under `<work>`: unpacked textures go to `<work>/out/texmod/<txd>/`, a finished
+(DXT1/DXT3/DXT5 or uncompressed, with mip levels) or replace a few textures in a copy of a game TXD. `--asset-class vehicle|ped|weapon|map|lod`
+packs with the formats and mip levels the vanilla game uses for that kind of model, `texture new` paints a flat,
+gradient or banded base image of any size, and `texture finish` gives a flat or drawn image the soft, photo-like
+San Andreas look without photographs and lands it inside the vanilla band of its role. The game is only read; everything is written under `<work>`: unpacked textures go to `<work>/out/texmod/<txd>/`, a finished
 mod to `<work>/out/mods/<name>/<file>.txd` with a `README.txt` (modloader layout). Every TXD written is re-read by
 the satk parser, the new textures are decoded, and the answer gives the PSNR against the source image.
 
@@ -18,6 +20,10 @@ the satk parser, the new textures are decoded, and the answer gives the PSNR aga
 satk texture extract txd:bistro
 satk texture replace txd:bistro Plate=bistro/Marble.png Panel=bistro/DinerFloor.png --format dxt1 --name bistro_demo
 satk texture pack bistro --name bistro_small --max-size 64
+satk texture pack bistro --name bistro_vehicle --asset-class vehicle
+satk texture finish bistro/Marble.png --preset wall
+satk texture new bin_base --size 256 128 --color "#7a7c7c" --rect 0:0:1:0.6=#5c7a68
+satk texture finish new/bin_base.png --role prop
 ```
 
 What comes back (shortened):
@@ -37,6 +43,9 @@ To install the mod, copy `<work>/out/mods/bistro_demo/` into `<game folder>/modl
 | `satk texture extract TXD [--out DIR] [--force]` | — (through `satk_op`) | mip 0 of every texture to `<name>.png` + `texmod.json` (names, formats, mips); edited PNGs are not overwritten without `--force` (`state: kept`, `warn: KEPT`) |
 | `satk texture pack DIR [--name X] [--file F] [--format auto] [--mips N] [--quality normal] [--no-pot] [--max-size N]` | — | the images of a folder (`.png`; with Pillow also `.bmp .tga .jpg .dds …`) → `<work>/out/mods/<X>/<F or X>.txd`; the texture name is the file name |
 | `satk texture replace TXD TEX=IMG... [--name X] [--file F] [--format auto] [--mips N] [--add] [...]` | — | a copy of the TXD with the listed textures replaced (`--add` appends new ones), everything else byte for byte; the file name defaults to the source name (`bistro.txd`), the folder to the TXD name |
+| `satk texture pack DIR --asset-class vehicle\|ped\|weapon\|map\|lod [--out MODDIR]` | — | formats and mip levels as in the vanilla game for that class (table below); `--out` writes `<MODDIR>/<file>` into any writable folder (a Mod Loader mod) without a README |
+| `satk texture finish IMG [--preset photo_like\|interior\|wheel\|wall] [--mask AO.png] [--edge EDGE.png] [--role R] [--out DIR]` | — | the SA look without photographs: `<stem>-<preset>.png`, its DXT1 preview `…-dxt.png`, a stats table (value, saturation, contrast, colours) and the vanilla band of the role; the result is pulled into the inner part of that band |
+| `satk texture new NAME [--size W H] [--color #rrggbb] [--color2 C --gradient u\|v] [--rect u0:v0:u1:v1=#hex ...] [--alpha N] [--out DIR]` | — | a base image of any size (each side a multiple of 4): a colour, an optional gradient and rectangles in UV space (`v` up, the rectangles `uv.fit` and `kit.uv_region` use) → `<work>/out/texmod/new/<NAME>.png`, so no Pillow script is needed |
 
 Parameters:
 
@@ -60,6 +69,46 @@ Parameters:
   compares mip 0 after decoding with the image (RGB; for textures with alpha, RGB multiplied by alpha, plus
   alpha); `100` means lossless.
 
+`--asset-class` (measured on the vanilla game; an explicit `--format`/`--mips` still wins):
+
+| Class | Opaque | 1-bit alpha | Smooth alpha | Mip levels | Largest vanilla side |
+|---|---|---|---|---|---|
+| `vehicle` | DXT1 | DXT1 | DXT3 (never DXT5) | 1 (0 of 593 vanilla vehicle textures have mips) | 256 |
+| `ped` | X8R8G8B8 | A8R8G8B8 | A8R8G8B8 | 1 (273 of 289 are uncompressed) | 256 |
+| `weapon` | DXT1 | DXT1 | DXT3 | 1 | 128 |
+| `map` | DXT1 | DXT1 | DXT3 | a full chain from 256 px (57-77 % of vanilla 256-512 px map textures), else 1 | 512 |
+| `lod` | DXT1 | DXT1 | DXT3 | 1 | 512 |
+
+A larger image gives `warn: CLASS_SIZE` (the `sa_plus` tier allows about twice the vanilla side).
+
+`texture finish` presets and the vanilla band they aim at (p10/p50/p90 of the vanilla game; `value` = mean of
+max(r, g, b), `colours` = exact RGB colours of the DXT1 preview):
+
+| Preset | Role | Vanilla value | Vanilla colours |
+|---|---|---|---|
+| `interior` | car interiors (n=147) | 0.085 / 0.119 / 0.261 | 364 / 590 / 921 |
+| `wheel` | car wheels (n=133) | 0.21 / 0.27 / 0.48 | 208 / 296 / 412 |
+| `wall` | map walls (n=300), tileable, keeps the value | 0.46 / 0.64 / 0.81 | 77 / 564 / 2,708 |
+| `photo_like` | anything: keeps the value | — | — |
+
+A flat 128×128 fill finished with `--preset interior` lands inside the band (value 0.13, 650 colours after DXT1).
+
+`texture finish` takes three more inputs and one more guarantee:
+
+- `--mask AO.png` darkens by ambient occlusion (white = open); `--edge EDGE.png` is the worn-edge mask (white = edge;
+  `kit.bake` writes `<object>_ao.png` and `<object>_edge.png`): edges turn lighter and greyer, like chipped paint.
+  A mask of another size than the image is resized to it (`warn: RESIZED_MASK`), so a bake at the wrong size is not
+  an error.
+- `--role` names the vanilla texture role (`interior wheel decal body ped weapon wall ground prop generic`) whose
+  band the result lands in. `auto` (default): the preset's role, else the role the file name suggests, else `prop`.
+- **Band landing:** after finishing, the DXT1 preview is measured with the `style.texture` metrics (`tex.val_mean`,
+  `tex.sat_mean`, `tex.hf_energy`, `tex.colours`) against the vanilla distribution of the role (the cached sample of
+  `style.texture`; the three measured bands above when the style cache is not built). A metric in the outer quarter
+  of its p10..p90 band, or beyond it, is pulled to 20 % inside the inner part (value and saturation through their
+  targets, detail and colour count through the noise gain), up to four rounds; the `landing` table lists what moved.
+  A flat grey-green base for a bin lands with value 0.48, saturation 0.26, detail 42 and 1,500 colours against the
+  prop band 0.27-0.85, 0.05-0.70, 12-57, 152-2,468. Without a band for the role nothing is changed.
+
 ## How it works
 
 - **DXT encoder** (numpy, `satk.texmod.bc`): the segment ends are the principal colour axis of the block (PCA)
@@ -80,6 +129,12 @@ Parameters:
   8 = compressed; rasterType 4. New textures get filter 6 (trilinear) and wrap addressing. When replacing, the
   name (as the TXD spells it), the mask, the filter and the addressing are taken from the old texture; if mips
   appear, a filter without mip filtering is raised (1 → 3, 2 → 6), otherwise the game does not use them.
+- **Finish** works at 4× the size: it desaturates towards the preset, multiplies a lognormal noise field (soft
+  tileable blotches at two scales plus grain at the output resolution, so the grain survives the box filter)
+  whose strength is fitted so the luminance contrast meets the preset, darkens by the AO mask and by grime, scales
+  the mean value to the preset, lightens the worn edges and box-filters back. The noise seed is the image content
+  plus the preset and the masks, so the same input gives the same PNG. When `satk.style` provides `style.texture`,
+  its answer replaces the built-in band, and its role distribution drives the band landing.
 - **Determinism:** the same input gives the same TXD bytes and the same README (it holds the paths and sha256 of
   the images, no time). `README.txt` has one section per TXD of the mod folder; a repeat run updates only its own
   section.
@@ -93,6 +148,8 @@ Parameters:
   on 6×6 gives `BAD_PARAMS`).
 - The mod's `--file` is the name of the file modloader replaces; keep the source name for `replace`.
 - numpy (the encoder) and Pillow (resizing and non-PNG images) are needed; without Pillow only 8-bit PNGs are read.
+- `texture new` makes opaque or uniformly translucent images; per-pixel alpha shapes are drawn elsewhere (the finish
+  step keeps an image's alpha).
 - Other TXDs left in the mod folder by earlier runs are not deleted: `warn: OTHER_FILES`.
 
 ## Python API (if other packages use it)

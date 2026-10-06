@@ -1,0 +1,38 @@
+// {{NAME}}: a small mission loop. Made by 'satk script new mission'.
+// Build: satk script asm {{NAME}}/{{NAME}}.txt; install: copy {{NAME}}.cs into the game's cleo folder (CLEO 4 or 5).
+// Type the cheat code to start; reach {{X}} {{Y}} {{Z}} within 2 minutes. 0@ blip; 33@ is a timer (ms).
+{$CLEO .cs}
+03A4: script_name '{{SNAME}}'
+
+:WAIT_START
+0001: wait 250
+00D6: if 1                              // and: both conditions
+0256: is_player_playing $2
+0ADC: test_cheat "{{CHEAT}}"
+004D: goto_if_false @WAIT_START
+018A: add_blip_for_coord {{X}} {{Y}} {{Z}} 0@
+0ACA: print_help_string "{{TEXT}}"
+0006: set_lvar_int 33@ 0                // the timer counts up from 0
+
+:RUN
+0001: wait 0
+00D6: if 0
+0256: is_player_playing $2
+004D: goto_if_false @FAIL               // wasted or busted
+00D6: if 0
+00FE: locate_char_any_means_3d $3 {{X}} {{Y}} {{Z}} 3.0 3.0 3.0 true
+004D: goto_if_false @CHECK_TIME
+0164: remove_blip 0@
+0109: add_score $2 500
+0ACB: print_big_string "MISSION PASSED!~n~~w~$500" 4000 1
+0002: goto @WAIT_START
+
+:CHECK_TIME
+00D6: if 0
+0019: is_int_lvar_greater_than_number 33@ 120000
+004D: goto_if_false @RUN
+
+:FAIL
+0164: remove_blip 0@
+0ACD: print_string_now "~r~Mission failed" 3000
+0002: goto @WAIT_START

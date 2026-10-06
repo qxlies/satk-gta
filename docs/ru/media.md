@@ -48,6 +48,11 @@ satk map image --center 2495,-1687 --span 300
   синим, `zone` — прямоугольники зон с именами (в ответе `zones` — зоны, в которых лежит центр).
 - `--area -1` — все интерьеры сразу; `--labels 0` — без номеров.
 - MCP: `inline=true` прикладывает картинку к ответу (не больше 1024 px); по умолчанию возвращается только путь.
+- `SID...` может быть и путём к своему файлу `.txd` (все его PC-текстуры, легенда `file:<имя>.txd/<текстура>`) или
+  `.png`: ваши текстуры ложатся на тот же лист, что и ванильные (`txd:vehicle`), индекс для них не нужен.
+- Маленькие картинки для агентов: `satk.media.encode` пишет JPEG или WebP с пределом пикселей (`max_px`) и байтов
+  (`max_bytes`: качество снижается от 85, затем картинка уменьшается); его используют превью
+  (`satk blender preview`: не больше 1024 пикселей и 300 КБ, [look.md](look.md)). Текстуры остаются PNG без потерь.
 
 ## Как это устроено
 
@@ -87,6 +92,8 @@ png = texture_png("tex:bistro/vent_64", size=256)                     # Path
 sheet, legend = contact_sheet(["txd:lawest1"], cols=0)                 # cols=0 — автоматически (до 8)
 mp, legend, m_per_px = map_image(2495, -1687, span=300, layers=("inst", "zone"))
 stats = export_all(jobs=12)                                            # {"written", "skipped", "seconds", "backend", ...}
+from satk.media.encode import save_image
+save_image("<work>/out/x.jpg", w, h, rgba, max_px=1024, max_bytes=300_000)   # {"path", "w", "h", "bytes", "quality"}
 ```
 
 Низкоуровневое: `satk.media.texture.resolve_refs(db, sids)`, `decode_ref(TexRef)`, `png_for_ref(TexRef, size)`;

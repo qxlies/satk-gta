@@ -247,6 +247,7 @@ def alpha_render(out):
     render.camera(scene, (0, 0, 10), (0, 0, -1))
     bpy.context.view_layer.update()
     # Packed images are unloaded on reopen: this is the actual `render --blend` path.
+    bpy.context.preferences.filepaths.file_preview_type = "NONE"  # no thumbnail in the user's .thumbnails
     blend = str(out / "alpha.blend")
     bpy.ops.wm.save_as_mainfile(filepath=blend, check_existing=False)
     bpy.ops.wm.open_mainfile(filepath=blend)

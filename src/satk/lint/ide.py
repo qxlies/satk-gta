@@ -31,7 +31,8 @@ def check_ide(c: Collector, label: str, text: str) -> tuple[list[ModelDef], list
         meshes = "meshes" in d.extra
         if d.sec in ("objs", "tobj") and not meshes and d.draw is not None and d.draw < dmin:
             c.add("ide.draw_min", label, line=d.line, id=d.id, name=d.name, draw=d.draw)
-        out.append(ModelDef(d.id, d.name, d.txd, d.sec, d.draw, f"{label}:{d.line}", meshes))
+        out.append(ModelDef(d.id, d.name, d.txd, d.sec, d.draw, f"{label}:{d.line}", meshes, flags=d.flags,
+                            extra=dict(d.extra) if d.extra else None, ide=label.lower()))
     return out, list(txdp)
 
 

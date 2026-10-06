@@ -1,0 +1,99 @@
+{
+ "format": "satk-shader-templates",
+ "version": 1,
+ "about": "Templates of 'satk shader new'. fx/lua = files in this folder ('//@satk:snippet <name>' lines take snippets/<name>.fxh); select = default world textures (kind, names or apply patterns; null = the user must choose); values = [parameter, default, comment] set from Lua; update/setup/teardown = Lua lines of the glue.",
+ "templates": {
+  "car_paint": {
+   "about": "car paint reflection: sky reflection with a Fresnel falloff and a sun highlight on vehicle paint",
+   "fx": "car_paint.fx",
+   "lua": "world.lua",
+   "select": {"kind": "vehicle_paint"},
+   "element_types": "vehicle",
+   "priority": 1,
+   "max_distance": 120,
+   "layered": false,
+   "timer": 1000,
+   "values": [["gReflection", 0.45, "sky reflection strength (0..1)"], ["gSpecular", 0.8, "sun highlight strength"], ["gSpecularPower", 24, "sun highlight sharpness"]],
+   "update": ["local function update()", "    if not shader then", "        return", "    end", "    local tr, tg, tb, br, bg, bb = getSkyGradient()", "    dxSetShaderValue(shader, \"gSkyTop\", tr / 255, tg / 255, tb / 255)", "    dxSetShaderValue(shader, \"gSkyBottom\", br / 255, bg / 255, bb / 255)", "end"]
+  },
+  "wet_roads": {
+   "about": "wet, shiny roads: darker asphalt with a sky reflection and a sun highlight that follow the rain",
+   "fx": "wet_roads.fx",
+   "lua": "world.lua",
+   "select": {"kind": "road"},
+   "element_types": "world,object",
+   "priority": 1,
+   "max_distance": 250,
+   "layered": false,
+   "timer": 500,
+   "values": [["gReflection", 0.6, "sky reflection strength at full wetness"], ["gSpecularPower", 40, "sun highlight sharpness"]],
+   "consts": ["local MIN_WETNESS = 0.0   -- 0.6 = always shiny roads, 0 = only in the rain"],
+   "update": ["local function update()", "    if not shader then", "        return", "    end", "    local rain = getRainLevel() or 0", "    dxSetShaderValue(shader, \"gWetness\", math.max(MIN_WETNESS, math.min(1, rain * 1.5)))", "    local tr, tg, tb, br, bg, bb = getSkyGradient()", "    dxSetShaderValue(shader, \"gSkyTop\", tr / 255, tg / 255, tb / 255)", "    dxSetShaderValue(shader, \"gSkyBottom\", br / 255, bg / 255, bb / 255)", "end"]
+  },
+  "water": {
+   "about": "animated water: scrolling ripples, a sky reflection and a colour tint on the water texture",
+   "fx": "water.fx",
+   "lua": "world.lua",
+   "select": {"names": ["waterclear256"]},
+   "element_types": "world,object,other",
+   "priority": 1,
+   "max_distance": 0,
+   "layered": false,
+   "timer": 1000,
+   "values": [["gWaterColor", [0.10, 0.30, 0.35, 0.35], "tint colour (r, g, b) and its strength"], ["gFlowSpeed", 0.03, "texture scroll speed"], ["gReflection", 0.5, "sky reflection strength"]],
+   "update": ["local function update()", "    if not shader then", "        return", "    end", "    local tr, tg, tb, br, bg, bb = getSkyGradient()", "    dxSetShaderValue(shader, \"gSkyTop\", tr / 255, tg / 255, tb / 255)", "    dxSetShaderValue(shader, \"gSkyBottom\", br / 255, bg / 255, bb / 255)", "end"]
+  },
+  "texture_replace": {
+   "about": "world texture replacement: draw one image instead of the selected world textures",
+   "fx": "texture_replace.fx",
+   "lua": "world.lua",
+   "select": null,
+   "element_types": "world,vehicle,object,other",
+   "priority": 0,
+   "max_distance": 0,
+   "layered": false,
+   "timer": 0,
+   "image": true,
+   "values": [],
+   "consts": ["local IMAGE = \"{{IMAGE}}\"", "local texture"],
+   "setup": ["    texture = texture or dxCreateTexture(IMAGE)", "    dxSetShaderValue(shader, \"gTexture\", texture)"],
+   "update": ["local function update()", "end"]
+  },
+  "sky_fog": {
+   "about": "sky and fog tint: a warm world tint, a distance haze and a matching sky gradient",
+   "fx": "sky_fog.fx",
+   "lua": "world.lua",
+   "select": {"apply": ["*"]},
+   "element_types": "world,object",
+   "priority": 0,
+   "max_distance": 0,
+   "layered": false,
+   "timer": 0,
+   "values": [["gTint", [1.0, 0.92, 0.85, 0.35], "colour multiplier (r, g, b) and its strength"], ["gHazeColor", [0.85, 0.62, 0.5, 1.0], "haze colour"], ["gHazeStart", 120, "haze starts at this distance (m)"], ["gHazeEnd", 650, "full haze at this distance (m)"], ["gHazeMax", 0.55, "strongest haze (0..1)"]],
+   "consts": ["local SKY_TOP = {200, 150, 130}      -- setSkyGradient top colour", "local SKY_BOTTOM = {235, 185, 150}   -- setSkyGradient bottom colour"],
+   "setup": ["    setSkyGradient(SKY_TOP[1], SKY_TOP[2], SKY_TOP[3], SKY_BOTTOM[1], SKY_BOTTOM[2], SKY_BOTTOM[3])"],
+   "teardown": ["    resetSkyGradient()"],
+   "update": ["local function update()", "end"]
+  },
+  "ped_shading": {
+   "about": "ped shading tweak: saturation, contrast, brightness and a tint of peds (pixel shader only, skinning untouched)",
+   "fx": "ped_shading.fx",
+   "lua": "world.lua",
+   "select": {"apply": ["*"]},
+   "element_types": "ped",
+   "priority": 0,
+   "max_distance": 0,
+   "layered": false,
+   "timer": 0,
+   "values": [["gBrightness", 1.05, "brightness"], ["gContrast", 1.05, "contrast"], ["gSaturation", 1.1, "saturation"], ["gTint", [1.0, 0.97, 0.94, 0.25], "colour multiplier (r, g, b) and its strength"]],
+   "update": ["local function update()", "end"]
+  },
+  "post_process": {
+   "about": "simple post-process: colour grading and a vignette over the screen, HUD untouched",
+   "fx": "post_process.fx",
+   "lua": "post.lua",
+   "select": "screen",
+   "values": [["gBrightness", 1.0, "brightness"], ["gContrast", 1.08, "contrast"], ["gSaturation", 1.15, "saturation"], ["gVignette", 0.35, "darkening of the corners (0 = none)"], ["gTint", [1.0, 0.98, 0.95, 0.5], "colour multiplier (r, g, b) and its strength"]]
+  }
+ }
+}

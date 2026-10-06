@@ -83,19 +83,29 @@ class B:
         return B.chunk(0x02, raw + b"\0" * (-len(raw) % 4))
 
     @staticmethod
-    def material(tex: str | None = None, rgba=(255, 255, 255, 255)) -> bytes:
+    def texture(tex: str) -> bytes:
+        return B.chunk(0x06, B.chunk(0x01, struct.pack("<HH", 0x1106, 0)) + B.string(tex) + B.string("")
+                       + B.chunk(0x03, b""))
+
+    @staticmethod
+    def material(tex: str | None = None, rgba=(255, 255, 255, 255), env: str | None = None) -> bytes:
+        """A material; ``env`` adds a MatFX environment map with that texture."""
         st = struct.pack("<I4BII3f", 0, *rgba, 0, 1 if tex is not None else 0, 1.0, 1.0, 1.0)
         body = B.chunk(0x01, st)
         if tex is not None:
-            body += B.chunk(0x06, B.chunk(0x01, struct.pack("<HH", 0x1106, 0)) + B.string(tex) + B.string("")
-                            + B.chunk(0x03, b""))
-        return B.chunk(0x07, body + B.chunk(0x03, b""))
+            body += B.texture(tex)
+        ext = b""
+        if env is not None:
+            fx = struct.pack("<I", 2) + struct.pack("<IfII", 2, 0.5, 0, 1) + B.texture(env) + struct.pack("<I", 0)
+            ext = B.chunk(0x120, fx)
+        return B.chunk(0x07, body + B.chunk(0x03, ext))
 
     @staticmethod
     def geometry(pos: list[tuple], tris: list[tuple], *, mats: list[bytes] | None = None, uv_sets: int = 1,
                  prelit: bool = True, normals: bool = False, night: bool = False, prelit_rgba=None, uvs=None,
-                 extra_flags: int = 0, skin: bool = False, lib: int = SA_LIBID) -> bytes:
-        """A Geometry with a struct triangle list (``tris``: (a, b, c, mat))."""
+                 extra_flags: int = 0, skin: bool | bytes = False, lib: int = SA_LIBID, nrm=None) -> bytes:
+        """A Geometry with a struct triangle list (``tris``: (a, b, c, mat)); ``nrm``: normals per vertex
+        (default (0, 0, 1)); ``skin``: True = an empty Skin plugin, bytes = that Skin payload."""
         nv = len(pos)
         flags = 0x02 | 0x20 | (0x08 if prelit else 0) | (0x10 if normals else 0) | extra_flags
         flags |= 0x80 if uv_sets >= 2 else (0x04 if uv_sets == 1 else 0)
@@ -112,14 +122,14 @@ class B:
         st += struct.pack("<4fII", 0.5, 0.5, 0.0, 1.0, 1, 1 if normals else 0)
         st += b"".join(struct.pack("<3f", *p) for p in pos)
         if normals:
-            st += b"".join(struct.pack("<3f", 0.0, 0.0, 1.0) for _ in pos)
+            st += b"".join(struct.pack("<3f", *(nrm[i] if nrm else (0.0, 0.0, 1.0))) for i in range(nv))
         mats = mats if mats is not None else [B.material("gm_wall")]
         ml = B.chunk(0x01, struct.pack(f"<I{len(mats)}i", len(mats), *([-1] * len(mats)))) + b"".join(mats)
         e = b""
         if night:
             e += B.chunk(0x253F2F9, struct.pack("<I", 1) + bytes((40, 40, 60, 255)) * nv)
         if skin:
-            e += B.chunk(0x116, b"\0" * 4)
+            e += B.chunk(0x116, skin if isinstance(skin, bytes) else b"\0" * 4)
         return B.chunk(0x0F, B.chunk(0x01, st, lib) + B.chunk(0x08, ml) + B.chunk(0x03, e), lib)
 
     QUAD = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (1.0, 1.0, 1.0)]
@@ -130,9 +140,10 @@ class B:
               lib: int = SA_LIBID) -> bytes:
         st = B.chunk(0x01, struct.pack("<III", len(atomics), 0, 0))
         fl = struct.pack("<I", len(frames))
-        for parent, _name in frames:
-            fl += struct.pack("<12fiI", 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, parent, 0)
-        fext = b"".join(B.chunk(0x03, B.chunk(0x253F2FE, name.encode()) if name else b"") for _p, name in frames)
+        for fr in frames:                                     # (parent, name[, (x, y, z)])
+            pos = fr[2] if len(fr) > 2 else (0.0, 0.0, 0.0)
+            fl += struct.pack("<12fiI", 1, 0, 0, 0, 1, 0, 0, 0, 1, *pos, fr[0], 0)
+        fext = b"".join(B.chunk(0x03, B.chunk(0x253F2FE, fr[1].encode()) if fr[1] else b"") for fr in frames)
         body = st + B.chunk(0x0E, B.chunk(0x01, fl) + fext)
         body += B.chunk(0x1A, B.chunk(0x01, struct.pack("<I", len(geoms))) + b"".join(geoms))
         for fi, gi in atomics:
@@ -166,9 +177,10 @@ class B:
 
     @staticmethod
     def col3(name: str, *, spheres=(), boxes=(), verts=(), faces=(), bounds=None, flags: int | None = None,
-             version: int = 3) -> bytes:
+             version: int = 3, shadow_verts=(), shadow_faces=()) -> bytes:
         """COL2/3. ``spheres``: (cx, cy, cz, r, mat); ``boxes``: (min3, max3, mat); ``verts`` metres (x128 on
-        disk); ``faces``: (a, b, c, mat); ``bounds``: (min3, max3, center3, radius)."""
+        disk); ``faces``: (a, b, c, mat[, light]) (light default 0x3F: day 15, night 3); ``bounds``: (min3, max3,
+        center3, radius); ``shadow_*`` (COL3): the shadow mesh."""
         mn, mx, c, r = bounds or ((-2.0, -2.0, -2.0), (2.0, 2.0, 2.0), (0.0, 0.0, 0.0), 3.5)
         hdr = 76 + (12 if version >= 3 else 0)
         data = b""
@@ -186,13 +198,16 @@ class B:
         o_box = put(b"".join(struct.pack("<6f4B", *b_[0], *b_[1], b_[2], 0, 0, 0) for b_ in boxes))
         vb = b"".join(struct.pack("<3h", *(round(x * 128) for x in v)) for v in verts)
         o_vrt = put(vb + b"\0" * (-len(vb) % 4))
-        o_face = put(b"".join(struct.pack("<3H2B", *f[:3], f[3], 0) for f in faces))
+        o_face = put(b"".join(struct.pack("<3H2B", *f[:3], f[3], f[4] if len(f) > 4 else 0x3F) for f in faces))
+        svb = b"".join(struct.pack("<3h", *(round(x * 128) for x in v)) for v in shadow_verts)
+        o_svrt = put(svb + b"\0" * (-len(svb) % 4)) if shadow_verts else 0
+        o_sface = put(b"".join(struct.pack("<3H2B", *f[:3], 0, 0) for f in shadow_faces)) if shadow_faces else 0
         if flags is None:
-            flags = 2 if (spheres or boxes or faces) else 0
+            flags = (2 if (spheres or boxes or faces) else 0) | (16 if shadow_faces else 0)
         h = struct.pack("<10f3HBxI6I", *mn, *mx, *c, r, len(spheres), len(boxes), len(faces), 0, flags,
                         o_sph, o_box, 0, o_vrt, o_face, 0)
         if version >= 3:
-            h += struct.pack("<3I", 0, 0, 0)
+            h += struct.pack("<3I", len(shadow_faces), o_svrt, o_sface)
         fc = b"COL3" if version == 3 else b"COL2"
         return fc + struct.pack("<I22sH", 24 + len(h) + len(data), name.encode()[:22], 0) + h + data
 

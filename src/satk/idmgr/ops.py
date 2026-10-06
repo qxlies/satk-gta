@@ -53,7 +53,7 @@ def id_free(kind: Kind | None = None, count: int = 1, range: str | None = None, 
         artconfig: SA-MP DL artconfig.txt files whose ids count as taken (--target samp-dl).
     """
     from .free import artconfig_ids, capacity, free_ids, open_profiles, taken_ids
-    from .ranges import DEFAULT_RANGE, SAMP_DL, VANILLA_VEHICLES, fmt_ranges, fmt_spec, parse_ranges
+    from .ranges import DEFAULT_RANGE, LOW_SLOTS, SAMP_DL, VANILLA_VEHICLES, fmt_ranges, fmt_spec, parse_ranges
 
     if kind is None:
         raise SatkError("BAD_PARAMS", "give --kind vehicle|ped|weapon|object", hint="satk id free --kind vehicle")
@@ -92,6 +92,10 @@ def id_free(kind: Kind | None = None, count: int = 1, range: str | None = None, 
         if cap["used"] + len(ids) > cap["store"]:
             warn.append(f"STORE_FULL: the stock engine has {cap['store']} {kind} model slots and a profile already "
                         f"defines {cap['used']}: more need a limit adjuster (Open Limit Adjuster or fastman92 LA)")
+        elif cap["store"] - cap["used"] < LOW_SLOTS:
+            warn.append(f"STORE_LOW: only {cap['store'] - cap['used']} of {cap['store']} stock {kind} model slots are "
+                        f"free (a profile defines {cap['used']}); more need a limit adjuster (Open Limit Adjuster or "
+                        "fastman92 LA)")
         if kind == "vehicle" and any(not VANILLA_VEHICLES[0] <= i <= VANILLA_VEHICLES[1] for i in ids):
             warn.append("ADDON_VEHICLE: vehicle ids outside 400-611 need fastman92 LA (vehicle models + handling "
                         "and audio patches)")

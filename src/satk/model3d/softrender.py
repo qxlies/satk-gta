@@ -9,7 +9,11 @@ What it draws (game-like, deterministic byte for byte on one machine):
   with a soft two-sided headlight term (models without prelit colours get ambient + diffuse);
 * alpha: textures with alpha are alpha-clipped at 0.5; translucent material colours (vehicle
   glass) are blended once over the nearest opaque surface;
-* 2× supersampling (box filter) when the view is at most 256 px.
+* 2× supersampling (box filter) when the view is at most 256 px;
+* the game look (``env`` = a timecyc light from :func:`satk.look.gamelook.env_at`, used by ``model_image``):
+  the same numbers as the Blender game look - lit models get ``(amb_obj + dir * max(0, N.L)) * LIT_MULT``
+  with the shared light direction, prelit models ``prelit + amb``, then the colour filter and the display
+  gamma of the game; vehicle bodies on ``vehiclegrunge256`` get dirt level ``dirt`` (``prepare``).
 
 All numpy work happens inside functions (``satk`` modules never import numpy at import time).
 
@@ -33,7 +37,7 @@ __all__ = ["RENDER_VERSION", "DEFAULT_BG", "Prepared", "prepare", "render", "she
            "placeholder"]
 
 #: Bump when the output of the renderer changes (part of the thumbnail cache key).
-RENDER_VERSION = 2
+RENDER_VERSION = 3
 DEFAULT_BG = (178, 186, 196)
 _HFOV = 30.0
 _MARGIN = 0.05
@@ -95,8 +99,23 @@ def _smooth_normals_np(np, P, T):
     return out
 
 
-def prepare(scene: ModelScene, mats: list[list[MatInfo]], *, parts=None) -> Prepared:
-    """Flatten the visible preview parts into numpy arrays (textures decoded via the shared cache)."""
+def _dirty(np, levels: list, dirt: float) -> list:
+    """Mip levels of ``vehiclegrunge256`` at a dirt level: ``c * i / 16 + 255 * (16 - i) / 16`` (alpha kept)."""
+    from ..look.gamelook import dirt_t
+
+    t = dirt_t(dirt)
+    out = []
+    for lv in levels:
+        a = lv.astype(np.float32)
+        a[..., :3] = a[..., :3] * t + 255.0 * (1.0 - t)
+        out.append(np.clip(np.floor(a + 0.5), 0, 255).astype(np.uint8))
+    return out
+
+
+def prepare(scene: ModelScene, mats: list[list[MatInfo]], *, parts=None, dirt: float | None = None) -> Prepared:
+    """Flatten the visible preview parts into numpy arrays (textures decoded via the shared cache).
+
+    ``dirt`` (0..16) turns ``vehiclegrunge256`` into that dirt level (vehicles; ``None`` keeps the texture)."""
     np = _np()
     parts = [p for p in (scene.preview_parts if parts is None else parts) if not p.hidden]
     Ps, Ns, UVs, Cs, Ts, TMs, TLs = [], [], [], [], [], [], []
@@ -153,11 +172,15 @@ def prepare(scene: ModelScene, mats: list[list[MatInfo]], *, parts=None) -> Prep
                     d = decode(mi.tex)
                     key = mi.tex.binding_key
                     ti = tex_index.get(key, -1)
+                    grunge = dirt is not None and mi.tex.name == "vehiclegrunge256"
+                    if grunge:
+                        key = (*key, "dirt", float(dirt))
+                        ti = tex_index.get(key, -1)
                     if ti < 0:
                         pk = mi.tex.pixel_key
                         if pk not in pixel_mips:
                             pixel_mips[pk] = _mips(np, d.rgba, d.w, d.h)
-                        textures.append(pixel_mips[pk])
+                        textures.append(_dirty(np, pixel_mips[pk], dirt) if grunge else pixel_mips[pk])
                         tex_addr.append((d.uaddr, d.vaddr))
                         ti = tex_index[key] = len(textures) - 1
                     alpha = d.alpha
@@ -289,9 +312,13 @@ def _lod(np, prep: Prepared, sx, sy, area2):
     return lvl
 
 
-def _render_one(np, prep: Prepared, az: float, el: float, S: int, bg):
+def _render_one(np, prep: Prepared, az: float, el: float, S: int, bg, env=None):
     T = prep.T
     sx, sy, iz, light = _camera(np, prep, az, el, S)
+    if env is not None:
+        from ..look.gamelook import LIGHT_DIR
+
+        light = np.array(LIGHT_DIR, dtype=np.float64)
     x0, x1, x2 = sx[T[:, 0]], sx[T[:, 1]], sx[T[:, 2]]
     y0, y1, y2 = sy[T[:, 0]], sy[T[:, 1]], sy[T[:, 2]]
     area2 = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)
@@ -383,17 +410,17 @@ def _render_one(np, prep: Prepared, az: float, el: float, S: int, bg):
     mask = (1 << tri_bits) - 1
     cov = np.flatnonzero(zb != INF)
     if len(cov):
-        rgb, _a = _shade(np, prep, zb[cov] & mask, cov, S, A0, B0, C0, A1, B1, C1, iz0, iz1, iz2, lvl, light)
+        rgb, _a = _shade(np, prep, zb[cov] & mask, cov, S, A0, B0, C0, A1, B1, C1, iz0, iz1, iz2, lvl, light, env)
         img[cov] = rgb
     tcov = np.flatnonzero((zt != INF) & ((zt >> tri_bits) < (zb >> tri_bits)))
     if len(tcov):
-        rgb, a = _shade(np, prep, zt[tcov] & mask, tcov, S, A0, B0, C0, A1, B1, C1, iz0, iz1, iz2, lvl, light)
+        rgb, a = _shade(np, prep, zt[tcov] & mask, tcov, S, A0, B0, C0, A1, B1, C1, iz0, iz1, iz2, lvl, light, env)
         a = a[:, None]
         img[tcov] = rgb * a + img[tcov] * (1.0 - a)
     return img.reshape(S, S, 3), len(cov)
 
 
-def _shade(np, prep: Prepared, tri, pix, S, A0, B0, C0, A1, B1, C1, iz0, iz1, iz2, lvl, light):
+def _shade(np, prep: Prepared, tri, pix, S, A0, B0, C0, A1, B1, C1, iz0, iz1, iz2, lvl, light, env=None):
     cx = (pix % S) + 0.5
     cy = (pix // S) + 0.5
     w0 = A0[tri] * cx + B0[tri] * cy + C0[tri]
@@ -423,8 +450,10 @@ def _shade(np, prep: Prepared, tri, pix, S, A0, B0, C0, A1, B1, C1, iz0, iz1, iz
     n = interp(prep.N)
     ln = np.linalg.norm(n, axis=1, keepdims=True)
     n = n / np.maximum(ln, 1e-12)
-    ndl = np.abs(n @ light).astype(np.float32)[:, None]
     lit = prep.tri_lit[tri]
+    if env is not None:
+        return _shade_game(np, prep, col, alpha, n, lit, interp, light, env)
+    ndl = np.abs(n @ light).astype(np.float32)[:, None]
     shade = np.where(lit[:, None], 0.80 + 0.30 * ndl, 0.42 + 0.68 * ndl).astype(np.float32)
     if lit.any():
         pre = interp(prep.C.astype(np.float64)).astype(np.float32)
@@ -433,10 +462,29 @@ def _shade(np, prep: Prepared, tri, pix, S, A0, B0, C0, A1, B1, C1, iz0, iz1, iz
     return col, np.clip(alpha, 0.0, 1.0)
 
 
+def _shade_game(np, prep: Prepared, col, alpha, n, lit, interp, light, env):
+    """The game's colour chain (display space): lit = ``(amb_obj + dir * max(0, N.L)) * LIT_MULT``,
+    prelit = ``prelit + amb``; then the colour filter and the display gamma (``satk.look.gamelook``)."""
+    from ..look import gamelook as G
+
+    f32 = np.float32
+    ndl = np.maximum(n @ light, 0.0).astype(f32)[:, None]
+    amb_obj = np.array(env["amb_obj"], dtype=f32)
+    dirc = np.array(env["dir"], dtype=f32)
+    light_lit = (amb_obj[None, :] + dirc[None, :] * ndl) * f32(G.lit_mult(env.get("balance") or 0.0))
+    shade = light_lit
+    if lit.any():
+        pre = interp(prep.C.astype(np.float64)).astype(f32)
+        shade = np.where(lit[:, None], pre + np.array(env["amb"], dtype=f32)[None, :], light_lit)
+    col = np.clip(col * shade, 0.0, 1.0) * np.array(G.grade_factors(env), dtype=f32)[None, :]
+    col = np.minimum(1.0, np.power((np.clip(col, 0.0, 1.0) * 255.0 + 1.0) / 256.0, G.DISPLAY_GAMMA)).astype(f32)
+    return col, np.clip(alpha, 0.0, 1.0)
+
+
 def render(prep: Prepared, views: list[tuple[float, float]], size: int, *, bg=DEFAULT_BG,
-           ss: int | None = None) -> tuple[list, list[float]]:
+           ss: int | None = None, env: dict | None = None) -> tuple[list, list[float]]:
     """``([(size, size, 3) uint8], [coverage share per view])``; ``ss`` = supersampling (default 2 if
-    ``size <= 256`` else 1)."""
+    ``size <= 256`` else 1); ``env`` = a timecyc light for the game look (``None`` = the plain preview light)."""
     np = _np()
     if ss is None:
         ss = 2 if size <= 256 else 1
@@ -448,7 +496,7 @@ def render(prep: Prepared, views: list[tuple[float, float]], size: int, *, bg=DE
             out.append(img)
             cover.append(0.0)
             continue
-        f, ncov = _render_one(np, prep, float(az), float(el), S, bg)
+        f, ncov = _render_one(np, prep, float(az), float(el), S, bg, env)
         if ss > 1:
             f = f.reshape(size, ss, size, ss, 3).mean(axis=(1, 3))
         out.append(np.clip(np.floor(f * 255.0 + 0.5), 0, 255).astype(np.uint8))

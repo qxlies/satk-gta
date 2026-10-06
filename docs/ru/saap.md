@@ -22,7 +22,7 @@ satk view conformance --target mock
 Что вернётся (сокращённо):
 
 ```json
-{"ok":true,"cols":["file","kind","items","errors"],"rows":[["camera.jsonl","cases",5,0],["SAAP-v1.md","spec",21,0]],"valid":true,"schemas":21}
+{"ok":true,"cols":["file","kind","items","errors"],"rows":[["camera.jsonl","cases",5,0],["SAAP-v1.md","spec",23,0]],"valid":true,"schemas":23}
 {"ok":true,"cols":["case","caps","result","ms","detail"],"rows":[["auth.bad_token","core","skip",0.0,"needs the SAAP transport"]],"total":48,"pass":38,"fail":0,"skip":10,"percent":100.0}
 ```
 
@@ -41,7 +41,7 @@ satk view conformance --target mock
 
 ## Как это устроено
 
-- `proto/schema/<method>.json` — JSON Schema 2020-12 для `params` и `result` каждого из 21 метода,
+- `proto/schema/<method>.json` — JSON Schema 2020-12 для `params` и `result` каждого из 23 методов,
   общие типы (`Pose`, `Env`, `EntityRef`) — `common.json`. Валидатор в `satk.saap.schema` — только stdlib
   (работает и из Python Blender); тесты сверяют его с пакетом `jsonschema`.
 - `proto/conformance/*.jsonl` — 48 кейсов «запрос → ожидание», включая негативные: неверный токен → `AUTH`
@@ -56,12 +56,15 @@ satk view conformance --target mock
   тот самый процесс (`satk.saap.client.verify_pid`); файлы, указывающие на чужой процесс, считаются
   устаревшими.
 - Mock — детерминированный синтетический мир у Гроув-стрит: все возможности протокола, одинаковые запросы
-  дают побайтно одинаковые PNG, стриминг имитируется (без settle кадр «с дырами»).
+  дают побайтно одинаковые PNG, стриминг имитируется (без settle кадр «с дырами»). Методы `author` работают
+  на маленькой искусственной сцене (`satk.studio.mock`).
+- Сессии студии Blender ([studio.md](studio.md)) — эндпоинты с ролью `blender` и возможностями `core` + `author`;
+  у каждой сессии своя пара файлов `blender-<name>.json`.
 - `proto/cpp/saap_frame.hpp` (MIT, C++14, один заголовочный файл): фрейм, лимиты, сравнение токена за постоянное время,
   атомарная запись дескриптора. Его вендорят нативные эндпоинты: форк Ariane
   (`viewer\ariane\tools\euryopa\saap\`) и позже форк MTA. <!-- linkcheck: ignore -->
 - Нативный эндпоинт Ariane проходит все применимые кейсы: `satk view conformance --target ariane` →
-  43 pass, 0 fail, 5 skip (`log`, `console`, `lua`, `mem.read` у Ariane нет). Он сам пишет
+  43 pass, 0 fail, 11 skip (`log`, `console`, `lua`, `mem.read` и `author` у Ariane нет). Он сам пишет
   `work\run\endpoints\ariane.json`, слушает эфемерный порт и принимает `path_prefix` только внутри `work\`
   (`SATK_AGENT_OUT_ROOT`).
 

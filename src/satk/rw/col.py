@@ -21,6 +21,7 @@ computed; ``raw`` (export only) carries the garbage bytes so that the JSON round
 
 from __future__ import annotations
 
+import functools
 import math
 import struct
 from dataclasses import dataclass, field
@@ -503,10 +504,76 @@ def _q(x: float, what: str) -> int:
     return q
 
 
+#: Face lighting when a model gives neither ``light`` nor ``prelight``: day 15 (the dominant day value of vanilla
+#: collision faces), night 3 (about the median night value of vanilla faces lit 15 by day).
+FALLBACK_LIGHT = 0x3F
+#: Linear fit ``nibble = a * prelit brightness (0..255) + b`` of vanilla face lighting against the prelit
+#: colours of the render mesh above it; ``data/colgen/tex_surface.json`` (``satk col derive``) overrides it.
+_LIGHT_FIT = {"day": (0.0809, 2.385), "night": (0.0889, 0.8793)}
+
+
+@functools.lru_cache(maxsize=1)
+def _light_fit() -> dict:
+    try:
+        from ..core.resources import read_json
+
+        fit = read_json("colgen", "tex_surface.json").get("lighting") or {}
+        return {k: tuple(fit.get(k, v)) for k, v in _LIGHT_FIT.items()}
+    except Exception:  # noqa: BLE001 - optional data of another package; the built-in fit is the fallback
+        return dict(_LIGHT_FIT)
+
+
+def _brightness(x: Any, what: str) -> float:
+    if isinstance(x, (int, float)) and not isinstance(x, bool) and 0 <= x <= 255:
+        return float(x)
+    if isinstance(x, (list, tuple)) and len(x) in (3, 4) and all(isinstance(c, (int, float)) for c in x[:3]):
+        r, g, b = (float(c) for c in x[:3])
+        return 0.299 * r + 0.587 * g + 0.114 * b
+    raise ColError(f"{what}: expected a brightness 0..255 or [r, g, b]")
+
+
+def face_light(day: float | None, night: float | None = None) -> int:
+    """COL face lighting byte (low nibble day, high nibble night, 0..15 each) from prelit brightness 0..255."""
+    fit = _light_fit()
+
+    def nib(v: float, k: str) -> int:
+        a, b = fit[k]
+        return int(min(15, max(0, round(a * v + b))))
+    d = nib(day, "day") if day is not None else FALLBACK_LIGHT & 15
+    n = nib(night, "night") if night is not None else FALLBACK_LIGHT >> 4
+    return d | (n << 4)
+
+
+def _model_light(d: dict, who: str) -> tuple[int | None, str]:
+    """Default face lighting of a model from ``"light"`` or ``"prelight"``: ``(byte, source)``."""
+    lt = d.get("light")
+    if lt is not None:
+        if isinstance(lt, dict):
+            day, night = lt.get("day", FALLBACK_LIGHT & 15), lt.get("night", FALLBACK_LIGHT >> 4)
+            _need(all(isinstance(x, int) and not isinstance(x, bool) and 0 <= x <= 15 for x in (day, night)),
+                  f"{who}: light day/night must be 0..15")
+            return day | (night << 4), "light"
+        return _u8(lt, f"{who} light"), "light"
+    pl = d.get("prelight")
+    if pl is not None:
+        if isinstance(pl, dict):
+            day = _brightness(pl["day"], f"{who} prelight day") if "day" in pl else None
+            night = _brightness(pl["night"], f"{who} prelight night") if "night" in pl else None
+        else:
+            day, night = _brightness(pl, f"{who} prelight"), None
+        return face_light(day, night), "prelight"
+    return None, ""
+
+
 def model_from_json(d: dict, *, surfaces: dict[str, int] | None = None, default_version: int = 3,
                     warn: list[str] | None = None) -> ColModel:
     """Build a :class:`ColModel` from the JSON form (see the module doc). ``surfaces`` maps upper-case
-    surface names to material IDs (for ``"surface": "TARMAC"``)."""
+    surface names to material IDs (for ``"surface": "TARMAC"``).
+
+    Collision faces (COL2+) without their own ``light`` take the model's ``light`` (a byte, or
+    ``{"day": 0..15, "night": 0..15}``), else the lighting fitted from the model's ``prelight`` (brightness
+    0..255 or ``[r, g, b]``, or ``{"day": ..., "night": ...}``), else :data:`FALLBACK_LIGHT` with a
+    ``FACE_LIGHT_DEFAULT`` warning (light 0 would make peds dark and switch car headlights on)."""
     _need(isinstance(d, dict), "a collision model must be a JSON object")
     name = d.get("name")
     _need(isinstance(name, str) and name and name.isascii() and len(name) <= 21,
@@ -552,13 +619,19 @@ def model_from_json(d: dict, *, surfaces: dict[str, int] | None = None, default_
             out.append(x if v == 1 else tuple(_q(c, f"{who} {what} {i}") for c in x))
         return out
 
-    def faces(raw_list: Any, nv: int, what: str, v1: bool) -> list:
+    implicit: list[int] = []                 # indices of collision faces without their own light
+
+    def faces(raw_list: Any, nv: int, what: str, v1: bool, track: bool = False) -> list:
         out = []
         for i, f in enumerate(raw_list or []):
+            has_light = False
             if isinstance(f, dict):
                 vv = f.get("v") or f.get("vertices")
                 _need(isinstance(vv, (list, tuple)) and len(vv) == 3, f"{who} {what} {i}: need 3 vertex indices")
                 s = surf(f.get("surface", f.get("material")), f"{who} {what} {i}")
+                sf = f.get("surface", f.get("material"))
+                has_light = "light" in f or (isinstance(sf, dict) and "light" in sf) or \
+                    (isinstance(sf, (list, tuple)) and len(sf) >= 4)
                 if "light" in f:
                     s = (s[0], s[1], s[2], _u8(f["light"], f"{who} {what} {i}"))
                 a, b, c = vv
@@ -572,15 +645,29 @@ def model_from_json(d: dict, *, surfaces: dict[str, int] | None = None, default_
                     mat = rest[0] if rest else 0
                     mat = _surface_id(mat, surfaces, f"{who} {what} {i}") if isinstance(mat, str) else _u8(mat, what)
                     s = (mat, 0, 0, _u8(rest[1], what) if len(rest) > 1 else 0)
+                    has_light = len(rest) > 1
             for x in (a, b, c):
                 _need(isinstance(x, int) and not isinstance(x, bool) and 0 <= x < nv,
                       f"{who} {what} {i}: vertex index {x!r} outside 0..{nv - 1}")
             out.append((a, b, c, s) if v1 else (a, b, c, s[0], s[3]))
+            if track and not v1 and not has_light:
+                implicit.append(len(out) - 1)
         return out
 
     m.vertices = verts(d.get("vertices"), "vertex")
     _need(len(m.vertices) <= 65536 or v == 1, f"{who}: more than 65536 vertices")
-    m.faces = faces(d.get("faces"), len(m.vertices), "face", v == 1)
+    m.faces = faces(d.get("faces"), len(m.vertices), "face", v == 1, track=True)
+    if implicit:
+        light, src = _model_light(d, who)
+        if light is None:
+            light = FALLBACK_LIGHT
+            if warn is not None:
+                warn.append(f"FACE_LIGHT_DEFAULT: {name}: {len(implicit)} face(s) without light set to "
+                            f"0x{light:02X} (day {light & 15}, night {light >> 4}); give \"light\" or \"prelight\" "
+                            "for the model (0 makes peds dark and switches car headlights on)")
+        for k in implicit:
+            a, b, c, mat, _l = m.faces[k]
+            m.faces[k] = (a, b, c, mat, light)
     sh = d.get("shadow") or {}
     if sh:
         _need(v >= 3, f"{who}: a shadow mesh needs version 3")

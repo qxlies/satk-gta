@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
@@ -13,6 +14,9 @@ import pytest
 from satk.core.errors import SatkError
 from satk.engine import setup as S
 from satk.engine.common import layout
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))  # tests/: sandbox helper; appended, so it never shadows a conftest
+import sandbox_compat  # noqa: E402
 
 
 def _sha(b: bytes) -> str:
@@ -326,6 +330,8 @@ def test_fork_info_without_checkout(satk_home):
 def test_ensure_fork_offline_from_local_donor(satk_home, tmp_path):
     """End to end on a synthetic donor: blobless file:// clone, remotes, main from upstream ref."""
     import subprocess
+
+    sandbox_compat.skip_unless_shell_runs(sandbox_compat.find_sh())  # git spawns sh for file:// clones
 
     L = layout()
     donor = L.donor

@@ -1,6 +1,6 @@
 """Operations of satk.re — the sa-re symbol DB (SPEC §4.6, §4.7 tools 20-23, §4.9; owner WP-09).
 
-CLI: ``satk re build|addr|find|src|patches|limits|export``; MCP: ``re_addr``, ``re_find``,
+CLI: ``satk re build|addr|find|src|patches|limits|nodes|export``; MCP: ``re_addr``, ``re_find``,
 ``re_src``, ``re_patches``. Also registers the ``fn``/``g``/``vt``/``patch`` SID provider, the
 ``re`` status section and the ``re_symdb`` doctor check. Module-level imports are stdlib-only.
 """
@@ -17,7 +17,7 @@ from ..core.ids import register_provider
 from ..core.registry import doctor_check, op, report_progress, status_provider
 from .provider import ReProvider
 
-__all__ = ["re_build", "re_addr", "re_find", "re_src", "re_patches", "re_limits", "re_export"]
+__all__ = ["re_build", "re_addr", "re_find", "re_src", "re_patches", "re_limits", "re_nodes", "re_export"]
 
 _PROVIDER = ReProvider()
 register_provider(_PROVIDER, replace=True)
@@ -191,14 +191,30 @@ def re_find(name: str, kind: Literal["func", "global", "vtable", "struct"] | Non
 def re_src(fn: str, context: int = 30) -> dict:
     """Source of a function.
 
+    ``context`` is 0..400 lines. A function the symbol DB has no source line for (not hooked in
+    gta-reversed, often a stub) is answered from the knowledge base: its file:line with
+    ``status: not reversed``, plus the lines when the clone is readable (``via: kb``).
+
     Args:
         fn: function name (CDoor::Process) or an address inside it.
         context: lines after the definition.
     """
-    from .api import src
+    from .api import _kb_location, _kb_src, src
     from .db import open_db
 
-    return src(open_db(), fn, context)
+    try:
+        db = open_db()
+    except SatkError as e:
+        if e.code != "NOT_READY" or not 0 <= context <= 400:
+            raise
+        hit = _kb_location(fn.strip()[3:] if fn.strip().lower().startswith("fn:") else fn.strip())
+        if hit is None:
+            raise
+        env = _kb_src(None, hit, context)
+        env["warn"] = [f"NO_SYMDB: {e.msg}; answered from the knowledge base (satk re build adds hooks, thunks and "
+                       "MTA patches)"]
+        return env
+    return src(db, fn, context)
 
 
 @op("re.patches", mcp="re_patches",
@@ -231,7 +247,7 @@ def re_patches(fn: str | None = None, range: str | None = None,  # noqa: A002 - 
     summary_ru="Лимиты движка: массивы, пулы, хранилища, диапазоны ID (из gta-reversed)",
     examples=("satk re limits", "satk re limits --kind pool", "satk re limits --match Corona"))
 def re_limits(kind: Literal["pool", "array", "id_range", "streaming", "store", "world"] | None = None, match: str | None = None,
-              limit: int = 500, cursor: str | None = None) -> dict:
+              limit: int = 20, cursor: str | None = None, summary: bool = False) -> dict:
     """Limit table (limit_def).
 
     Args:
@@ -239,11 +255,39 @@ def re_limits(kind: Literal["pool", "array", "id_range", "streaming", "store", "
         match: substring of the name.
         limit: rows per page.
         cursor: page cursor from 'next'.
+        summary: only the counts per kind (no rows).
     """
     from .api import limits
     from .db import open_db
 
-    return limits(open_db(), kind, match, clamp_limit(limit, default=500), _offset(cursor))
+    return limits(open_db(), kind, match, clamp_limit(limit, default=20), _offset(cursor), summary=summary)
+
+
+@op("re.nodes", mcp=False,
+    summary="Frame names the engine looks up per vehicle type (automobile, mtruck, quad, heli, plane, boat, train, "
+            "fheli, fplane, bike, bmx, trailer) and for peds, with ids, part/dummy/extra role and flags, read from "
+            "gta_sa.exe. Use it to name the frames, dummies and extras of a new model.",
+    summary_ru="Имена фреймов, которые движок ищет у каждого типа транспорта и у педов: id, роль (деталь, "
+               "дамми, экстра) и флаги, прочитанные из gta_sa.exe.",
+    examples=("satk re nodes", "satk re nodes --type automobile", "satk re nodes --type bike",
+              "satk re nodes --type ped"))
+def re_nodes(type: Literal["automobile", "mtruck", "quad", "heli", "plane", "boat", "train", "fheli", "fplane",  # noqa: A002
+                           "bike", "bmx", "trailer", "ped"] | None = None,
+             exe: str | None = None, limit: int = 100) -> dict:
+    """Frame-name tables of the executable (no symbol DB needed; node names need the knowledge base).
+
+    Without ``type``: one row per table (12 vehicle types and ped) with the counts of parts, dummies
+    and extras. With ``type``: name, id (node number, dummy position index, 0 for extras), role,
+    flags and flag words, and the gta-reversed node name when ``satk kb build`` ran.
+
+    Args:
+        type: vehicle type or ped.
+        exe: gta_sa.exe 1.0 US to read (default: the clean copy, else the game).
+        limit: rows of one table.
+    """
+    from .nodes import nodes
+
+    return nodes(type, exe, clamp_limit(limit, default=100))
 
 
 @op("re.export", mcp=False,

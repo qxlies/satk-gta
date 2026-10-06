@@ -125,6 +125,12 @@ def satk_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.F
     monkeypatch.setenv("SATK_CONFIG", "none")
     _config.reset()
     request.addfinalizer(_config.reset)
+    # The index cache is keyed by profile only: a database opened under an earlier test's workspace would otherwise
+    # still be served here (while its temp file exists), hiding "no index" in this one.
+    from satk.index import api as _index_api
+
+    _index_api.clear_cache()
+    request.addfinalizer(_index_api.clear_cache)
     return ws
 
 

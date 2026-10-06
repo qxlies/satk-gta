@@ -1,0 +1,22 @@
+{
+  "format": "satk.convert-presets/1",
+  "formats": [".glb", ".gltf", ".fbx", ".obj", ".dae", ".blend"],
+  "roles": {
+    "body": {"preset": "photo_like", "vanilla": 128, "sa_plus": 256},
+    "interior": {"preset": "interior", "vanilla": 128, "sa_plus": 256},
+    "wheel": {"preset": "wheel", "vanilla": 128, "sa_plus": 128},
+    "decal": {"preset": "photo_like", "vanilla": 128, "sa_plus": 128},
+    "wall": {"preset": "wall", "vanilla": 128, "sa_plus": 256},
+    "ground": {"preset": "wall", "vanilla": 128, "sa_plus": 256},
+    "prop": {"preset": "photo_like", "vanilla": 128, "sa_plus": 256},
+    "weapon": {"preset": "photo_like", "vanilla": 128, "sa_plus": 128},
+    "generic": {"preset": "photo_like", "vanilla": 128, "sa_plus": 256}
+  },
+  "default_roles": {
+    "vehicle": "body", "world": "prop", "character": "weapon",
+    "building": "wall", "interior_shell": "wall", "terrain": "ground"
+  },
+  "dissolve_degrees": 0.5,
+  "weld_relative": 0.00001,
+  "bake_samples": 16
+}

@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/scene.ped.json",
+  "title": "scene.ped",
+  "description": "Place a skinned ped in a static pose taken from an IFP animation frame.",
+  "x-saap": {
+    "method": "scene.ped",
+    "capability": "view",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "minLength": 1,
+          "description": "game model id or name"
+        },
+        "dff": {
+          "$ref": "common.json#/$defs/Path",
+          "description": "absolute path of a file (read only)"
+        },
+        "txd": {
+          "oneOf": [
+            {
+              "$ref": "common.json#/$defs/Path",
+              "description": "absolute path of a file (read only)"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/Path",
+                "description": "absolute path of a file (read only)"
+              },
+              "minItems": 1,
+              "maxItems": 8
+            }
+          ],
+          "description": "texture dictionaries, searched in order before the game's"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,48}$",
+          "description": "handle chosen by the client; placing again with the same id replaces that entity"
+        },
+        "pos": {
+          "$ref": "common.json#/$defs/Vec3"
+        },
+        "rot": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 4,
+          "description": "[rx, ry, rz] degrees (X, then Y, then Z about world axes) or a quaternion [x, y, z, w]"
+        },
+        "heading": {
+          "type": "number",
+          "description": "degrees about Z, counter-clockwise seen from above (GTA heading)"
+        },
+        "ground": {
+          "type": "boolean",
+          "description": "drop onto the collision below pos (lowest point on the ground)"
+        },
+        "watch": {
+          "type": "boolean",
+          "description": "reload when the files change (polled, about 0.5 s)"
+        },
+        "anim": {
+          "type": "object",
+          "properties": {
+            "ifp": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024,
+              "description": "game animation file name (ped, anim.img entries) or an absolute .ifp path"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "time": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3600
+            }
+          }
+        }
+      },
+      "required": [
+        "pos"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "dff"
+          ]
+        },
+        {
+          "required": [
+            "model"
+          ]
+        }
+      ]
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "handle": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ref": {
+          "type": "string",
+          "pattern": "^@"
+        },
+        "entity": {
+          "$ref": "common.json#/$defs/EntityRef"
+        },
+        "replaced": {
+          "type": "boolean"
+        },
+        "stats": {
+          "type": "object",
+          "properties": {
+            "atomics": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tris": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "textures": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "missing_textures": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "bounds": {
+              "type": "array",
+              "items": {
+                "$ref": "common.json#/$defs/Vec3"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        },
+        "grounded": {
+          "type": "boolean"
+        },
+        "warn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "load_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "ped": {
+          "type": "object",
+          "properties": {
+            "anim": {
+              "type": "object",
+              "properties": {
+                "ifp": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "time": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "duration": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "bones": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "nodes": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "handle",
+        "ref",
+        "entity",
+        "ped"
+      ]
+    }
+  }
+}

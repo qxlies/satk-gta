@@ -48,7 +48,9 @@ Commands and arguments (defaults in :data:`ARG_DEFAULTS`):
 * ``game_ready {src, objects, name, budget, height, scale, origin, uv, bake, tex_size, prelight, col,
   surface, lod, draw, out, render, save}`` - any mesh (``.blend``/``.obj``/``.glb``/``.fbx``...) made
   game-ready: decimated to a triangle budget, UV, day/night prelight, COL, LOD; DFF + COL (+ LOD DFF)
-  and PNG textures into ``out`` (added in M2-08; the TXD is packed on the satk side).
+  and PNG textures into ``out`` (added in M2-08; the TXD is packed on the satk side);
+* ``preview {spec, save}`` - SA-look preview cells of model plans or a map context
+  (``satk_blender.look.preview``; the spec is built by ``satk.look.ops``, added in wave A1).
 """
 
 from __future__ import annotations
@@ -78,7 +80,7 @@ __all__ = [
 ]
 
 CONTRACT = "satk-blender/1"
-CMDS = ("doctor", "import_model", "import_area", "render", "export", "game_ready")
+CMDS = ("doctor", "import_model", "import_area", "render", "export", "game_ready", "preview")
 ENGINES = ("workbench", "eevee")
 TARGETS = ("mta-resource", "modloader")
 MATCH = ("aabb", "center")
@@ -128,6 +130,7 @@ ARG_DEFAULTS: dict[str, dict[str, Any]] = {
                    "origin": "base", "uv": "auto", "bake": "auto", "tex_size": 256, "prelight": "bake",
                    "col": "hull", "surface": 0, "lod": 0.25, "draw": 150.0, "out": None, "render": False,
                    "save": True},
+    "preview": {"spec": None, "save": False},
 }
 
 
@@ -363,6 +366,11 @@ def normalize_args(cmd: str, args: dict | None) -> dict:
             a["name"] = str(a["name"])
     elif cmd == "game_ready":
         _game_ready_args(a)
+    elif cmd == "preview":
+        sp = a["spec"]
+        if not isinstance(sp, dict) or not (sp.get("entries") or sp.get("area")):
+            raise ContractError("preview needs 'spec' with 'entries' (model plans) or 'area'")
+        a["save"] = _bool(a["save"], "save")
     return a
 
 

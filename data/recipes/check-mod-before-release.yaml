@@ -1,0 +1,33 @@
+# satk recipe (shipped). Run: satk recipe run check-mod-before-release --var mod=<mod folder, .zip or .img>
+name: check-mod-before-release
+summary: Before publishing a mod - what it changes, its problems (lint, ID collisions, files Mod Loader skips), texture audit and id conflicts; fails on fatal or error findings.
+description: |
+  Read-only: only the recipe report is written (work/out/recipes). mod.check runs the asset lint as well.
+  The texture audit step is skipped when that operation is not installed.
+vars:
+  mod: {required: true, help: "the mod: folder, .zip or .img"}
+  profile: {default: vanilla, help: "game the mod is compared with: vanilla (the clean copy) or installed"}
+steps:
+  - id: inspect
+    op: mod.inspect
+    input: ${mod}
+    args: {profile: "${profile}", limit: 20}
+  - id: check
+    op: mod.check
+    input: ${mod}
+    args: {profile: "${profile}", sev: warn, limit: 20}
+    on_error: continue
+    fail_if:
+      - "${steps.check.summary.fatal|default:0}"
+      - "${steps.check.summary.error|default:0}"
+  - id: textures
+    op: texture.audit
+    input: ${mod}
+    args: {profile: "${profile}", limit: 20}
+    on_error: continue
+  - id: ids
+    op: id.conflicts
+    input: ${mod}
+    args: {profile: "${profile}"}
+    on_error: continue
+    fail_if: "${steps.ids.errors|default:0}"

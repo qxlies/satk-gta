@@ -61,6 +61,52 @@ without reading design notes or the satk source code. Any client registered with
   function and source line (`CStreaming::Update+0x33`, `Streaming.cpp:111` for the sample), whether MTA patches it,
   and the full pool (`ped 140/140`). Calls: 2-3.
 
+### Creation scenarios E5-E7 (= S25, S26)
+
+These take tens of calls, so the 8-call rule of the protocol does not apply. Score instead: PASS = every gate
+reached with its numbers in the class band of the chosen tier and the human checkpoints shown; SOFT = reached but
+with unexplained out-of-band rows or a missed checkpoint; FAIL = hand-typed geometry (a vertex list or a private
+mesh library instead of session methods), more than 2 style topics read before G1 without need, a full-size image
+opened, or a forbidden action. Record calls, wall time to G1 and to the first export, context size at the first
+export, and the lines of agent-written geometry code (target <= 300).
+
+#### E5 car blockout to G2
+
+- Prompt: "Make an SA-style replacement for the Premier (model 426) inspired by <a real sedan>. Get it to the
+  shape-and-shading gate and show me."
+- Expected: reads `style` + `style_vehicle` (<= 12K characters); `asset.init` with tier `sa_plus`;
+  `kit.template --like model:426`; blockout in the session; G1 lineup sheet shown by about 15 min with
+  `dims.L_rel` in the sedan band; `kit.shade`; at G2 `shade.normal_bend` and `shade.flat_share` inside the car
+  band, `part.tris[chassis]` inside the `sa_plus` proposal; second sheet shown.
+
+#### E6 street prop with collision (and the LOD question)
+
+- Prompt: "Make a new bus shelter for Grove Street with collision, in the stock style."
+- Expected: kind `prop`, its size bucket's `geo.tris` and `uv.texel_px_m`; tiling or 0..1 UVs as the class does;
+  prelight with warm night colours (`blender.game_ready --asset-class prop` or the kit); collision from primitives
+  (`col.gen`) with a non-zero face light; draw distance at most 100-299; NO LOD unless the model is about 30 m or
+  more (props almost never have one) - the agent should say why.
+
+#### E7 weapon
+
+- Prompt: "Replace the baseball bat with a cricket bat in SA style."
+- Expected: `kit.template --like model:336`; real length against the 1.84 m ped; smooth shading (melee);
+  one 64 px photo-like texture (`style.texture` in the weapon band); `asset.check` clean; the readme names the
+  inherited `weapon.dat` line.
+
+#### Discovery checks (no session needed)
+
+One `satk_ops` call each (or `satk mcp ops <words>` on the CLI); expected among the first 3 rows:
+
+| Query | Expected operation |
+|---|---|
+| create vehicle | `kit.template`, `blender.session` or `mod.add` |
+| make txd from png | `texture.pack` |
+| smooth faceted normals | `rw.patch` or `kit.shade` |
+| check my model against vanilla | `asset.check` |
+| preview my dff next to vanilla | `blender.preview` |
+| style numbers for sedans | `style.profile` |
+
 ## Results
 
 ### Scripted baseline (not a fresh session)
@@ -84,3 +130,4 @@ chains work and fit the budget; it does not prove an agent finds them.
 | date | commit | scenario | calls | tokens | result | notes |
 |---|---|---|---|---|---|---|
 | - | - | E1-E4 | - | - | not run yet | needs a person to start a new client session (protocol above) |
+| - | - | E5-E7 | - | - | not run yet | need the authoring operations merged and a person to start the session |

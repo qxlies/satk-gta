@@ -1,0 +1,122 @@
+{
+  "format": "satk.style-tiers/1",
+  "_comment": [
+    "Detail tiers and the metric sets of satk.style.profile / asset.check / style.card.",
+    "vanilla: the measured class band p10..p90 of the peer set. sa_plus: the same visual language with higher",
+    "budgets where silhouette and curvature live; its numbers are a PROPOSAL until validated next to vanilla in",
+    "previews and in game (every answer marks them 'proposal'). A metric without an sa_plus rule keeps the",
+    "vanilla band in both tiers (shading, UVs, scale, collision, lighting do not change with the tier).",
+    "Rule forms (values relative to the vanilla peer set): band [lo, hi] absolute; mul [a, b] x p50;",
+    "hi_mul x -> [p10, x * p90]; cap = hard upper limit shown next to the band. Rules are looked up by class",
+    "(car.sedan, then car), then by family (vehicle, map, ped, weapon, pickup, upgrade)."
+  ],
+  "default_tier": "sa_plus",
+  "tiers": {
+    "vanilla": {"status": "measured", "what": "every metric inside the class band p10..p90; for replacements that must sit unnoticed next to vanilla"},
+    "sa_plus": {"status": "proposal", "what": "default for new assets: vanilla style with higher budgets for silhouette and curvature"}
+  },
+  "fence": {
+    "k": 1.5,
+    "min_rel": 0.08,
+    "borrow_below": 15,
+    "borrow": 0.5,
+    "what": "A value is out of band (verdict low/high) only beyond the fence p10 - max(k*(p50 - p10), min_rel*|p50|) .. p90 + max(k*(p90 - p50), min_rel*|p50|) of the peer set; a peer set of fewer than borrow_below models also takes borrow x the margins of its parent (car.van -> car). Between the band and the fence a value is 'edge' (advisory, not counted). Calibrated by leave-one-out on vanilla (satk style build --validate)."
+  },
+  "metrics": {
+    "vehicle": {
+      "profile": ["veh.hd_tris", "veh.hi_tris", "part.tris[chassis]", "part.tris[wheel]", "part.tris[chassis_vlo]",
+                  "part.tris[door_lf_ok]", "part.tris[bonnet_ok]", "part.tris[bump_front_ok]", "part.tris[windscreen_ok]",
+                  "shade.normal_bend", "shade.flat_share", "shade.hard_at_seam", "dff.verts_per_tri",
+                  "geo.median_dihedral", "geo.largest_piece_share", "geo.sliver_share", "uv.zero_area_share",
+                  "mat.count", "dims.L", "dims.W", "dims.H", "dims.wheelbase", "dims.track", "dims.wheel_d",
+                  "col.spheres", "col.shadow_faces"],
+      "check": ["veh.hd_tris", "part.tris[chassis]", "part.tris[wheel]", "shade.normal_bend", "shade.flat_share",
+                "dff.verts_per_tri", "geo.largest_piece_share", "geo.sliver_share", "uv.zero_area_share",
+                "geo.median_dihedral", "dims.L", "dims.W", "dims.H"],
+      "anchors": ["dims.L_over_wheel", "dims.W_over_wheel", "dims.H_over_wheel", "dims.wheelbase_over_wheel",
+                  "dims.track_over_wheel"]
+    },
+    "map": {
+      "profile": ["geo.tris", "geo.tris_per_m2", "geo.median_edge_m", "mat.count", "uv.texel_px_m", "uv.span_max",
+                  "uv.zero_area_share", "light.prelit_lum_p50", "light.night_ratio", "light.night_tint",
+                  "light.lit_vertex_share", "dims.size", "dims.H", "col.mesh_faces", "col.boxes", "col.spheres"],
+      "check": ["geo.tris", "geo.tris_per_m2", "mat.count", "uv.texel_px_m", "uv.zero_area_share",
+                "light.prelit_lum_p50"]
+    },
+    "ped": {
+      "profile": ["geo.tris", "shade.normal_bend", "shade.flat_share", "dff.verts_per_tri", "mat.count",
+                  "uv.texel_px_m", "uv.zero_area_share", "dims.H", "dims.W"],
+      "check": ["geo.tris", "shade.normal_bend", "shade.flat_share", "dims.H", "mat.count"]
+    },
+    "weapon": {
+      "profile": ["geo.tris", "shade.normal_bend", "shade.flat_share", "dff.verts_per_tri", "mat.count",
+                  "uv.texel_px_m", "uv.zero_area_share", "dims.size"],
+      "check": ["geo.tris", "shade.normal_bend", "shade.flat_share", "uv.texel_px_m"]
+    },
+    "pickup": {
+      "profile": ["geo.tris", "shade.normal_bend", "shade.flat_share", "mat.count", "uv.texel_px_m", "dims.size"],
+      "check": ["geo.tris", "uv.texel_px_m"]
+    },
+    "upgrade": {
+      "profile": ["geo.tris", "shade.normal_bend", "shade.flat_share", "dff.verts_per_tri", "mat.count",
+                  "uv.texel_px_m", "uv.zero_area_share", "dims.size"],
+      "check": ["geo.tris", "shade.normal_bend", "shade.flat_share", "uv.zero_area_share"]
+    }
+  },
+  "sa_plus": {
+    "car": {
+      "veh.hd_tris": {"band": [3000, 4500], "cap": 5000},
+      "veh.hi_tris": {"mul": [1.4, 2.1]},
+      "part.tris[chassis]": {"band": [2000, 3000]},
+      "part.tris[wheel]": {"band": [240, 400]},
+      "part.tris[chassis_vlo]": {"band": [55, 130]},
+      "part.tris[door_lf_ok]": {"band": [120, 220]},
+      "part.tris[door_rf_ok]": {"band": [120, 220]},
+      "part.tris[bump_front_ok]": {"band": [150, 300]},
+      "part.tris[bump_rear_ok]": {"band": [150, 300]},
+      "part.tris[bonnet_ok]": {"mul": [1.5, 2.5]},
+      "part.tris[boot_ok]": {"mul": [1.5, 2.5]},
+      "part.tris[windscreen_ok]": {"band": [12, 30]},
+      "geo.tris": {"mul": [1.4, 2.1]}
+    },
+    "vehicle": {
+      "veh.hd_tris": {"mul": [1.4, 2.1]},
+      "veh.hi_tris": {"mul": [1.4, 2.1]},
+      "geo.tris": {"mul": [1.4, 2.1]},
+      "part.tris[chassis]": {"mul": [1.4, 2.1]},
+      "part.tris[wheel]": {"band": [240, 400]},
+      "part.tris[wheel_front]": {"mul": [1.4, 2.1]},
+      "part.tris[wheel_rear]": {"mul": [1.4, 2.1]}
+    },
+    "lod": {
+      "geo.tris": {"same": true},
+      "uv.texel_px_m": {"same": true}
+    },
+    "map": {
+      "geo.tris": {"hi_mul": 2.0},
+      "geo.tris_per_m2": {"hi_mul": 2.0},
+      "uv.texel_px_m": {"mul": [1.5, 2.0]}
+    },
+    "ped": {
+      "geo.tris": {"band": [1600, 2500]}
+    },
+    "weapon": {
+      "geo.tris": {"band": [400, 1200]},
+      "uv.texel_px_m": {"mul": [1.5, 2.0]}
+    },
+    "pickup": {
+      "geo.tris": {"hi_mul": 2.0}
+    },
+    "upgrade": {
+      "geo.tris": {"hi_mul": 2.0}
+    }
+  },
+  "notes": {
+    "vehicle": "sa_plus keeps the shared vehicle.txd textures, key colours and lamp codes, paint on vehiclegrunge256 with UV2 for the sheen, the shading rule, DXT1/DXT3 with one mip level, scale and proportions, frames and dummies, LOD and collision budgets. Own TXD: up to 4 textures, interior 256, wheel 128.",
+    "map": "sa_plus keeps tiling textures, prelight with warm nights, draw distance <= 300 for HD models with collision, and the vanilla LOD budget (not a ratio of the sa_plus HD). Round props 12-16 sides, poles 8. Texture side <= 512 (256 typical).",
+    "ped": "sa_plus: 1,600-2,500 triangles, 256x512 textures, the same 32-bone skeleton, one material.",
+    "weapon": "sa_plus: 400-1,200 triangles, 128 px textures.",
+    "pickup": "sa_plus: up to 2x the vanilla p90 triangles; 64-128 px textures.",
+    "upgrade": "sa_plus: up to 2x the vanilla p90 triangles; parts keep the vanilla frame names (ug_*)."
+  }
+}

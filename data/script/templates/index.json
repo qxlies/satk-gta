@@ -1,0 +1,35 @@
+{
+  "about": "Starter CLEO scripts for 'satk script new'. Placeholders: {{NAME}} file name, {{SNAME}} script name (7 characters), {{CHEAT}}, {{KEY}}, {{MODEL}}, {{X}} {{Y}} {{Z}}, {{TEXT}}. 'uses' lists the options a template reads; 'defaults' fills the ones not given.",
+  "templates": {
+    "hello": {
+      "about": "shows a help message when the game is running, then another one each time a key is pressed",
+      "uses": ["key", "text"],
+      "defaults": {"key": 116, "text": "Hello from {{NAME}}! Press F5."}
+    },
+    "cheat": {
+      "about": "type a cheat code to get $1000, full health and armour",
+      "uses": ["cheat", "text"],
+      "defaults": {"cheat": "SATKCASH", "text": "Cheat activated: $1000, health and armour"}
+    },
+    "spawn_car": {
+      "about": "type a cheat code to spawn a vehicle (by model id) in front of the player",
+      "uses": ["cheat", "model", "text"],
+      "defaults": {"cheat": "SATKCAR", "model": 411, "text": "Here is your car"}
+    },
+    "teleport": {
+      "about": "type a cheat code to teleport the player (or the player's car) to a point",
+      "uses": ["cheat", "pos", "text"],
+      "defaults": {"cheat": "SATKTP", "pos": [2495.0, -1687.5, 13.5], "text": "Teleported"}
+    },
+    "text": {
+      "about": "a key toggles live text on screen every frame (default: the player's position and heading)",
+      "uses": ["key", "text"],
+      "defaults": {"key": 116, "text": "X %.2f Y %.2f Z %.2f H %.1f"}
+    },
+    "mission": {
+      "about": "a small mission loop: a cheat code starts it, reach the marker within 2 minutes for $500",
+      "uses": ["cheat", "pos", "text"],
+      "defaults": {"cheat": "SATKGO", "pos": [2491.0, -1667.0, 13.3], "text": "Reach the ~r~marker~s~ in 2 minutes"}
+    }
+  }
+}

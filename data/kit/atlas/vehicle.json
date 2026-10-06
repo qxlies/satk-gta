@@ -1,0 +1,565 @@
+{
+ "version": 1,
+ "source": "vanilla GTA SA PC 1.0 US: UV centroids of the undamaged parts of all vehicles.ide cars, area-weighted, per material role (key colour, alpha, texture); 'labelled' rectangles were drawn on the textures, their support was measured the same way",
+ "uv_origin": "top-left, v down (DFF/D3D); Blender UVs use v_blender = 1 - v",
+ "fields": {
+  "rect": "[u0, v0, u1, v1]",
+  "support": "share of the role's vanilla UV area inside the rect",
+  "usage": "share of all vanilla UV area on that texture inside the rect",
+  "cars": "cars using the role"
+ },
+ "texel_px_m": {
+  "vehiclegrunge256": [
+   20.864,
+   49.614,
+   100.835
+  ],
+  "vehiclelights128": [
+   89.189,
+   159.905,
+   261.204
+  ],
+  "vehiclegeneric256": [
+   3.603,
+   56.108,
+   146.067
+  ],
+  "vehicletyres128": [
+   139.794,
+   183.647,
+   204.647
+  ]
+ },
+ "grunge_v_height_corr": [
+  -0.899,
+  -0.742,
+  -0.08
+ ],
+ "regions": {
+  "generic.paint_core": {
+   "texture": "vehiclegeneric256",
+   "rect": [
+    0.0625,
+    0.3125,
+    0.1875,
+    0.375
+   ],
+   "roles": [
+    "paint",
+    "paint2"
+   ],
+   "what": "paint on vehiclegeneric256 (the measured core of vanilla paint triangles)",
+   "kind": "measured",
+   "support": 0.376,
+   "usage": 0.032,
+   "cars": 113
+  },
+  "generic.white": {
+   "texture": "vehiclegeneric256",
+   "rect": [
+    0.0,
+    0.0,
+    0.5,
+    0.25
+   ],
+   "roles": [
+    "paint",
+    "paint2",
+    "white"
+   ],
+   "what": "plain white block: flat key colour without detail",
+   "kind": "labelled",
+   "support": 0.001,
+   "usage": 0.002,
+   "cars": 192
+  },
+  "generic.chrome_strip": {
+   "texture": "vehiclegeneric256",
+   "rect": [
+    0.0,
+    0.5625,
+    0.25,
+    0.75
+   ],
+   "roles": [
+    "white",
+    "grey"
+   ],
+   "what": "chrome strips with a soft gradient (trim lines, bumpers)",
+   "kind": "labelled",
+   "support": 0.002,
+   "usage": 0.014,
+   "cars": 192
+  },
+  "generic.chrome_pipe": {
+   "texture": "vehiclegeneric256",
+   "rect": [
+    0.25,
+    0.75,
+    0.5,
+    0.875
+   ],
+   "roles": [
+    "white",
+    "grey"
+   ],
+   "what": "chrome tube highlights (exhausts, bars)",
+   "kind": "labelled",
+   "support": 0.034,
+   "usage": 0.03,
+   "cars": 192
+  },
+  "generic.grille": {
+   "texture": "vehiclegeneric256",
+   "rect": [
+    0.75,
+    0.375,
+    1.0,
+    0.5
+   ],
+   "roles": [
+    "white",
+    "grey"
+   ],
+   "what": "grille slats",
+   "kind": "labelled",
+   "support": 0.022,
+   "usage": 0.019,
+   "cars": 192
+  },
+  "generic.black": {
+   "texture": "vehiclegeneric256",
+   "rect": [
+    0.25,
+    0.5,
+    0.5,
+    0.75
+   ],
+   "roles": [
+    "white",
+    "grey",
+    "other"
+   ],
+   "what": "dark textured plastic (underbody, bumpers, seals)",
+   "kind": "labelled",
+   "support": 0.153,
+   "usage": 0.132,
+   "cars": 192
+  },
+  "generic.engine": {
+   "texture": "vehiclegeneric256",
+   "rect": [
+    0.5,
+    0.5,
+    1.0,
+    0.75
+   ],
+   "roles": [
+    "white",
+    "grey"
+   ],
+   "what": "engine bay and underbody machinery",
+   "kind": "labelled",
+   "support": 0.294,
+   "usage": 0.252,
+   "cars": 192
+  },
+  "generic.panel": {
+   "texture": "vehiclegeneric256",
+   "rect": [
+    0.5,
+    0.0,
+    0.875,
+    0.3125
+   ],
+   "roles": [
+    "white",
+    "grey"
+   ],
+   "what": "dark panels with a chrome frame (dash, vents)",
+   "kind": "labelled",
+   "support": 0.049,
+   "usage": 0.042,
+   "cars": 192
+  },
+  "generic.glass": {
+   "texture": "vehiclegeneric256",
+   "rect": [
+    0.5,
+    0.875,
+    0.75,
+    1.0
+   ],
+   "roles": [
+    "glass"
+   ],
+   "what": "dark glass gradient (all glass)",
+   "kind": "labelled",
+   "support": 0.74,
+   "usage": 0.144,
+   "cars": 177
+  },
+  "generic.glass_core": {
+   "texture": "vehiclegeneric256",
+   "rect": [
+    0.5,
+    0.9375,
+    0.6875,
+    1.0
+   ],
+   "roles": [
+    "glass"
+   ],
+   "what": "glass: where vanilla puts most glass triangles",
+   "kind": "measured",
+   "support": 0.674,
+   "usage": 0.108,
+   "cars": 177
+  },
+  "generic.plate": {
+   "texture": "vehiclegeneric256",
+   "rect": [
+    0.0,
+    0.875,
+    0.25,
+    1.0
+   ],
+   "roles": [
+    "white"
+   ],
+   "what": "printed plate-like strip",
+   "kind": "labelled",
+   "support": 0.001,
+   "usage": 0.003,
+   "cars": 192
+  },
+  "grunge.paint": {
+   "texture": "vehiclegrunge256",
+   "rect": [
+    0.0,
+    0.0,
+    1.0,
+    1.0
+   ],
+   "roles": [
+    "paint",
+    "paint2"
+   ],
+   "what": "whole vehiclegrunge256: paint with dirt; V follows height (higher = smaller v)",
+   "kind": "measured",
+   "support": 1.0,
+   "usage": 1.0,
+   "cars": 140
+  },
+  "lights.head_wide": {
+   "texture": "vehiclelights128",
+   "rect": [
+    0.0,
+    0.25,
+    0.5,
+    0.5
+   ],
+   "roles": [
+    "lamp_front"
+   ],
+   "what": "wide rectangular headlamp",
+   "kind": "labelled",
+   "support": 0.81,
+   "usage": 0.312,
+   "cars": 153
+  },
+  "lights.head_square": {
+   "texture": "vehiclelights128",
+   "rect": [
+    0.0,
+    0.0,
+    0.5,
+    0.25
+   ],
+   "roles": [
+    "lamp_front"
+   ],
+   "what": "square headlamp",
+   "kind": "labelled",
+   "support": 0.089,
+   "usage": 0.075,
+   "cars": 153
+  },
+  "lights.head_round": {
+   "texture": "vehiclelights128",
+   "rect": [
+    0.25,
+    0.75,
+    0.5,
+    1.0
+   ],
+   "roles": [
+    "lamp_front"
+   ],
+   "what": "round headlamp",
+   "kind": "labelled",
+   "support": 0.0,
+   "usage": 0.012,
+   "cars": 153
+  },
+  "lights.head_small": {
+   "texture": "vehiclelights128",
+   "rect": [
+    0.0,
+    0.75,
+    0.25,
+    1.0
+   ],
+   "roles": [
+    "lamp_front"
+   ],
+   "what": "small rectangular lamp",
+   "kind": "labelled",
+   "support": 0.067,
+   "usage": 0.031,
+   "cars": 153
+  },
+  "lights.tail_bar": {
+   "texture": "vehiclelights128",
+   "rect": [
+    0.5,
+    0.0,
+    1.0,
+    0.25
+   ],
+   "roles": [
+    "lamp_rear"
+   ],
+   "what": "red tail-light bar",
+   "kind": "labelled",
+   "support": 0.686,
+   "usage": 0.187,
+   "cars": 153
+  },
+  "lights.tail_wide": {
+   "texture": "vehiclelights128",
+   "rect": [
+    0.5,
+    0.25,
+    1.0,
+    0.5
+   ],
+   "roles": [
+    "lamp_rear"
+   ],
+   "what": "wide grey lamp cluster",
+   "kind": "labelled",
+   "support": 0.0,
+   "usage": 0.154,
+   "cars": 153
+  },
+  "lights.tail_round": {
+   "texture": "vehiclelights128",
+   "rect": [
+    0.5,
+    0.75,
+    0.75,
+    1.0
+   ],
+   "roles": [
+    "lamp_rear"
+   ],
+   "what": "round red tail light",
+   "kind": "labelled",
+   "support": 0.106,
+   "usage": 0.027,
+   "cars": 153
+  },
+  "lights.tail_bar2": {
+   "texture": "vehiclelights128",
+   "rect": [
+    0.75,
+    0.75,
+    1.0,
+    1.0
+   ],
+   "roles": [
+    "lamp_rear"
+   ],
+   "what": "second red bar",
+   "kind": "labelled",
+   "support": 0.194,
+   "usage": 0.068,
+   "cars": 153
+  },
+  "lights.indicators": {
+   "texture": "vehiclelights128",
+   "rect": [
+    0.5,
+    0.5,
+    0.75,
+    0.75
+   ],
+   "roles": [
+    "lamp_front",
+    "lamp_rear",
+    "white"
+   ],
+   "what": "small red/blue/amber round lenses",
+   "kind": "labelled",
+   "support": 0.016,
+   "usage": 0.015,
+   "cars": 165
+  },
+  "lights.amber_bar": {
+   "texture": "vehiclelights128",
+   "rect": [
+    0.75,
+    0.5,
+    1.0,
+    0.75
+   ],
+   "roles": [
+    "lamp_front",
+    "lamp_rear",
+    "white"
+   ],
+   "what": "amber lens bar",
+   "kind": "labelled",
+   "support": 0.104,
+   "usage": 0.119,
+   "cars": 165
+  },
+  "lights.front_measured": {
+   "texture": "vehiclelights128",
+   "rect": [
+    0.0625,
+    0.28125,
+    0.4375,
+    0.46875
+   ],
+   "roles": [
+    "lamp_front"
+   ],
+   "what": "front lamp keys: measured core",
+   "kind": "measured",
+   "support": 0.755,
+   "usage": 0.297,
+   "cars": 153
+  },
+  "lights.rear_measured": {
+   "texture": "vehiclelights128",
+   "rect": [
+    0.5625,
+    0.03125,
+    0.96875,
+    0.9375
+   ],
+   "roles": [
+    "lamp_rear"
+   ],
+   "what": "rear lamp keys: measured core",
+   "kind": "measured",
+   "support": 0.898,
+   "usage": 0.535,
+   "cars": 153
+  },
+  "tyres.tread": {
+   "texture": "vehicletyres128",
+   "rect": [
+    0.0,
+    0.0,
+    0.25,
+    1.0
+   ],
+   "roles": [
+    "tread"
+   ],
+   "what": "tread strip (u 0-0.25, one tyre per v quarter)",
+   "kind": "measured",
+   "support": 0.726,
+   "usage": 0.347,
+   "cars": 145
+  },
+  "tyres.tread_a": {
+   "texture": "vehicletyres128",
+   "rect": [
+    0.0,
+    0.0,
+    0.25,
+    0.25
+   ],
+   "roles": [
+    "tread"
+   ],
+   "what": "tread of tyre A (first v quarter)",
+   "kind": "labelled",
+   "support": 0.23,
+   "usage": 0.11,
+   "cars": 145
+  },
+  "tyres.sidewall": {
+   "texture": "vehicletyres128",
+   "rect": [
+    0.25,
+    0.0,
+    0.5,
+    1.0
+   ],
+   "roles": [
+    "sidewall"
+   ],
+   "what": "sidewall column (u 0.25-0.5)",
+   "kind": "measured",
+   "support": 0.578,
+   "usage": 0.303,
+   "cars": 148
+  },
+  "tyres.sidewall_a": {
+   "texture": "vehicletyres128",
+   "rect": [
+    0.25,
+    0.25,
+    0.5,
+    0.5
+   ],
+   "roles": [
+    "sidewall"
+   ],
+   "what": "sidewall disk of tyre A (centre 0.375,0.375, radius about 0.17)",
+   "kind": "measured",
+   "support": 0.201,
+   "usage": 0.105,
+   "cars": 148
+  },
+  "plate.front": {
+   "texture": "carplate",
+   "rect": [
+    0.0,
+    0.0,
+    1.0,
+    1.0
+   ],
+   "roles": [
+    "white"
+   ],
+   "what": "front plate texture (engine prints the text)",
+   "kind": "measured",
+   "support": 1.0,
+   "usage": 1.0,
+   "cars": 134
+  },
+  "plate.back": {
+   "texture": "carpback",
+   "rect": [
+    0.0,
+    0.0,
+    1.0,
+    1.0
+   ],
+   "roles": [
+    "white"
+   ],
+   "what": "back plate texture",
+   "kind": "measured",
+   "support": 1.0,
+   "usage": 1.0,
+   "cars": 132
+  }
+ }
+}

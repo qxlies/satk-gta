@@ -254,6 +254,35 @@ def test_open_index_cache_and_reopen(db_file: Path):
         api.clear_cache()
 
 
+def test_open_index_cache_follows_the_workspace(satk_home, tmp_path, monkeypatch):
+    """A database cached under one workspace is never served for another (order-dependent ``id free`` failure).
+
+    The cache is keyed by profile and resolved path, so a configuration reset alone (no ``clear_cache``) is enough:
+    the other workspace is a cache miss and a missing file is ``INDEX_MISSING`` again.
+    """
+    from satk.core import config
+
+    FakeIndexDB().to_sqlite(satk_home / "work" / "index" / "vanilla.sqlite")
+    first = api.open_index("vanilla")
+    other = tmp_path / "ws2"
+    (other / "work" / "index").mkdir(parents=True)
+    monkeypatch.setenv("SATK_HOME", str(other))
+    config.reset()  # what a changed environment looks like to the cache: nothing else happens
+    try:
+        with pytest.raises(SatkError) as e:
+            api.open_index("vanilla")
+        assert e.value.code == "INDEX_MISSING" and "/ws2/work/index/vanilla.sqlite" in e.value.data["path"]
+        second = FakeIndexDB().to_sqlite(other / "work" / "index" / "vanilla.sqlite")
+        b = api.open_index("vanilla")
+        assert b is not first and b.path == Path(second).resolve() and b.path.as_posix().endswith("/ws2/work/index/vanilla.sqlite")
+        monkeypatch.setenv("SATK_HOME", str(satk_home))
+        config.reset()
+        assert api.open_index("vanilla") is first  # back in the first workspace: its database is still cached
+    finally:
+        monkeypatch.undo()
+        config.reset()
+
+
 # ---------------------------------------------------------------- geometry helpers
 
 

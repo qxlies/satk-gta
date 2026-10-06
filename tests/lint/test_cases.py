@@ -8,12 +8,19 @@ from pathlib import Path
 
 import pytest
 
+from satk.lint import runner
+from satk.lint.link import IndexView
 from satk.lint.rules import Rules, rules_path
 from satk.lint.runner import lint
 
 from lint_synth import B, Mod, libid
 
 NAN = float("nan")
+CARS = "cars\n400, gm_car, gm_txd, car, PREMIER, PREMIER, null, richfamily, 10, 0, 0, -1, 0.7, 0.7, -1\nend\n"
+PEDS = "peds\n290, gm_ped, gm_txd, CIVMALE, STAT_STREET_GUY, man, 1983, 0, null, 9, 9, PED_TYPE_GEN, VOICE_GEN_BMOST, " \
+       "VOICE_GEN_BMOST\nend\n"
+WEAP = "weap\n346, gm_gun, gm_txd, colt45, 1, 50, 0\nend\n"
+FLAT = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (1.0, 1.0, 0.0)]
 
 
 def _game_root(root: Path, colfile: bytes) -> Path:
@@ -90,6 +97,66 @@ def _case(m: Mod, tmp: Path, rule: str, cfg) -> tuple[str | None, dict]:  # noqa
         kw["config"] = cfg({rule: {"params": {"budget": {"map": 0}}}})
     elif rule == "dff.rw_version":
         f["gm_box.dff"] = B.dff(lib=libid(0x37002), night=True)
+    elif rule == "dff.flat_shading":
+        m.ide += CARS
+        f["gm_car.dff"] = B.dff(pos=FLAT, normals=True)
+    elif rule == "dff.vert_sharing":
+        m.ide += CARS
+        kw["config"] = cfg({rule: {"params": {"min_tris": 1}}})
+        f["gm_car.dff"] = B.dff(pos=FLAT[:3] + [FLAT[2], FLAT[1], FLAT[3]], tris=[(0, 1, 2, 0), (3, 4, 5, 0)],
+                                normals=True)
+    elif rule == "veh.frames":
+        m.ide += CARS
+        f["gm_car.dff"] = B.dff(frames=((-1, "gm_car"),), normals=True)
+    elif rule == "veh.dummy_side":
+        m.ide += CARS
+        f["gm_car.dff"] = B.dff(frames=((-1, "gm_car"), (0, "wheel_lf_dummy", (1.0, 1.2, 0.0))), normals=True)
+    elif rule == "veh.wheel_scale":
+        m.ide += CARS
+        f["gm_car.dff"] = B.dff(frames=((-1, "gm_car"), (0, "wheel")), atomics=((1, 0),), normals=True,
+                                pos=[(0.0, -1.0, -1.0), (0.0, 1.0, -1.0), (0.0, -1.0, 1.0), (0.0, 1.0, 1.0)])
+    elif rule == "veh.shadow_mesh":
+        m.ide += CARS
+        f["gm_car.dff"] = B.dff(normals=True)
+    elif rule == "veh.env_uv2":
+        m.ide += CARS
+        f["gm_car.dff"] = B.dff(mats=[B.material("gm_wall", env="xvehicleenv128")], normals=True)
+    elif rule == "veh.light_key_tex":
+        m.ide += CARS
+        f["gm_car.dff"] = B.dff(mats=[B.material("gm_wall", rgba=(255, 175, 0, 255))], normals=True)
+    elif rule == "veh.paint_dirt":
+        m.ide += CARS
+        f["gm_car.dff"] = B.dff(mats=[B.material("vehiclegeneric256", rgba=(60, 255, 0, 255))], normals=True)
+    elif rule == "veh.upgrade_frames":
+        m.ide += CARS
+        f["gm_car.dff"] = B.dff(frames=((-1, "gm_car"),), normals=True)
+        kw["_ref_frames"] = {"gm_car": frozenset({"gm_car", "ug_nitro", "ug_roof"})}
+    elif rule == "veh.hd_tris":
+        m.ide += CARS
+        kw["config"] = cfg({rule: {"params": {"budget": {"default": 1}}}})
+        f["gm_car.dff"] = B.dff(normals=True)
+    elif rule == "veh.part_tris":
+        m.ide += CARS
+        kw["config"] = cfg({rule: {"params": {"budget": {"chassis": 1}}}})
+        f["gm_car.dff"] = B.dff(frames=((-1, "gm_car"), (0, "chassis")), atomics=((1, 0),), normals=True)
+    elif rule == "veh.dam_ratio":
+        m.ide += CARS
+        kw["config"] = cfg({rule: {"params": {"min_tris": 1}}})
+        four = [(0, 1, 2, 0), (2, 1, 3, 0), (0, 2, 1, 0), (1, 2, 3, 0)]
+        geoms = [B.geometry(B.QUAD, four, normals=True), B.geometry(B.QUAD, four[:1], normals=True),
+                 B.geometry(B.QUAD, four, normals=True), B.geometry(B.QUAD, four[:1], normals=True)]
+        f["gm_car.dff"] = B.clump(geoms, frames=((-1, "gm_car"), (0, "door_lf_ok"), (0, "door_lf_dam"),
+                                                 (0, "bump_front_ok"), (0, "bump_front_dam")),
+                                  atomics=((1, 0), (2, 1), (3, 2), (4, 3)))
+    elif rule == "ped.skin":
+        m.ide += PEDS
+        f["gm_ped.dff"] = B.dff(normals=True)
+    elif rule == "weap.flash":
+        m.ide += WEAP
+        f["gm_gun.dff"] = B.dff(frames=((-1, "gm_gun"), (0, "gunflash")), normals=True)
+    elif rule == "mat.alpha_draw_last":
+        kw["config"] = cfg({rule: {"enabled": True}})
+        f["gm_box.dff"] = B.dff(mats=[B.material("gm_wall", rgba=(255, 255, 255, 128))], night=True)
     elif rule == "txd.parse":
         f["gm_txd.txd"] = struct.pack("<III", 0x16, 999, 0x1803FFFF)
     elif rule == "txd.platform":
@@ -152,6 +219,8 @@ def _case(m: Mod, tmp: Path, rule: str, cfg) -> tuple[str | None, dict]:  # noqa
         f["gm_box.col"] = B.col3("gm_box", boxes=B.BOX, bounds=((-2.0, -2.0, -2.0), (2.0, 2.0, 2.0), (0, 0, 0), 0.5))
     elif rule == "col.surface":
         f["gm_box.col"] = B.col3("gm_box", verts=B.TRI_VERTS, faces=((0, 1, 2, 200),))
+    elif rule == "col.face_light_zero":
+        f["gm_box.col"] = B.col3("gm_box", boxes=B.BOX, verts=B.TRI_VERTS, faces=((0, 1, 2, 0, 0),))
     elif rule == "col.dup_name":
         f["again.col"] = B.col3("gm_box", boxes=B.BOX)
     elif rule == "col.colfile_buffer":
@@ -171,6 +240,8 @@ def _case(m: Mod, tmp: Path, rule: str, cfg) -> tuple[str | None, dict]:  # noqa
         m.ide += "objs\n18001, gm_box, gm_txd, 100, 0\nend\n"
     elif rule == "ide.draw_min":
         m.ide = "objs\n18000, gm_box, gm_txd, 2, 0\nend\n"
+    elif rule == "ide.draw_bigbuilding":
+        m.ide = "objs\n18000, gm_box, gm_txd, 400, 0\nend\n"
     elif rule == "link.dff_missing":
         m.ide += "objs\n18001, gm_gone, gm_txd, 100, 0\nend\n"
     elif rule == "link.txd_missing":
@@ -202,10 +273,37 @@ def test_the_clean_mod_has_no_findings(mod: Mod):
     assert lint(str(mod.dir), use_index=False, preset="strict").findings == []
 
 
+class _RefIndex(IndexView):
+    """An index that only answers reference frame names (rules comparing a replacement with vanilla)."""
+
+    def __init__(self, frames: dict):
+        super().__init__(None)
+        self.frames = frames
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    def ref_frames(self, dff: str):
+        return self.frames.get(dff.lower())
+
+    def model(self, name):
+        return None
+
+    def has_blob(self, kind, name):
+        return None
+
+    def txd_users(self, name, limit=50):
+        return []
+
+
 @pytest.mark.parametrize("rule", ALL_RULES)
-def test_rule_catches_its_synthetic_bad_file(rule: str, mod: Mod, tmp_path: Path, config_file):
+def test_rule_catches_its_synthetic_bad_file(rule: str, mod: Mod, tmp_path: Path, config_file, monkeypatch):
     target, kw = _case(mod, tmp_path, rule, config_file)
     path = mod.write()
+    ref = kw.pop("_ref_frames", None)
+    if ref is not None:
+        monkeypatch.setattr(runner, "_open_index", lambda profile, use: (_RefIndex(ref), None))
     rep = lint(target or str(path), use_index=False, **kw)
     hits = [f for f in rep.findings if f.rule == rule]
     assert hits, (rule, [f.row() for f in rep.findings])

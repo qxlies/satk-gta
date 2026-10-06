@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from ..core.errors import SatkError
 from ..core.ids import Sid
 from .col import ColFacts
-from .dff import DffFacts, ModelDef, model_class
+from .dff import MAP_LIKE, DffFacts, ModelDef, model_class
 from .rules import Collector
 from .txd import TxdFacts
 
@@ -34,6 +34,9 @@ class IndexView:
         self._parent: dict[str, str | None] = {}
         self._cols: dict[str, tuple | None] = {}
         self._bulk_txds: set[str] | None = None
+        self._frames: dict[str, frozenset | None] = {}
+        self._alpha: dict[str, frozenset | None] = {}
+        self._prims: dict[str, int | None] = {}
 
     def preload(self, page: int = 500) -> bool:
         """Load every model name of the index in a few paged queries (for large targets).
@@ -48,15 +51,18 @@ class IndexView:
         models: dict[str, dict] = {}
         txds: set[str] = set()
         off = 0
+        sql = ("SELECT m.name, m.id, m.sec, m.txd, m.draw, m.flags, m.extra, s.relpath FROM model m "
+               "JOIN ide i ON i.id = m.ide_id JOIN source s ON s.id = i.source_id WHERE m.active = 1 "
+               "ORDER BY m.id LIMIT ? OFFSET ?")
         try:
             while True:
-                env = self.db.query("SELECT name, id, sec, txd, draw FROM v_model ORDER BY id LIMIT ? OFFSET ?",
-                                    [page, off], limit=page)
+                env = self.db.query(sql, [page, off], limit=page)
                 rows = env.get("rows") or []
-                for name, mid, sec, txd, draw in rows:
+                for name, mid, sec, txd, draw, flags, extra, ide in rows:
                     if name:
                         models[str(name).lower()] = {"id": f"model:{mid}", "name": name, "sec": sec, "txd": txd,
-                                                     "draw": draw}
+                                                     "draw": draw, "flags": flags, "extra": extra,
+                                                     "links": {"ide": f"ide:{ide}"} if ide else {}}
                     if txd:
                         txds.add(str(txd).lower())
                 if len(rows) < page:
@@ -172,6 +178,58 @@ class IndexView:
         return self._cols[k]
 
 
+    def _rows(self, sql: str, params: list, limit: int = 500) -> list | None:
+        try:
+            return self.db.query(sql, params, limit=limit).get("rows") or []
+        except (SatkError, ValueError, TypeError):
+            return None
+
+    def ref_frames(self, dff: str) -> frozenset | None:
+        """Lower-case frame names of ``dff:<name>`` in the index (``None`` if absent or no index): the
+        reference a replacement model is compared with (upgrade frames, muzzle flash)."""
+        if self.db is None:
+            return None
+        k = dff.lower()
+        if k not in self._frames:
+            rows = self._rows("SELECT f.name FROM dff_frame f JOIN dff d ON d.id = f.dff_id WHERE d.name = ?", [k])
+            self._frames[k] = None if not rows else frozenset(str(r[0]).lower() for r in rows if r[0])
+        return self._frames[k]
+
+    def txd_alpha(self, name: str) -> frozenset | None:
+        """Lower-case names of the textures of ``txd:<name>`` with blended alpha (``None``: unknown)."""
+        if self.db is None:
+            return None
+        k = name.lower()
+        if k not in self._alpha:
+            from .txd import BLEND_ALPHA
+
+            fmts = sorted(BLEND_ALPHA)
+            rows = self._rows("SELECT t.name FROM texture t JOIN txd x ON x.id = t.txd_id WHERE x.name = ? AND "
+                              f"t.alpha = 1 AND t.d3dfmt IN ({','.join('?' * len(fmts))})", [k, *fmts])
+            self._alpha[k] = None if rows is None else frozenset(str(r[0]).lower() for r in rows)
+        return self._alpha[k]
+
+    def txd_users(self, name: str, limit: int = 50) -> list[ModelDef]:
+        """Definitions of the index models whose TXD is ``name`` (for the class of a TXD)."""
+        if self.db is None:
+            return []
+        rows = self._rows("SELECT m.id, m.name, m.sec, m.draw, m.flags, s.relpath FROM model m JOIN ide i ON "
+                          "i.id = m.ide_id JOIN source s ON s.id = i.source_id WHERE m.txd = ? AND m.active = 1 "
+                          "ORDER BY m.id LIMIT ?", [name.lower(), limit], limit=limit) or []
+        return [ModelDef(int(mid), str(nm), name, str(sec), draw, "index", flags=flags, ide=str(ide or "").lower())
+                for mid, nm, sec, draw, flags, ide in rows]
+
+    def col_prims(self, name: str) -> int | None:
+        """Spheres + boxes + faces of the active collision model ``name`` (``None`` if absent)."""
+        if self.db is None:
+            return None
+        k = name.lower()
+        if k not in self._prims:
+            rows = self._rows("SELECT spheres + boxes + faces FROM col WHERE name = ? AND active = 1", [k])
+            self._prims[k] = int(rows[0][0] or 0) if rows else None
+        return self._prims[k]
+
+
 @dataclass
 class Catalog:
     """Everything the link checks know about the linted set."""
@@ -241,6 +299,32 @@ def _textures_of(cat: Catalog, ix: IndexView, txd: str) -> frozenset | None:
     return ix.txd_textures(txd)
 
 
+def _bigbuilding(c: Collector, d: ModelDef, col, ix: IndexView, where: str, lod_name: str) -> None:
+    """``ide.draw_bigbuilding``: a non-LOD model with collision whose draw distance makes it a big building
+    (``LODDistMultiplier (1.0) x draw > 300``: the game turns its collision off, FileLoader.cpp:1992)."""
+    if lod_name and lod_name in d.name.lower():
+        return
+    prims = col.prims if col is not None else ix.col_prims(d.name)
+    if not prims:
+        return
+    c.seen("ide.draw_bigbuilding")
+    lim = float(c.rules.param("ide.draw_bigbuilding", "max_draw", 300.0))
+    if d.draw is not None and d.draw > lim:
+        line = d.origin.rpartition(":")[2]
+        c.add("ide.draw_bigbuilding", where, line=line, id=d.id, name=d.name, draw=d.draw)
+
+
+def _alpha_order(c: Collector, d: ModelDef, dff: DffFacts) -> None:
+    """``mat.alpha_draw_last``: a map model with semi-transparent material colours (alpha < 255: always
+    blended, unlike texture alpha that is mostly alpha-tested cut-outs) and neither the draw_last (4) nor the
+    additive (8) IDE flag."""
+    if d.flags is None or dff.cls not in MAP_LIKE or not dff.mat_alpha:
+        return
+    c.seen("mat.alpha_draw_last")
+    if not d.flags & (4 | 8):
+        c.add("mat.alpha_draw_last", dff.label, id=d.id, name=d.name, flags=d.flags)
+
+
 def check_links(c: Collector, cat: Catalog, ix: IndexView, *, skip_loose_orphans: bool = False) -> None:
     """Run the ``link.*`` rules over the catalog (and the index for names outside the set).
 
@@ -250,6 +334,7 @@ def check_links(c: Collector, cat: Catalog, ix: IndexView, *, skip_loose_orphans
     if not (ix.available or cat.dff_list or cat.txd_list or cat.col_list):
         return
     min_gap = float(c.rules.param("link.col_offset", "min_gap", 5.0))
+    lod_name = str(c.rules.classes.get("lod_name", "lod")).lower()
     dff_ph = [str(x).lower() for x in c.rules.param("link.dff_missing", "placeholders", []) or []]
     txd_ph = [str(x).lower() for x in c.rules.param("link.txd_missing", "placeholders", []) or []]
     builtin = {str(x).lower() for x in c.rules.param("link.txd_missing", "builtin", []) or []}
@@ -280,8 +365,13 @@ def check_links(c: Collector, cat: Catalog, ix: IndexView, *, skip_loose_orphans
                           chain="+".join(chain))
         col = cat.cols.get(name)
         cbox = (col.bbox,) if col is not None else ix.col_bbox(name)
-        if d.sec in ("objs", "tobj") and model_class(c.rules.classes, d, None) == "map" and cbox is None:
+        cls = model_class(c.rules.classes, d, None, archive=dff.archive if dff is not None else None)
+        if d.sec in ("objs", "tobj") and cls in MAP_LIKE and cbox is None:
             c.add("link.col_missing", where, id=d.id, name=d.name, sec=d.sec)
+        if d.sec in ("objs", "tobj") and d.origin != "index":
+            _bigbuilding(c, d, col, ix, where, lod_name)
+            if dff is not None:
+                _alpha_order(c, d, dff)
         if dff is not None and dff.bbox is not None and cbox:
             g = _gap(dff.bbox, cbox[0])
             if g > min_gap:

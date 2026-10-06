@@ -41,7 +41,7 @@ def bounds_file(world, tmp_path):
 
 
 def test_build_uses_exact_ranges_and_thunk_owner(world, satk_home, bounds_file):
-    from conftest import make_sources
+    from re_synth import make_sources
 
     sources = make_sources(world)
     sources.ghidra_functions = bounds_file
@@ -71,7 +71,7 @@ def test_build_uses_exact_ranges_and_thunk_owner(world, satk_home, bounds_file):
 
 
 def test_bad_ghidra_input_does_not_replace_database(world, satk_home, bounds_file):
-    from conftest import make_sources
+    from re_synth import make_sources
 
     sources = make_sources(world)
     out = satk_home / "work/re/existing.sqlite"
@@ -102,7 +102,7 @@ def test_rejects_invalid_ghidra_ranges(world, tmp_path, row):
 
 
 def test_detached_block_before_entry_has_signed_offset(world, satk_home, bounds_file):
-    from conftest import make_sources
+    from re_synth import make_sources
 
     # CFoo::Baz owns a block preceding its entry, even though another named entry is nearer.
     rows = [
@@ -125,7 +125,7 @@ def test_detached_block_before_entry_has_signed_offset(world, satk_home, bounds_
 
 
 def test_exact_body_does_not_promote_an_interior_hook_site(world, satk_home, bounds_file):
-    from conftest import make_sources
+    from re_synth import make_sources
 
     site = C.F_BAR + 0x20  # aligned, but a detached block of CFoo::Bar rather than a new function
     (world.gtarev / "source/game_sa/Interior.cpp").write_text(

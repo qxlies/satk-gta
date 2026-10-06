@@ -10,6 +10,7 @@ import hashlib
 import io
 import os
 import subprocess
+import sys
 import tarfile
 import zipfile
 from pathlib import Path
@@ -20,6 +21,9 @@ from satk.core import registry as R
 from satk.core.errors import SatkError
 from satk.release import public as P
 from satk.release.tree import Tree, export
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))  # tests/: sandbox helper; appended, so it never shadows a conftest
+import sandbox_compat  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 BS = "\\"
@@ -283,6 +287,7 @@ def test_snapshot_refuses_a_foreign_folder(dev_repo, tmp_path):
 
 
 def test_snapshot_on_top_of_the_public_history(dev_repo, tmp_path):
+    sandbox_compat.skip_unless_shell_runs(sandbox_compat.find_sh())  # a local git clone starts sh
     kept, _ = _export(dev_repo)
     first = tmp_path / "first"
     P.write_snapshot(kept, dev_repo, first, version="1.0.0")

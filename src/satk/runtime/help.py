@@ -29,7 +29,8 @@ from satk.core.registry import GROUPS, OpSpec, all_ops
 
 from .schemadoc import read_schema, schema_files
 
-__all__ = ["TOPICS", "render", "register_topic", "topic_names", "op_signature", "find_op", "MAX_TOPIC_CHARS"]
+__all__ = ["TOPICS", "render", "register_topic", "topic_names", "op_signature", "find_op", "find",
+           "MAX_TOPIC_CHARS"]
 
 #: Upper bound for one topic's text (~1.5k tokens at ~4 chars/token); enforced by tests.
 MAX_TOPIC_CHARS = 6000
@@ -141,6 +142,10 @@ gta-reversed (hooks, names, file:line), PE thunks of the HOODLUM exe, MTA/Neon p
 - re_find(name, kind=func|global|vtable|struct): exact, then prefix, then substring.
 - re_src(fn, context=30): gta-reversed source lines -- reference only, never copy into repo files.
 - re_patches(fn=... | range="0x..-0x..", origin=upstream|trunk|neon|all): MTA patch points.
+- satk_op("re.nodes", {"type": "automobile"}): frame names the engine looks up per vehicle type / ped (from the
+  exe); re_src without a symbol-DB line falls back to the knowledge base (via: kb); context is 0..400 lines.
+- Knowledge base: satk_op("kb.sym", {"name": "eCarPiece"}) lists enum members; satk_op("kb.fact", {"key":
+  "asset"}) gives the tested authoring facts (lamp/paint keys, wheel size, hinges, capacity, ...).
 Also via generic tools: asset_get("fn:0x53bf09"), asset_get("g:0xc8d4c0"), asset_refs(fn, rel="patches")."""
 
 _BLENDER = """\
@@ -188,7 +193,9 @@ Long-running operations (index build, re build, blender.*, ...) run in a subproc
 timeout 600 s, the whole process tree is killed on timeout/cancel; others in a thread (120 s).
 Refused (error UNSUPPORTED = CLI only, CONSENT_REQUIRED = ask the user): listed below.
 SATK_MCP_GROUPS of the server limits satk_op to those groups. Full parameter docs: satk_help(op).
-CLI equivalents: `satk mcp ops <query>`, `satk mcp op <op> --args <json>`."""
+CLI equivalents: `satk ops <words>` (= `satk mcp ops`), `satk op <op> --args <json>`; `satk help --find
+<words>` also searches the help topics. CLI output of any command: `--summary` (one line), `--out FILE`
+(whole answer to a file, one line printed)."""
 
 _GOLDEN = """\
 # Golden numbers (profile vanilla = the clean 1.0 US copy, paths.game)
@@ -239,20 +246,28 @@ def _ops_in(pred: Callable[[OpSpec], bool]) -> list[OpSpec]:
     return [o for o in all_ops() if pred(o)]
 
 
-def _op_lines(ops: list[OpSpec], *, ru: bool = False) -> list[str]:
+def _op_lines(ops: list[OpSpec], *, ru: bool = False, short: bool = False) -> list[str]:
     out = []
     for o in ops:
         name = _tool(o) or f"satk {o.cli}"
         cli = f" (CLI: satk {o.cli})" if _tool(o) else ""
-        out.append(f"- `{name}`{cli}: {o.summary_ru if ru else o.summary}")
+        summary = o.summary_ru if ru else o.summary
+        out.append(f"- `{name}`{cli}: {_first_sentence(summary) if short else summary}")
     return out
 
 
 def _section_with_ops(text: str, title: str, pred: Callable[[OpSpec], bool]) -> str:
+    """Topic text plus the operations registered now (first sentences only when the topic would be too long)."""
     ops = _ops_in(pred)
-    lines = [text, "", f"## {title} registered now ({len(ops)})"]
-    lines += _op_lines(ops) if ops else ["(none yet: the package is not merged or failed to import; see satk doctor)"]
-    return "\n".join(lines)
+    head = [text, "", f"## {title} registered now ({len(ops)})"]
+    if not ops:
+        return "\n".join(head + ["(none yet: the package is not merged or failed to import; see satk doctor)"])
+    out = "\n".join(head + _op_lines(ops))
+    if len(out) > MAX_TOPIC_CHARS:
+        out = "\n".join(head + _op_lines(ops, short=True))
+    if len(out) > MAX_TOPIC_CHARS:
+        out = out[: MAX_TOPIC_CHARS - 60].rsplit("\n", 1)[0] + "\n... (all: satk ops <words>)"
+    return out
 
 
 def _grouped() -> dict[str, list[str]]:
@@ -362,6 +377,13 @@ def _t_tools(ru: bool) -> dict:
     text = _tools_text(ru, short=False)
     if len(text) > MAX_TOPIC_CHARS:  # more tools than the topic can hold: first sentences only
         text = _tools_text(ru, short=True)
+    if len(text) > MAX_TOPIC_CHARS:
+        # still too long: cut the tool lines, keep the two closing sections (Via satk_op / CLI only)
+        *head, via, cli = text.split("\n")
+        tail = "\n".join(["... (full list: tools/docs/agent/tools.md)", via, cli])
+        room = MAX_TOPIC_CHARS - len(tail) - 1
+        if room > 0:
+            text = "\n".join(head)[:room].rsplit("\n", 1)[0] + "\n" + tail
     if len(text) > MAX_TOPIC_CHARS:
         text = text[: MAX_TOPIC_CHARS - 80].rsplit("\n", 1)[0] + "\n... (full list: tools/docs/agent/tools.md)"
     return {"topic": "tools", "text": text}
@@ -562,3 +584,52 @@ def render(topic: str | None = "start", ru: bool = False) -> dict:
     raise SatkError("BAD_PARAMS", f"unknown help topic {topic!r}",
                     did_you_mean=difflib.get_close_matches(key, cands, n=3, cutoff=0.5),
                     data={"topics": list(TOPICS) + ["guide", "all"]})
+
+
+def _topic_text(name: str) -> str:
+    """Name, summary and text of a topic (empty text when it cannot render here)."""
+    summary, fn = TOPICS[name]
+    try:
+        text = fn(False).get("text") or ""
+    except Exception:  # noqa: BLE001 - a broken topic must not break the search
+        text = ""
+    return f"{name} {summary}".lower(), text.lower()
+
+
+def find(query: str, limit: int = 20) -> dict:
+    """``satk help --find <words>``: help topics and operations (also CLI-only ones) matching the words.
+
+    Operations of a task intent ("make txd from png", "create vehicle") come first, then topics in which
+    every word occurs (name, summary or text), then the other operations ranked like ``satk_ops``.
+    Rows ``kind | name | run | summary``.
+    """
+    from satk.core.envelope import clamp_limit
+    from satk.mcp import generic
+
+    lim = clamp_limit(limit)
+    words = generic._words(query)  # noqa: SLF001 - same word rules as satk_ops
+    if not words:
+        raise SatkError("BAD_PARAMS", "give words to search for", hint="satk help --find make txd from png")
+    scored = []
+    for name in TOPICS:
+        head, text = _topic_text(name)
+        hits = [w for w in words if any(f in head or f in text for f in generic._forms(w))]  # noqa: SLF001
+        if len(hits) == len(words):
+            score = sum(3 if any(f in head for f in generic._forms(w)) else 1 for w in words)  # noqa: SLF001
+            scored.append((-score, name))
+    topic_rows = [["topic", name, f"satk help {name}", TOPICS[name][0]] for _s, name in sorted(scored)]
+    ops, full = generic.rank(query, all_ops())
+    intents = set(generic._intents(words))  # noqa: SLF001 - a task intent ("make txd") puts its ops first
+    op_rows = []
+    for o in ops:
+        why = generic.denial(o)
+        tag = f" (CLI only: {why[1]})" if why else ""
+        op_rows.append(["op", o.name, f"satk {o.cli}", _first_sentence(o.summary) + tag])
+    first = [r for r in op_rows if r[1] in intents]
+    rows = first + topic_rows + [r for r in op_rows if r[1] not in intents]
+    env = table(["kind", "name", "run", "summary"], rows[:lim], total=len(rows),
+                warn=[] if full or not ops else [f"NO_FULL_MATCH: no operation matches all of {words}; "
+                                                 "showing the closest"])
+    env["hint"] = ("details: satk help <name>; agents: satk_ops(query) -> satk_op(op, args)" if rows
+                   else "try other words; satk help --all lists every command")
+    return env

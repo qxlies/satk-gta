@@ -13,12 +13,16 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import anyio
 import pytest
 
 from satk.core.config import SRC_ROOT
 from satk.mcp import adapter as A
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))  # tests/: sandbox helper; appended, so it never shadows a conftest
+import sandbox_compat  # noqa: E402
 
 pytestmark = pytest.mark.slow
 pytest.importorskip("mcp")
@@ -92,6 +96,7 @@ def test_handshake_versions(satk_home, protocol):
 
 
 def test_official_sdk_stdio_client(satk_home):
+    sandbox_compat.skip_unless_async_subprocess()
     from mcp import Client
     from mcp.client.stdio import StdioServerParameters
 

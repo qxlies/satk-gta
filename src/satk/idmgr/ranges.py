@@ -18,7 +18,7 @@ import re
 
 from ..core.errors import SatkError
 
-__all__ = ["KINDS", "KIND_SECTIONS", "MAX_ID", "DEFAULT_RANGE", "STORES", "ENGINE_RESERVED", "SAMP_RESERVED",
+__all__ = ["KINDS", "KIND_SECTIONS", "MAX_ID", "DEFAULT_RANGE", "STORES", "LOW_SLOTS", "ENGINE_RESERVED", "SAMP_RESERVED",
            "SAMP_DL", "VANILLA_VEHICLES", "parse_ranges", "fmt_ranges", "fmt_spec", "iter_range", "f92_max_id"]
 
 KINDS = ("vehicle", "ped", "weapon", "object")
@@ -31,6 +31,8 @@ DEFAULT_RANGE = {"vehicle": (400, MAX_ID), "ped": (1, MAX_ID), "weapon": (1, MAX
 #: Stock model-info store sizes: kind -> (store size, IDE sections counted against it).
 STORES = {"vehicle": (212, ("cars",)), "ped": (278, ("peds",)), "weapon": (51, ("weap",)),
           "object": (14070, ("objs",))}
+#: Fewer free store slots than this -> a STORE_LOW warning (vanilla: ped 2, weapon 1, object 25 left).
+LOW_SLOTS = 10
 
 #: (first, last, why) - taken for every kind of model.
 ENGINE_RESERVED: tuple[tuple[int, int, str], ...] = (

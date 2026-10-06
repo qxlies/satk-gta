@@ -1,0 +1,75 @@
+{
+  "format": "satk.style-brief-terms/1",
+  "_comment": [
+    "Wording of task briefs that prescribes a known anti-pattern of agent-made SA assets (satk.style.brief).",
+    "pattern = case-insensitive regular expression on the brief with line breaks joined to spaces; why = what",
+    "vanilla does instead (measured); fix = what the brief should say. A brief names the asset, the tier and the",
+    "--like model and points to the style help topics; it never restates style numbers."
+  ],
+  "terms": {
+    "crisp": {
+      "pattern": "\\bcrisp\\b",
+      "why": "vanilla textures are small, soft and photo-like (hundreds of colours, painted grime); 'crisp' produces vector-art textures with a few flat colours",
+      "fix": "say 'photo-like textures with shading and grime painted in' and cite style_texture",
+      "ref": "style_texture"
+    },
+    "clean_shapes": {
+      "pattern": "\\bclean\\b(,?\\s+(and\\s+)?(readable|slightly simplified|simple|simplified))?\\s+(shapes|surfaces|lines|forms)\\b",
+      "why": "vanilla bodies carry trim, panel lines, lamps and grime in geometry and texture; 'clean shapes' gives bare, under-detailed models",
+      "fix": "say 'silhouette first, detail where the outline turns' and cite the class topic",
+      "ref": "style_vehicle"
+    },
+    "flat_colour": {
+      "pattern": "\\bflat\\s+(material\\s+)?colou?rs?\\b",
+      "why": "vanilla paint is the key colour times vehiclegrunge256 (grain, dirt, height-dependent value) plus the env sheen; map materials are textured and prelit",
+      "fix": "say 'paint on vehiclegrunge256 with the class colour keys' (vehicles) or 'tiling textures with prelight' (map)",
+      "ref": "style_vehicle"
+    },
+    "no_photos": {
+      "pattern": "\\b(no|never|without|avoid|not)\\b[^.]{0,24}\\bphoto(graph)?s?\\b",
+      "why": "vanilla textures are photo-sourced; a ban on photographs pushes agents to vector art",
+      "fix": "allow licensed photographs or name the photo-free recipe of style_texture",
+      "ref": "style_texture"
+    },
+    "real_scale": {
+      "pattern": "\\b(close to|true to|exact|1:1)\\s+(the\\s+)?real(-world|\\s+world|\\s+life)?\\s+(scale|size|dimensions)\\b|\\breal[- ]world\\s+scale\\b",
+      "why": "SA vehicles are about 1.1-1.2x their real counterparts with real-size wheels; real-world specs made the benchmark car 4.98 m, below every vanilla 4-door",
+      "fix": "say 'scale from the class anchor (wheel size or ped height); the class band decides'",
+      "ref": "style_vehicle"
+    },
+    "hard_edges": {
+      "pattern": "\\b(deliberate|crisp|sharp|many)\\s+hard\\s+(edges|creases)\\b|\\bmany\\s+hard\\s+creases\\b|\\bsharp\\s+edges\\b",
+      "why": "vanilla cars are soft (normal bend about 10 deg, about 10 % flat triangles); 83-92 % of their hard edges sit on material or UV seams",
+      "fix": "say 'smooth inside a material, split normals at seams and designed creases' and cite style_shading",
+      "ref": "style_shading"
+    },
+    "dam_lighter": {
+      "pattern": "_dam\\b[^.]{0,60}\\b(not more than|no more than|never (more|heavier)( than)?|fewer (triangles )?than|lighter than|less than)\\b",
+      "why": "vanilla _dam parts are 0.8-1.1x their _ok part; a 'never heavier' rule makes agents decimate the damage states",
+      "fix": "say 'damage parts of comparable density' (dam.ok_ratio of the class)",
+      "ref": "style_vehicle"
+    },
+    "from_nothing": {
+      "pattern": "\\bfrom\\s+nothing\\b|\\b(re-?build|re-?generate|re-?create)s?\\b[^.]{0,60}\\bfrom\\s+scratch\\b",
+      "why": "rebuilding from scripts made agents hand-type thousands of coordinates; reproducibility comes from the session journal and checkpoints",
+      "fix": "say 'model in the live Blender session; asset.json, the journal and checkpoints make it reproducible'",
+      "ref": "authoring"
+    }
+  },
+  "budget": {
+    "pattern": "(\\d[\\d,]*)\\s*(?:-|to|\\u2013)\\s*(\\d[\\d,]*)",
+    "context": "tri|triangle|poly|budget",
+    "parts": {
+      "chassis_vlo": "part.tris[chassis_vlo]",
+      "vlo": "part.tris[chassis_vlo]",
+      "chassis": "part.tris[chassis]",
+      "wheel": "part.tris[wheel]",
+      "_ok": "veh.hd_tris",
+      "whole": "veh.hd_tris",
+      "total": "veh.hd_tris"
+    },
+    "why": "a triangle floor above the vanilla p50 of the class asks for a heavier model than vanilla without naming the tier",
+    "fix": "name the tier (sa_plus or vanilla) and let style.profile give the band; do not set triangle floors in the brief",
+    "ref": "style"
+  }
+}

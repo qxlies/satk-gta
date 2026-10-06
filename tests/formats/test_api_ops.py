@@ -40,9 +40,10 @@ FIELDS = {
                          "h", "depth", "levels", "alpha", "mip0_off", "mip0_size", "pal_off", "pal_size",
                          "unsupported"],
     ("txd", "Txd"): ["count", "device_id", "rw_version", "textures"],
-    ("dff", "Material"): ["geom", "idx", "rgba", "texture", "mask", "fx", "color_slot"],
-    ("dff", "Frame"): ["idx", "parent", "name", "atomic"],
-    ("dff", "GeomInfo"): ["idx", "rw_flags", "verts", "tris", "uv_sets", "strip", "frame", "bsphere", "geom_off"],
+    ("dff", "Material"): ["geom", "idx", "rgba", "texture", "mask", "fx", "color_slot", "effects"],
+    ("dff", "Frame"): ["idx", "parent", "name", "atomic", "matrix"],
+    ("dff", "GeomInfo"): ["idx", "rw_flags", "verts", "tris", "uv_sets", "strip", "frame", "bsphere", "geom_off",
+                          "bbox"],
     ("dff", "Effect2D"): ["idx", "type", "type_name", "pos", "data"],
     ("dff", "DffInfo"): ["rw_version", "clumps", "atomics", "frames", "geoms", "materials", "verts", "tris", "flags",
                          "plugins", "effects", "bbox", "bsphere"],
@@ -400,3 +401,100 @@ def test_cli_dump_canonical_file_sids(run_cli, satk_home, b, tmp_path):
     (tmp_path / "o.img").write_bytes(b.ver2([("Infernus.DFF", dff)]))
     env = run_cli(["formats", "dump", f"{tmp_path / 'o.img'}/infernus.dff"]).json
     assert "id" not in env and env["path"].endswith("/o.img") and env["entry"] == "Infernus.DFF"
+
+
+# --------------------------------------------------------------------------- A1-L7: cwd paths, paging markers
+
+
+def _ide(n: int) -> bytes:
+    return ("objs\n" + "".join(f"{1000 + i}, obj{i}, objtxd, 100, 0\n" for i in range(n)) + "end\n").encode()
+
+
+def test_cli_dump_relative_path_from_cwd(run_cli, satk_home, tmp_path, monkeypatch):
+    here = tmp_path / "proj"
+    (here / "data").mkdir(parents=True)
+    (here / "data" / "mine.ide").write_bytes(_ide(2))
+    monkeypatch.chdir(here)
+    env = run_cli(["formats", "dump", "data/mine.ide"]).json
+    assert env["ok"] and env["resolved_from"] == "cwd" and env["defs"] == 2 and "warn" not in env
+    assert env["path"] == (here / "data" / "mine.ide").as_posix()
+    root = profile_root("vanilla")
+    (root / "data").mkdir(parents=True)
+    (root / "data" / "mine.ide").write_bytes(_ide(3))
+    (root / "data" / "game.ide").write_bytes(_ide(4))
+    shadow = run_cli(["formats", "dump", "data/mine.ide"]).json        # both exist: the current folder wins
+    assert shadow["defs"] == 2 and shadow["warn"][0].startswith("PATH_SHADOWS: data/mine.ide")
+    sid = run_cli(["formats", "dump", "file:data/mine.ide"]).json       # a SID is always the game file
+    assert sid["defs"] == 3 and sid["resolved_from"] == "profile" and sid["id"] == "file:data/mine.ide"
+    game = run_cli(["formats", "dump", "data/game.ide"]).json
+    assert game["resolved_from"] == "profile" and game["id"] == "file:data/game.ide"
+    miss = run_cli(["formats", "dump", "data/nope.ide"])
+    assert miss.code == 1 and "current folder" in miss.json["error"]["msg"]
+
+
+def test_cli_dump_full_marks_truncation_and_pages(run_cli, satk_home, tmp_path):
+    p = tmp_path / "big.ide"
+    p.write_bytes(_ide(30))
+    first = run_cli(["formats", "dump", str(p), "--level", "full"]).json
+    assert len(first["rows"]) == 20 and first["truncated"] == ["defs 20 of 30"] and first["next"] == "20"
+    assert first["warn"][0].startswith("TRUNCATED: defs 20 of 30; next page: --cursor 20")
+    second = run_cli(["formats", "dump", str(p), "--level", "full", "--cursor", first["next"]]).json
+    assert [r[3] for r in second["rows"]] == [f"obj{i}" for i in range(20, 30)]
+    assert second["truncated"] == ["defs 21-30 of 30"] and "next" not in second
+    whole = run_cli(["formats", "dump", str(p), "--level", "full", "--limit", "50"]).json
+    assert len(whole["rows"]) == 30 and "truncated" not in whole and "warn" not in whole
+    past = run_cli(["formats", "dump", str(p), "--level", "full", "--cursor", "40"]).json
+    assert past["rows"] == [] and past["truncated"] == ["defs none of 30 (cursor past the end)"]
+    assert run_cli(["formats", "dump", str(p), "--level", "full", "--cursor", "x"]).code == 2
+
+
+def test_cli_dump_dff_lists_are_paged_together(run_cli, satk_home, b, tmp_path):
+    geoms = [b.geometry([(0, 0, 0), (1, 0, 0), (0, 1, 0)], lists=[(0, [0, 1, 2])]) for _ in range(3)]
+    p = tmp_path / "three.dff"
+    p.write_bytes(b.clump(geoms))
+    env = run_cli(["formats", "dump", str(p), "--level", "full", "--limit", "2"]).json
+    assert env["geoms"] == 3 and len(env["geom_rows"]) == 2 and env["next"] == "2"
+    assert "geoms 2 of 3" in env["truncated"]
+    nxt = run_cli(["formats", "dump", str(p), "--level", "full", "--limit", "2", "--cursor", "2"]).json
+    assert [g[0] for g in nxt["geom_rows"]] == [2] and "next" not in nxt
+
+
+@pytest.mark.game
+def test_full_dump_of_premier_is_marked_truncated():
+    from satk.core import config as _config
+    from satk.formats.ops import formats_dump
+
+    game = _config.build().paths.game
+    if not (game / "models" / "gta3.img").is_file():
+        pytest.skip(f"no clean copy at {game}")
+    env = formats_dump(f"{game.as_posix()}/models/gta3.img/premier.dff", level="full")
+    assert env["frames"] == 51 and len(env["frame_names"]) == 20 and env["next"] == "20"
+    assert "frames 20 of 51" in env["truncated"] and env["warn"][0].startswith("TRUNCATED: ")
+    rest = formats_dump(f"{game.as_posix()}/models/gta3.img/premier.dff", level="full", limit=40, cursor="20")
+    assert len(rest["frame_names"]) == 31 and "next" in rest          # materials (107) still have more
+
+
+@pytest.mark.game
+def test_dump_by_index_sid():
+    from satk.core.errors import SatkError
+    from satk.formats.ops import formats_dump
+    from satk.index import api
+
+    api.clear_cache()
+    try:
+        try:
+            env = formats_dump("model:426")
+        except SatkError as e:
+            if e.code in ("INDEX_MISSING", "NOT_READY"):
+                pytest.skip(f"no vanilla index: {e.code}")
+            raise
+        assert env["resolved_from"] == "index" and env["id"] == "file:models/gta3.img/premier.dff"
+        assert env["frames"] == 51 and env["kind"] == "dff"
+        assert formats_dump("dff:premier")["id"] == env["id"]
+        txd = formats_dump("txd:premier")
+        assert txd["kind"] == "txd" and txd["id"] == "file:models/gta3.img/premier.txd"
+        with pytest.raises(SatkError) as e:
+            formats_dump("model:no_such_model_name")
+        assert e.value.code == "NOT_FOUND"
+    finally:
+        api.clear_cache()      # the real index must not leak into later isolated tests

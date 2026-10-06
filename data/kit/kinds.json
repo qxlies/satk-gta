@@ -1,0 +1,2561 @@
+{
+ "version": 1,
+ "source": "vanilla GTA SA PC 1.0 US, satk vanilla index + DFF decode (names and numbers only, no geometry); ranges are [p10, p50, p90] over the peers of the kind",
+ "frames_note": "required = in >= 90 % of the peers, common = 50-90 %, optional = 20-50 % (share); a template copies the exact frame tree of its 'like' model in the vanilla order",
+ "kinds": {
+  "automobile": {
+   "group": "vehicle",
+   "summary": "4-wheel car, van, truck or bus (vehicles.ide type car)",
+   "ide": {
+    "file": "vehicles.ide",
+    "sec": "cars",
+    "type": "car"
+   },
+   "like": "model:426",
+   "like_name": "premier",
+   "peers": 144,
+   "examples": [
+    "admiral",
+    "alpha",
+    "ambulan",
+    "baggage",
+    "bandito",
+    "banshee",
+    "barracks",
+    "benson"
+   ],
+   "dims_m": {
+    "L": [
+     4.67,
+     5.84,
+     8.44
+    ],
+    "W": [
+     2.19,
+     2.52,
+     3.19
+    ],
+    "H": [
+     1.36,
+     1.69,
+     3.38
+    ]
+   },
+   "tris_hd": [
+    2238.0,
+    2884.0,
+    3338.0
+   ],
+   "atomics": [
+    13.0,
+    20.0,
+    25.0
+   ],
+   "frames_n": [
+    29.0,
+    44.0,
+    54.0
+   ],
+   "frames": {
+    "required": [
+     "headlights",
+     "wheel_lf_dummy",
+     "wheel_rf_dummy",
+     "taillights",
+     "wheel_lb_dummy",
+     "wheel_rb_dummy",
+     "chassis_dummy",
+     "ped_frontseat",
+     "exhaust",
+     "engine",
+     "petrolcap",
+     "door_lf_dummy",
+     "chassis_vlo",
+     "door_rf_dummy",
+     "windscreen_dummy",
+     "bump_front_dummy",
+     "chassis",
+     "windscreen_ok",
+     "door_rf_ok",
+     "door_lf_ok",
+     "wheel"
+    ],
+    "common": [
+     "ped_arm",
+     "bonnet_dummy",
+     "boot_dummy",
+     "bump_rear_dummy",
+     "exhaust_ok",
+     "ug_nitro",
+     "bump_rear_ok",
+     "bump_rear_dam",
+     "bump_front_ok",
+     "bump_front_dam",
+     "windscreen_dam",
+     "boot_ok",
+     "door_rf_dam",
+     "boot_dam",
+     "bonnet_ok",
+     "bonnet_dam",
+     "door_lf_dam"
+    ],
+    "optional": {
+     "ped_backseat": 0.35,
+     "taillights2": 0.26,
+     "headlights2": 0.28,
+     "door_lr_dummy": 0.33,
+     "door_rr_dummy": 0.33,
+     "extra1": 0.29,
+     "ug_roof": 0.26,
+     "ug_wing_left": 0.27,
+     "extra2": 0.22,
+     "ug_wing_right": 0.27,
+     "misc_a": 0.22,
+     "door_rr_dam": 0.32,
+     "plate_rear_ok": 0.28,
+     "door_rr_ok": 0.33,
+     "plate_rear_dam": 0.24,
+     "ug_spoiler": 0.31,
+     "door_lr_ok": 0.33,
+     "plate_front_dam": 0.24,
+     "door_lr_dam": 0.32,
+     "plate_front_ok": 0.24
+    }
+   },
+   "slots": [
+    "ok",
+    "dam",
+    "vlo"
+   ],
+   "material_roles": [
+    "paint1",
+    "paint2",
+    "chrome",
+    "trim",
+    "black",
+    "glass",
+    "lamp_fl",
+    "lamp_fr",
+    "lamp_rl",
+    "lamp_rr",
+    "lens",
+    "interior",
+    "plate",
+    "tyre",
+    "rim",
+    "scratch",
+    "shatter"
+   ],
+   "col": {
+    "where": "embedded in the DFF",
+    "name": "<model>_col",
+    "recipe": "spheres (+rare boxes) along the body with surface CAR (63), brightness 187 and the piece byte (eCarPiece: bumpers, doors, bonnet, boot), a few mesh faces (CAR, GLASS) and a closed shadow mesh",
+    "spheres": [
+     16.0,
+     21.0,
+     35.0
+    ],
+    "boxes": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "faces": [
+     8.0,
+     12.0,
+     14.0
+    ],
+    "shadow_faces": [
+     216.0,
+     280.0,
+     599.0
+    ]
+   },
+   "lod": {
+    "recipe": "the low-detail atomic of the same DFF",
+    "frame": "chassis_vlo",
+    "tris_max": 130
+   },
+   "txd": {
+    "class": "vehicle",
+    "name": "<model>",
+    "parent": "vehicle (shared atlases, never copied)",
+    "own_textures": [
+     2.0,
+     2.0,
+     4.0
+    ],
+    "formats": {
+     "DXT1": 343,
+     "DXT3": 32,
+     "X8R8G8B8": 1
+    },
+    "levels": 1,
+    "max_side": {
+     "128": 196,
+     "64": 134,
+     "32": 32,
+     "256": 10,
+     "16": 4
+    }
+   },
+   "data_lines": [
+    "vehicles.ide cars line (id, name, txd, type, handling, gxt, anims, class, freq, flags, comprules, wheel id, wheel scale front/rear, upgrades)",
+    "handling.cfg",
+    "carcols.dat",
+    "carmods.dat (upgrades)",
+    "cargrp.dat (traffic groups)",
+    "ID-bound engine data: audio, special abilities"
+   ],
+   "pipeline": "vehicle: lit by the engine, normals, no prelight, UV set 2 for the env sheen",
+   "anchors": {
+    "wheel_scale": [
+     0.65,
+     0.7,
+     1.0
+    ]
+   }
+  },
+  "mtruck": {
+   "group": "vehicle",
+   "summary": "monster truck (long-travel suspension, huge wheels)",
+   "ide": {
+    "file": "vehicles.ide",
+    "sec": "cars",
+    "type": "mtruck"
+   },
+   "like": "model:444",
+   "like_name": "monster",
+   "peers": 5,
+   "examples": [
+    "dumper",
+    "duneride",
+    "monster",
+    "monstera",
+    "monsterb"
+   ],
+   "dims_m": {
+    "L": [
+     5.72,
+     6.2,
+     9.45
+    ],
+    "W": [
+     3.12,
+     3.5,
+     4.69
+    ],
+    "H": [
+     2.92,
+     3.07,
+     4.21
+    ]
+   },
+   "tris_hd": [
+    3208.0,
+    3519.0,
+    4754.0
+   ],
+   "atomics": [
+    9.0,
+    12.0,
+    14.0
+   ],
+   "frames_n": [
+    25.0,
+    28.0,
+    34.0
+   ],
+   "frames": {
+    "required": [
+     "wheel_lb_dummy",
+     "headlights",
+     "wheel_lf_dummy",
+     "taillights",
+     "chassis_dummy",
+     "wheel_rf_dummy",
+     "wheel_rb_dummy",
+     "ped_frontseat",
+     "windscreen_dummy",
+     "door_lf_dummy",
+     "chassis",
+     "chassis_vlo",
+     "door_lf_ok",
+     "wheel"
+    ],
+    "common": [
+     "exhaust",
+     "headlights2",
+     "engine",
+     "ped_arm",
+     "petrolcap",
+     "bump_front_dummy",
+     "bump_rear_dummy",
+     "door_rf_dummy",
+     "transmission_f",
+     "transmission_r",
+     "windscreen_ok",
+     "door_rf_ok",
+     "bump_rear_ok",
+     "bump_front_ok"
+    ],
+    "optional": {
+     "taillights2": 0.4,
+     "bonnet_dummy": 0.2,
+     "extra1": 0.4,
+     "extra2": 0.4,
+     "bump_rear_dam": 0.2,
+     "extra3": 0.2,
+     "misc_a": 0.2,
+     "bump_front_dam": 0.2,
+     "door_rf_dam": 0.4,
+     "transmision_f": 0.2,
+     "windscreen_dam": 0.4,
+     "transmision_r": 0.2,
+     "door_lf_dam": 0.4
+    }
+   },
+   "slots": [
+    "ok",
+    "dam",
+    "vlo"
+   ],
+   "material_roles": [
+    "paint1",
+    "paint2",
+    "chrome",
+    "trim",
+    "black",
+    "glass",
+    "lamp_fl",
+    "lamp_fr",
+    "lamp_rl",
+    "lamp_rr",
+    "lens",
+    "interior",
+    "plate",
+    "tyre",
+    "rim",
+    "scratch",
+    "shatter"
+   ],
+   "col": {
+    "where": "embedded in the DFF",
+    "name": "<model>_col",
+    "recipe": "spheres (+rare boxes) along the body with surface CAR (63), brightness 187 and the piece byte (eCarPiece: bumpers, doors, bonnet, boot), a few mesh faces (CAR, GLASS) and a closed shadow mesh",
+    "spheres": [
+     33.0,
+     34.0,
+     42.0
+    ],
+    "boxes": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "faces": [
+     12.0,
+     12.0,
+     19.0
+    ],
+    "shadow_faces": [
+     374.0,
+     902.0,
+     940.0
+    ]
+   },
+   "lod": {
+    "recipe": "the low-detail atomic of the same DFF",
+    "frame": "chassis_vlo",
+    "tris_max": 130
+   },
+   "txd": {
+    "class": "vehicle",
+    "name": "<model>",
+    "parent": "vehicle (shared atlases, never copied)",
+    "own_textures": [
+     3.0,
+     4.0,
+     5.0
+    ],
+    "formats": {
+     "DXT1": 19,
+     "DXT3": 1
+    },
+    "levels": 1,
+    "max_side": {
+     "128": 11,
+     "64": 5,
+     "256": 2,
+     "32": 1,
+     "16": 1
+    }
+   },
+   "data_lines": [
+    "vehicles.ide cars line (id, name, txd, type, handling, gxt, anims, class, freq, flags, comprules, wheel id, wheel scale front/rear, upgrades)",
+    "handling.cfg",
+    "carcols.dat",
+    "carmods.dat (upgrades)",
+    "cargrp.dat (traffic groups)",
+    "ID-bound engine data: audio, special abilities"
+   ],
+   "pipeline": "vehicle: lit by the engine, normals, no prelight, UV set 2 for the env sheen",
+   "anchors": {
+    "wheel_scale": [
+     1.28,
+     1.5,
+     1.97
+    ]
+   }
+  },
+  "quad": {
+   "group": "vehicle",
+   "summary": "quad bike (4 wheels, rider on top, handlebars)",
+   "ide": {
+    "file": "vehicles.ide",
+    "sec": "cars",
+    "type": "quad"
+   },
+   "like": "model:471",
+   "like_name": "quad",
+   "peers": 1,
+   "examples": [
+    "quad"
+   ],
+   "dims_m": {
+    "L": [
+     1.83,
+     1.83,
+     1.83
+    ],
+    "W": [
+     1.21,
+     1.21,
+     1.21
+    ],
+    "H": [
+     1.22,
+     1.22,
+     1.22
+    ]
+   },
+   "tris_hd": [
+    2283.0,
+    2283.0,
+    2283.0
+   ],
+   "atomics": [
+    7.0,
+    7.0,
+    7.0
+   ],
+   "frames_n": [
+    18.0,
+    18.0,
+    18.0
+   ],
+   "frames": {
+    "required": [
+     "wheel_rf_dummy",
+     "wheel_lf_dummy",
+     "wheel_lb_dummy",
+     "wheel_rb_dummy",
+     "taillights",
+     "chassis_dummy",
+     "exhaust",
+     "ped_frontseat",
+     "headlights",
+     "rear_axle",
+     "handlebars",
+     "suspension_lf",
+     "suspension_rf",
+     "ped_backseat",
+     "chassis",
+     "chassis_vlo",
+     "wheel"
+    ],
+    "common": [],
+    "optional": {}
+   },
+   "slots": [
+    "ok",
+    "dam",
+    "vlo"
+   ],
+   "material_roles": [
+    "paint1",
+    "chrome",
+    "trim",
+    "black",
+    "lamp_fl",
+    "lamp_rl",
+    "lens",
+    "tyre",
+    "rim",
+    "interior",
+    "paint2"
+   ],
+   "col": {
+    "where": "embedded in the DFF",
+    "name": "<model>_col",
+    "recipe": "spheres (+rare boxes) along the body with surface CAR (63), brightness 187 and the piece byte (eCarPiece: bumpers, doors, bonnet, boot), a few mesh faces (CAR, GLASS) and a closed shadow mesh",
+    "spheres": [
+     11.0,
+     11.0,
+     11.0
+    ],
+    "boxes": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "faces": [
+     16.0,
+     16.0,
+     16.0
+    ],
+    "shadow_faces": [
+     760.0,
+     760.0,
+     760.0
+    ]
+   },
+   "lod": {
+    "recipe": "the low-detail atomic of the same DFF",
+    "frame": "chassis_vlo",
+    "tris_max": 130
+   },
+   "txd": {
+    "class": "vehicle",
+    "name": "<model>",
+    "parent": "vehicle (shared atlases, never copied)",
+    "own_textures": [
+     5.0,
+     5.0,
+     5.0
+    ],
+    "formats": {
+     "DXT1": 4,
+     "DXT3": 1
+    },
+    "levels": 1,
+    "max_side": {
+     "64": 2,
+     "32": 2,
+     "128": 1
+    }
+   },
+   "data_lines": [
+    "vehicles.ide cars line (id, name, txd, type, handling, gxt, anims, class, freq, flags, comprules, wheel id, wheel scale front/rear, upgrades)",
+    "handling.cfg",
+    "carcols.dat",
+    "carmods.dat (upgrades)",
+    "cargrp.dat (traffic groups)",
+    "ID-bound engine data: audio, special abilities"
+   ],
+   "pipeline": "vehicle: lit by the engine, normals, no prelight, UV set 2 for the env sheen",
+   "anchors": {
+    "wheel_scale": [
+     0.6,
+     0.6,
+     0.6
+    ]
+   }
+  },
+  "bike": {
+   "group": "vehicle",
+   "summary": "motorbike (2 wheels, forks, rider leans)",
+   "ide": {
+    "file": "vehicles.ide",
+    "sec": "cars",
+    "type": "bike"
+   },
+   "like": "model:461",
+   "like_name": "pcj600",
+   "peers": 10,
+   "examples": [
+    "bf400",
+    "copbike",
+    "faggio",
+    "fcr900",
+    "freeway",
+    "nrg500",
+    "pcj600",
+    "pizzaboy"
+   ],
+   "dims_m": {
+    "L": [
+     2.1,
+     2.31,
+     2.58
+    ],
+    "W": [
+     0.77,
+     0.77,
+     0.95
+    ],
+    "H": [
+     1.25,
+     1.31,
+     1.5
+    ]
+   },
+   "tris_hd": [
+    1639.0,
+    2770.0,
+    3295.0
+   ],
+   "atomics": [
+    8.0,
+    9.0,
+    13.0
+   ],
+   "frames_n": [
+    17.0,
+    20.0,
+    25.0
+   ],
+   "frames": {
+    "required": [
+     "ped_frontseat",
+     "chassis_dummy",
+     "headlights",
+     "exhaust",
+     "taillights",
+     "ped_backseat",
+     "taillights2",
+     "engine",
+     "forks_front",
+     "chassis",
+     "forks_rear",
+     "chassis_vlo",
+     "handlebars",
+     "wheel_rear",
+     "mudguard",
+     "wheel_front"
+    ],
+    "common": [
+     "petrolcap",
+     "bargrip",
+     "plate_rear"
+    ],
+    "optional": {
+     "extra2": 0.3,
+     "extra4": 0.3,
+     "extra5": 0.3,
+     "extra3": 0.3,
+     "extra1": 0.3
+    }
+   },
+   "slots": [
+    "ok",
+    "dam",
+    "vlo"
+   ],
+   "material_roles": [
+    "paint1",
+    "chrome",
+    "trim",
+    "black",
+    "lamp_fl",
+    "lamp_rl",
+    "lens",
+    "tyre",
+    "rim",
+    "interior"
+   ],
+   "col": {
+    "where": "embedded in the DFF",
+    "name": "<model>_col",
+    "recipe": "spheres (+rare boxes) along the body with surface CAR (63), brightness 187 and the piece byte (eCarPiece: bumpers, doors, bonnet, boot), a few mesh faces (CAR, GLASS) and a closed shadow mesh",
+    "spheres": [
+     13.0,
+     13.0,
+     13.0
+    ],
+    "boxes": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "faces": [
+     0.0,
+     10.0,
+     12.0
+    ],
+    "shadow_faces": [
+     360.0,
+     496.0,
+     818.0
+    ]
+   },
+   "lod": {
+    "recipe": "the low-detail atomic of the same DFF",
+    "frame": "chassis_vlo",
+    "tris_max": 130
+   },
+   "txd": {
+    "class": "vehicle",
+    "name": "<model>",
+    "parent": "vehicle (shared atlases, never copied)",
+    "own_textures": [
+     2.0,
+     3.0,
+     4.0
+    ],
+    "formats": {
+     "DXT1": 18,
+     "DXT3": 10
+    },
+    "levels": 1,
+    "max_side": {
+     "128": 17,
+     "64": 11
+    }
+   },
+   "data_lines": [
+    "vehicles.ide cars line (id, name, txd, type, handling, gxt, anims, class, freq, flags, comprules, wheel id, wheel scale front/rear, upgrades)",
+    "handling.cfg",
+    "carcols.dat",
+    "carmods.dat (upgrades)",
+    "cargrp.dat (traffic groups)",
+    "ID-bound engine data: audio, special abilities"
+   ],
+   "pipeline": "vehicle: lit by the engine, normals, no prelight, UV set 2 for the env sheen",
+   "anchors": {
+    "wheel_scale": [
+     0.46,
+     0.68,
+     0.68
+    ]
+   }
+  },
+  "bmx": {
+   "group": "vehicle",
+   "summary": "pedal bicycle (chainset and pedals animate)",
+   "ide": {
+    "file": "vehicles.ide",
+    "sec": "cars",
+    "type": "bmx"
+   },
+   "like": "model:481",
+   "like_name": "bmx",
+   "peers": 3,
+   "examples": [
+    "bike",
+    "bmx",
+    "mtbike"
+   ],
+   "dims_m": {
+    "L": [
+     1.73,
+     1.84,
+     1.93
+    ],
+    "W": [
+     0.63,
+     0.64,
+     0.65
+    ],
+    "H": [
+     1.04,
+     1.09,
+     1.14
+    ]
+   },
+   "tris_hd": [
+    2087.0,
+    2105.0,
+    2974.0
+   ],
+   "atomics": [
+    9.0,
+    9.0,
+    9.0
+   ],
+   "frames_n": [
+    15.0,
+    15.0,
+    15.0
+   ],
+   "frames": {
+    "required": [
+     "taillights",
+     "ped_frontseat",
+     "headlights",
+     "chassis_dummy",
+     "bargrip",
+     "forks_front",
+     "chassis",
+     "chassis_vlo",
+     "handlebars",
+     "wheel_rear",
+     "chainset",
+     "pedal_r",
+     "pedal_l",
+     "wheel_front"
+    ],
+    "common": [],
+    "optional": {}
+   },
+   "slots": [
+    "ok",
+    "vlo"
+   ],
+   "material_roles": [
+    "paint1",
+    "chrome",
+    "trim",
+    "black",
+    "tyre",
+    "rim"
+   ],
+   "col": {
+    "where": "embedded in the DFF",
+    "name": "<model>_col",
+    "recipe": "spheres (+rare boxes) along the body with surface CAR (63), brightness 187 and the piece byte (eCarPiece: bumpers, doors, bonnet, boot), a few mesh faces (CAR, GLASS) and a closed shadow mesh",
+    "spheres": [
+     11.0,
+     13.0,
+     13.0
+    ],
+    "boxes": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "faces": [
+     1.0,
+     4.0,
+     4.0
+    ],
+    "shadow_faces": [
+     596.0,
+     722.0,
+     893.0
+    ]
+   },
+   "lod": {
+    "recipe": "the low-detail atomic of the same DFF",
+    "frame": "chassis_vlo",
+    "tris_max": 130
+   },
+   "txd": {
+    "class": "vehicle",
+    "name": "<model>",
+    "parent": "vehicle (shared atlases, never copied)",
+    "own_textures": [
+     2.0,
+     3.0,
+     3.0
+    ],
+    "formats": {
+     "DXT1": 5,
+     "DXT3": 3
+    },
+    "levels": 1,
+    "max_side": {
+     "64": 4,
+     "128": 3,
+     "32": 1
+    }
+   },
+   "data_lines": [
+    "vehicles.ide cars line (id, name, txd, type, handling, gxt, anims, class, freq, flags, comprules, wheel id, wheel scale front/rear, upgrades)",
+    "handling.cfg",
+    "carcols.dat",
+    "carmods.dat (upgrades)",
+    "cargrp.dat (traffic groups)",
+    "ID-bound engine data: audio, special abilities"
+   ],
+   "pipeline": "vehicle: lit by the engine, normals, no prelight, UV set 2 for the env sheen",
+   "anchors": {
+    "wheel_scale": [
+     0.53,
+     0.54,
+     0.65
+    ]
+   }
+  },
+  "boat": {
+   "group": "vehicle",
+   "summary": "boat (no wheels; hull, prop, wake)",
+   "ide": {
+    "file": "vehicles.ide",
+    "sec": "cars",
+    "type": "boat"
+   },
+   "like": "model:452",
+   "like_name": "speeder",
+   "peers": 10,
+   "examples": [
+    "coastg",
+    "dinghy",
+    "jetmax",
+    "launch",
+    "marquis",
+    "predator",
+    "reefer",
+    "speeder"
+   ],
+   "dims_m": {
+    "L": [
+     8.75,
+     13.1,
+     16.36
+    ],
+    "W": [
+     2.52,
+     3.89,
+     5.0
+    ],
+    "H": [
+     2.53,
+     4.99,
+     11.65
+    ]
+   },
+   "tris_hd": [
+    1288.0,
+    2260.0,
+    2752.0
+   ],
+   "atomics": [
+    3.0,
+    6.0,
+    9.0
+   ],
+   "frames_n": [
+    8.0,
+    10.0,
+    15.0
+   ],
+   "frames": {
+    "required": [
+     "boat_vlo",
+     "ped_frontseat"
+    ],
+    "common": [
+     "boat_lights",
+     "boat",
+     "moving_prop2",
+     "engine",
+     "static_prop2",
+     "static_prop",
+     "moving_prop",
+     "omni01"
+    ],
+    "optional": {
+     "boat_hi": 0.3,
+     "extra2": 0.3,
+     "chassis": 0.2,
+     "exhaust": 0.2,
+     "extra1": 0.4,
+     "boat_rearflap_left": 0.4,
+     "boat_rearflap_right": 0.4,
+     "boat_flap_left": 0.2,
+     "boat_moving": 0.2
+    }
+   },
+   "slots": [
+    "ok",
+    "dam",
+    "vlo"
+   ],
+   "material_roles": [
+    "paint1",
+    "paint2",
+    "chrome",
+    "trim",
+    "black",
+    "glass",
+    "interior",
+    "lamp_fl",
+    "lamp_rl"
+   ],
+   "col": {
+    "where": "embedded in the DFF",
+    "name": "<model>_col",
+    "recipe": "spheres (+rare boxes) along the body with surface CAR (63), brightness 187 and the piece byte (eCarPiece: bumpers, doors, bonnet, boot), a few mesh faces (CAR, GLASS) and a closed shadow mesh",
+    "spheres": [
+     44.0,
+     50.0,
+     100.0
+    ],
+    "boxes": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "faces": [
+     20.0,
+     41.0,
+     64.0
+    ],
+    "shadow_faces": [
+     157.0,
+     254.0,
+     504.0
+    ]
+   },
+   "lod": {
+    "recipe": "the low-detail atomic of the same DFF",
+    "frame": "boat_vlo",
+    "tris_max": 130
+   },
+   "txd": {
+    "class": "vehicle",
+    "name": "<model>",
+    "parent": "vehicle (shared atlases, never copied)",
+    "own_textures": [
+     2.0,
+     2.0,
+     3.0
+    ],
+    "formats": {
+     "DXT1": 16,
+     "DXT3": 9
+    },
+    "levels": 1,
+    "max_side": {
+     "128": 21,
+     "64": 2,
+     "16": 2
+    }
+   },
+   "data_lines": [
+    "vehicles.ide cars line (id, name, txd, type, handling, gxt, anims, class, freq, flags, comprules, wheel id, wheel scale front/rear, upgrades)",
+    "handling.cfg",
+    "carcols.dat",
+    "carmods.dat (upgrades)",
+    "cargrp.dat (traffic groups)",
+    "ID-bound engine data: audio, special abilities"
+   ],
+   "pipeline": "vehicle: lit by the engine, normals, no prelight, UV set 2 for the env sheen"
+  },
+  "plane": {
+   "group": "vehicle",
+   "summary": "fixed-wing plane (rudder, elevators, ailerons, prop)",
+   "ide": {
+    "file": "vehicles.ide",
+    "sec": "cars",
+    "type": "plane"
+   },
+   "like": "model:593",
+   "like_name": "dodo",
+   "peers": 13,
+   "examples": [
+    "androm",
+    "at400",
+    "beagle",
+    "cropdust",
+    "dodo",
+    "hydra",
+    "nevada",
+    "rcbaron"
+   ],
+   "dims_m": {
+    "L": [
+     4.24,
+     10.73,
+     41.37
+    ],
+    "W": [
+     3.52,
+     11.27,
+     41.15
+    ],
+    "H": [
+     1.78,
+     3.84,
+     10.32
+    ]
+   },
+   "tris_hd": [
+    1545.0,
+    2368.0,
+    3558.0
+   ],
+   "atomics": [
+    8.0,
+    12.0,
+    15.0
+   ],
+   "frames_n": [
+    17.0,
+    29.0,
+    32.0
+   ],
+   "frames": {
+    "required": [
+     "ped_frontseat",
+     "wheel_lb_dummy",
+     "chassis",
+     "rudder",
+     "wheel_rb_dummy",
+     "wheel_rf_dummy",
+     "wheel_lf_dummy",
+     "omni01",
+     "omni02"
+    ],
+    "common": [
+     "gear_l",
+     "aileron_pos",
+     "exhaust",
+     "aileron_r",
+     "static_prop",
+     "aileron_l",
+     "elevator_r",
+     "chassis_vlo",
+     "door_lf_dummy",
+     "moving_prop",
+     "wingtip_pos",
+     "engine",
+     "door_lf_ok",
+     "wheel",
+     "omni03"
+    ],
+    "optional": {
+     "chassis_dummy": 0.23,
+     "headlights": 0.31,
+     "taillights": 0.23,
+     "rudder_pos": 0.31,
+     "elevator_pos": 0.38,
+     "misc_b": 0.31,
+     "gear_r": 0.46,
+     "door_rf_dummy": 0.38,
+     "misc_a": 0.46,
+     "elevator_l": 0.46,
+     "moving_prop2": 0.23,
+     "door_rf_ok": 0.38
+    }
+   },
+   "slots": [
+    "ok",
+    "dam",
+    "vlo"
+   ],
+   "material_roles": [
+    "paint1",
+    "paint2",
+    "chrome",
+    "trim",
+    "black",
+    "glass",
+    "interior",
+    "tyre",
+    "rim",
+    "lamp_fl",
+    "lamp_rl"
+   ],
+   "col": {
+    "where": "embedded in the DFF",
+    "name": "<model>_col",
+    "recipe": "spheres (+rare boxes) along the body with surface CAR (63), brightness 187 and the piece byte (eCarPiece: bumpers, doors, bonnet, boot), a few mesh faces (CAR, GLASS) and a closed shadow mesh",
+    "spheres": [
+     16.0,
+     29.0,
+     59.0
+    ],
+    "boxes": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "faces": [
+     2.0,
+     16.0,
+     27.0
+    ],
+    "shadow_faces": [
+     0.0,
+     358.0,
+     469.0
+    ]
+   },
+   "lod": {
+    "recipe": "the low-detail atomic of the same DFF",
+    "frame": "chassis_vlo",
+    "tris_max": 130
+   },
+   "txd": {
+    "class": "vehicle",
+    "name": "<model>",
+    "parent": "vehicle (shared atlases, never copied)",
+    "own_textures": [
+     1.0,
+     2.0,
+     3.0
+    ],
+    "formats": {
+     "DXT1": 19,
+     "DXT3": 10
+    },
+    "levels": 1,
+    "max_side": {
+     "256": 11,
+     "64": 10,
+     "128": 8
+    }
+   },
+   "data_lines": [
+    "vehicles.ide cars line (id, name, txd, type, handling, gxt, anims, class, freq, flags, comprules, wheel id, wheel scale front/rear, upgrades)",
+    "handling.cfg",
+    "carcols.dat",
+    "carmods.dat (upgrades)",
+    "cargrp.dat (traffic groups)",
+    "ID-bound engine data: audio, special abilities"
+   ],
+   "pipeline": "vehicle: lit by the engine, normals, no prelight, UV set 2 for the env sheen",
+   "anchors": {
+    "wheel_scale": [
+     0.48,
+     0.66,
+     0.94
+    ]
+   }
+  },
+  "heli": {
+   "group": "vehicle",
+   "summary": "helicopter (static and moving rotor atomics)",
+   "ide": {
+    "file": "vehicles.ide",
+    "sec": "cars",
+    "type": "heli"
+   },
+   "like": "model:487",
+   "like_name": "maverick",
+   "peers": 11,
+   "examples": [
+    "cargobob",
+    "hunter",
+    "leviathn",
+    "maverick",
+    "polmav",
+    "raindanc",
+    "rcgoblin",
+    "rcraider"
+   ],
+   "dims_m": {
+    "L": [
+     1.81,
+     14.11,
+     22.89
+    ],
+    "W": [
+     1.65,
+     11.39,
+     19.86
+    ],
+    "H": [
+     0.84,
+     3.83,
+     5.53
+    ]
+   },
+   "tris_hd": [
+    1034.0,
+    2640.0,
+    3143.0
+   ],
+   "atomics": [
+    4.0,
+    8.0,
+    10.0
+   ],
+   "frames_n": [
+    15.0,
+    21.0,
+    24.0
+   ],
+   "frames": {
+    "required": [
+     "chassis_dummy",
+     "ped_frontseat",
+     "wheel_lb_dummy",
+     "wheel_rb_dummy",
+     "wheel_lf_dummy",
+     "wheel_rf_dummy",
+     "chassis",
+     "chassis_vlo",
+     "static_rotor",
+     "moving_rotor",
+     "omni01",
+     "omni02"
+    ],
+    "common": [
+     "headlights",
+     "taillights",
+     "door_lf_dummy",
+     "door_rf_dummy",
+     "moving_rotor2",
+     "static_rotor2",
+     "door_rf_ok",
+     "door_lf_ok"
+    ],
+    "optional": {
+     "wheel": 0.27
+    }
+   },
+   "slots": [
+    "ok",
+    "dam",
+    "vlo"
+   ],
+   "material_roles": [
+    "paint1",
+    "paint2",
+    "chrome",
+    "trim",
+    "black",
+    "glass",
+    "interior",
+    "lamp_fl",
+    "lamp_rl"
+   ],
+   "col": {
+    "where": "embedded in the DFF",
+    "name": "<model>_col",
+    "recipe": "spheres (+rare boxes) along the body with surface CAR (63), brightness 187 and the piece byte (eCarPiece: bumpers, doors, bonnet, boot), a few mesh faces (CAR, GLASS) and a closed shadow mesh",
+    "spheres": [
+     6.0,
+     18.0,
+     43.0
+    ],
+    "boxes": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "faces": [
+     0.0,
+     12.0,
+     20.0
+    ],
+    "shadow_faces": [
+     440.0,
+     474.0,
+     688.0
+    ]
+   },
+   "lod": {
+    "recipe": "the low-detail atomic of the same DFF",
+    "frame": "chassis_vlo",
+    "tris_max": 130
+   },
+   "txd": {
+    "class": "vehicle",
+    "name": "<model>",
+    "parent": "vehicle (shared atlases, never copied)",
+    "own_textures": [
+     2.0,
+     4.0,
+     6.0
+    ],
+    "formats": {
+     "DXT1": 29,
+     "DXT3": 16
+    },
+    "levels": 1,
+    "max_side": {
+     "64": 24,
+     "128": 16,
+     "256": 3,
+     "32": 2
+    }
+   },
+   "data_lines": [
+    "vehicles.ide cars line (id, name, txd, type, handling, gxt, anims, class, freq, flags, comprules, wheel id, wheel scale front/rear, upgrades)",
+    "handling.cfg",
+    "carcols.dat",
+    "carmods.dat (upgrades)",
+    "cargrp.dat (traffic groups)",
+    "ID-bound engine data: audio, special abilities"
+   ],
+   "pipeline": "vehicle: lit by the engine, normals, no prelight, UV set 2 for the env sheen",
+   "anchors": {
+    "wheel_scale": [
+     0.25,
+     0.7,
+     0.7
+    ]
+   }
+  },
+  "trailer": {
+   "group": "vehicle",
+   "summary": "trailer towed by a truck (hookup frame)",
+   "ide": {
+    "file": "vehicles.ide",
+    "sec": "cars",
+    "type": "trailer"
+   },
+   "like": "model:435",
+   "like_name": "artict1",
+   "peers": 9,
+   "examples": [
+    "artict1",
+    "artict2",
+    "artict3",
+    "bagboxa",
+    "bagboxb",
+    "farmtr1",
+    "petrotr",
+    "tugstair"
+   ],
+   "dims_m": {
+    "L": [
+     2.82,
+     4.3,
+     11.13
+    ],
+    "W": [
+     1.53,
+     2.41,
+     2.89
+    ],
+    "H": [
+     1.29,
+     3.44,
+     4.29
+    ]
+   },
+   "tris_hd": [
+    920.0,
+    1160.0,
+    1448.0
+   ],
+   "atomics": [
+    4.0,
+    4.0,
+    8.0
+   ],
+   "frames_n": [
+    11.0,
+    13.0,
+    16.0
+   ],
+   "frames": {
+    "required": [
+     "wheel_lb_dummy",
+     "wheel_lf_dummy",
+     "wheel_rf_dummy",
+     "wheel_rb_dummy",
+     "chassis_dummy",
+     "hookup",
+     "chassis",
+     "chassis_vlo"
+    ],
+    "common": [
+     "misc_a",
+     "wheel"
+    ],
+    "optional": {
+     "taillights": 0.44,
+     "extra2": 0.22,
+     "extra1": 0.33,
+     "extra3": 0.22,
+     "misc_b": 0.44
+    }
+   },
+   "slots": [
+    "ok",
+    "dam",
+    "vlo"
+   ],
+   "material_roles": [
+    "paint1",
+    "chrome",
+    "trim",
+    "black",
+    "lamp_rl",
+    "lens",
+    "tyre",
+    "rim",
+    "plate"
+   ],
+   "col": {
+    "where": "embedded in the DFF",
+    "name": "<model>_col",
+    "recipe": "spheres (+rare boxes) along the body with surface CAR (63), brightness 187 and the piece byte (eCarPiece: bumpers, doors, bonnet, boot), a few mesh faces (CAR, GLASS) and a closed shadow mesh",
+    "spheres": [
+     15.0,
+     21.0,
+     30.0
+    ],
+    "boxes": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "faces": [
+     4.0,
+     8.0,
+     17.0
+    ],
+    "shadow_faces": [
+     225.0,
+     276.0,
+     851.0
+    ]
+   },
+   "lod": {
+    "recipe": "the low-detail atomic of the same DFF",
+    "frame": "chassis_vlo",
+    "tris_max": 130
+   },
+   "txd": {
+    "class": "vehicle",
+    "name": "<model>",
+    "parent": "vehicle (shared atlases, never copied)",
+    "own_textures": [
+     1.0,
+     3.0,
+     3.0
+    ],
+    "formats": {
+     "DXT1": 20,
+     "DXT3": 1
+    },
+    "levels": 1,
+    "max_side": {
+     "64": 11,
+     "128": 7,
+     "256": 2,
+     "32": 1
+    }
+   },
+   "data_lines": [
+    "vehicles.ide cars line (id, name, txd, type, handling, gxt, anims, class, freq, flags, comprules, wheel id, wheel scale front/rear, upgrades)",
+    "handling.cfg",
+    "carcols.dat",
+    "carmods.dat (upgrades)",
+    "cargrp.dat (traffic groups)",
+    "ID-bound engine data: audio, special abilities"
+   ],
+   "pipeline": "vehicle: lit by the engine, normals, no prelight, UV set 2 for the env sheen",
+   "anchors": {
+    "wheel_scale": [
+     0.54,
+     0.68,
+     1.1
+    ]
+   }
+  },
+  "train": {
+   "group": "vehicle",
+   "summary": "train car or loco (bogies, 8 wheel dummies)",
+   "ide": {
+    "file": "vehicles.ide",
+    "sec": "cars",
+    "type": "train"
+   },
+   "like": "model:537",
+   "like_name": "freight",
+   "peers": 6,
+   "examples": [
+    "freibox",
+    "freiflat",
+    "freight",
+    "streak",
+    "streakc",
+    "tram"
+   ],
+   "dims_m": {
+    "L": [
+     12.89,
+     17.99,
+     19.59
+    ],
+    "W": [
+     2.88,
+     3.3,
+     3.39
+    ],
+    "H": [
+     2.89,
+     4.61,
+     4.76
+    ]
+   },
+   "tris_hd": [
+    1954.0,
+    2610.0,
+    3041.0
+   ],
+   "atomics": [
+    5.0,
+    6.0,
+    8.0
+   ],
+   "frames_n": [
+    22.0,
+    24.0,
+    27.0
+   ],
+   "frames": {
+    "required": [
+     "chassis_dummy",
+     "headlights",
+     "taillights",
+     "chassis",
+     "chassis_vlo",
+     "bogie_front",
+     "bogie_rear",
+     "wheel_lb2_dummy",
+     "wheel_rb2_dummy",
+     "wheel_lb1_dummy",
+     "wheel_rb1_dummy",
+     "wheel_lf1_dummy",
+     "wheel_lf2_dummy",
+     "wheel_rf2_dummy",
+     "wheel_rf1_dummy",
+     "wheel"
+    ],
+    "common": [
+     "exhaust",
+     "ped_frontseat",
+     "door_lf_dummy",
+     "door_rf_dummy",
+     "door_rf_ok",
+     "door_lf_ok"
+    ],
+    "optional": {
+     "wheel_lb3_dummy": 0.33,
+     "wheel_rb3_dummy": 0.33,
+     "wheel_lf3_dummy": 0.33,
+     "wheel_rf3_dummy": 0.33
+    }
+   },
+   "slots": [
+    "ok",
+    "dam",
+    "vlo"
+   ],
+   "material_roles": [
+    "paint1",
+    "paint2",
+    "chrome",
+    "trim",
+    "black",
+    "glass",
+    "interior",
+    "lamp_fl",
+    "lamp_rl"
+   ],
+   "col": {
+    "where": "embedded in the DFF",
+    "name": "<model>_col",
+    "recipe": "spheres (+rare boxes) along the body with surface CAR (63), brightness 187 and the piece byte (eCarPiece: bumpers, doors, bonnet, boot), a few mesh faces (CAR, GLASS) and a closed shadow mesh",
+    "spheres": [
+     18.0,
+     32.0,
+     40.0
+    ],
+    "boxes": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "faces": [
+     3.0,
+     6.0,
+     12.0
+    ],
+    "shadow_faces": [
+     0.0,
+     296.0,
+     898.0
+    ]
+   },
+   "lod": {
+    "recipe": "the low-detail atomic of the same DFF",
+    "frame": "chassis_vlo",
+    "tris_max": 130
+   },
+   "txd": {
+    "class": "vehicle",
+    "name": "<model>",
+    "parent": "vehicle (shared atlases, never copied)",
+    "own_textures": [
+     2.0,
+     3.0,
+     4.0
+    ],
+    "formats": {
+     "DXT1": 14,
+     "DXT3": 3
+    },
+    "levels": 1,
+    "max_side": {
+     "128": 12,
+     "256": 3,
+     "64": 2
+    }
+   },
+   "data_lines": [
+    "vehicles.ide cars line (id, name, txd, type, handling, gxt, anims, class, freq, flags, comprules, wheel id, wheel scale front/rear, upgrades)",
+    "handling.cfg",
+    "carcols.dat",
+    "carmods.dat (upgrades)",
+    "cargrp.dat (traffic groups)",
+    "ID-bound engine data: audio, special abilities"
+   ],
+   "pipeline": "vehicle: lit by the engine, normals, no prelight, UV set 2 for the env sheen",
+   "anchors": {
+    "wheel_scale": [
+     0.92,
+     1.06,
+     1.06
+    ]
+   }
+  },
+  "prop": {
+   "group": "world",
+   "summary": "street or small static prop (bin, sign, bench, crate): one atomic, one COL",
+   "ide": {
+    "file": "<map>.ide",
+    "sec": "objs"
+   },
+   "like": "model:3335",
+   "like_name": "CE_roadsign1",
+   "peers": 699,
+   "size_m": [
+    0.57,
+    2.5,
+    7.22
+   ],
+   "tris_hd": [
+    10.0,
+    84.0,
+    324.0
+   ],
+   "frames": {
+    "required": [
+     "<model>"
+    ],
+    "common": [],
+    "optional": {}
+   },
+   "slots": [],
+   "game_ready_class": "prop",
+   "pipeline": "map: prelit day colours + night colours (0x253F2F9), no normals, lit by the timecyc ambient",
+   "txd": {
+    "class": "map",
+    "name": "<shared map TXD>",
+    "levels": "full chain from 256 px",
+    "formats": {
+     "DXT1": "opaque",
+     "DXT3": "alpha"
+    }
+   },
+   "data_lines": [
+    "<map>.ide objs/tobj line (id, model, txd, draw distance, flags)",
+    "<map>.ipl inst line",
+    "object.dat (breakables, physics)"
+   ],
+   "material_roles": [
+    "map",
+    "map_alpha"
+   ],
+   "col": {
+    "where": "<model>.col in a COL archive",
+    "name": "<model>",
+    "recipe": "box or a few boxes/spheres; faces only when the shape needs it"
+   },
+   "lod": {
+    "recipe": "none (draw 30-150)"
+   },
+   "draw": [
+    45.0,
+    100.0,
+    290.0
+   ]
+  },
+  "building": {
+   "group": "world",
+   "summary": "building or terrain piece with a LOD model (HD draw <= 300, LOD draw ~800)",
+   "ide": {
+    "file": "<map>.ide",
+    "sec": "objs"
+   },
+   "like": "model:3464",
+   "like_name": "shabbyhouse03_lvs",
+   "peers": 734,
+   "size_m": [
+    8.13,
+    15.21,
+    22.37
+   ],
+   "tris_hd": [
+    21.0,
+    210.0,
+    752.0
+   ],
+   "frames": {
+    "required": [
+     "<model>"
+    ],
+    "common": [],
+    "optional": {},
+    "lod_pair": "lod<model[3:]>"
+   },
+   "slots": [],
+   "game_ready_class": "building",
+   "pipeline": "map: prelit day colours + night colours (0x253F2F9), no normals, lit by the timecyc ambient",
+   "txd": {
+    "class": "map",
+    "name": "<shared map TXD>",
+    "levels": "full chain from 256 px",
+    "formats": {
+     "DXT1": "opaque",
+     "DXT3": "alpha"
+    }
+   },
+   "data_lines": [
+    "<map>.ide objs/tobj line (id, model, txd, draw distance, flags)",
+    "<map>.ipl inst line",
+    "object.dat (breakables, physics)"
+   ],
+   "material_roles": [
+    "map",
+    "map_alpha",
+    "map_window_night"
+   ],
+   "col": {
+    "where": "<model>.col",
+    "name": "<model>",
+    "recipe": "mesh faces (welded, decimated) + face light from prelight"
+   },
+   "lod": {
+    "recipe": "a separate model lod<name[3:]> placed at the same spot (IPL lod index)",
+    "name": "lod + name[3:] (95 % of vanilla LOD names start with lod)",
+    "ratio_tris": [
+     0.049,
+     0.208,
+     0.698
+    ],
+    "draw": [
+     450.0,
+     800.0,
+     1500.0
+    ],
+    "hd_draw": [
+     100.0,
+     160.0,
+     299.0
+    ],
+    "tex_max_side": [
+     32.0,
+     64.0,
+     64.0
+    ],
+    "like": "model:3536"
+   },
+   "draw": [
+    100.0,
+    160.0,
+    299.0
+   ]
+  },
+  "interior_shell": {
+   "group": "world",
+   "summary": "interior room shell (walls, floor, ceiling; area/interior != 0)",
+   "ide": {
+    "file": "<map>.ide",
+    "sec": "objs"
+   },
+   "like": "model:14746",
+   "like_name": "rylounge",
+   "peers": 672,
+   "size_m": [
+    10.29,
+    22.27,
+    83.11
+   ],
+   "tris_hd": [
+    59.0,
+    647.0,
+    2918.0
+   ],
+   "frames": {
+    "required": [
+     "<model>"
+    ],
+    "common": [],
+    "optional": {}
+   },
+   "slots": [],
+   "game_ready_class": "interior_shell",
+   "pipeline": "map: prelit day colours + night colours (0x253F2F9), no normals, lit by the timecyc ambient",
+   "txd": {
+    "class": "map",
+    "name": "<shared map TXD>",
+    "levels": "full chain from 256 px",
+    "formats": {
+     "DXT1": "opaque",
+     "DXT3": "alpha"
+    }
+   },
+   "data_lines": [
+    "<map>.ide objs/tobj line (id, model, txd, draw distance, flags)",
+    "<map>.ipl inst line",
+    "object.dat (breakables, physics)"
+   ],
+   "material_roles": [
+    "map",
+    "map_alpha"
+   ],
+   "col": {
+    "where": "<model>.col",
+    "name": "<model>",
+    "recipe": "mesh faces of floor and walls"
+   },
+   "lod": {
+    "recipe": "none"
+   }
+  },
+  "interior_prop": {
+   "group": "world",
+   "summary": "furniture or clutter inside an interior",
+   "ide": {
+    "file": "<map>.ide",
+    "sec": "objs"
+   },
+   "like": "model:1739",
+   "like_name": "SWANK_DIN_CHAIR_5",
+   "peers": 1413,
+   "size_m": [
+    0.47,
+    1.48,
+    3.8
+   ],
+   "tris_hd": [
+    26.0,
+    144.0,
+    570.0
+   ],
+   "frames": {
+    "required": [
+     "<model>"
+    ],
+    "common": [],
+    "optional": {}
+   },
+   "slots": [],
+   "game_ready_class": "interior_prop",
+   "pipeline": "map: prelit day colours + night colours (0x253F2F9), no normals, lit by the timecyc ambient",
+   "txd": {
+    "class": "map",
+    "name": "<shared map TXD>",
+    "levels": "full chain from 256 px",
+    "formats": {
+     "DXT1": "opaque",
+     "DXT3": "alpha"
+    }
+   },
+   "data_lines": [
+    "<map>.ide objs/tobj line (id, model, txd, draw distance, flags)",
+    "<map>.ipl inst line",
+    "object.dat (breakables, physics)"
+   ],
+   "material_roles": [
+    "map"
+   ],
+   "col": {
+    "where": "<model>.col",
+    "name": "<model>",
+    "recipe": "box or hull"
+   },
+   "lod": {
+    "recipe": "none (draw 30)"
+   }
+  },
+  "breakable": {
+   "group": "world",
+   "summary": "breakable or dynamic object (object.dat entry, breakable DFF plugin)",
+   "ide": {
+    "file": "<map>.ide",
+    "sec": "objs"
+   },
+   "like": "model:1280",
+   "like_name": "parkbench1",
+   "peers": 699,
+   "size_m": [
+    0.57,
+    2.5,
+    7.22
+   ],
+   "tris_hd": [
+    10.0,
+    84.0,
+    324.0
+   ],
+   "frames": {
+    "required": [
+     "<model>"
+    ],
+    "common": [],
+    "optional": {}
+   },
+   "slots": [],
+   "game_ready_class": "prop",
+   "pipeline": "map: prelit day colours + night colours (0x253F2F9), no normals, lit by the timecyc ambient",
+   "txd": {
+    "class": "map",
+    "name": "<shared map TXD>",
+    "levels": "full chain from 256 px",
+    "formats": {
+     "DXT1": "opaque",
+     "DXT3": "alpha"
+    }
+   },
+   "data_lines": [
+    "<map>.ide objs/tobj line (id, model, txd, draw distance, flags)",
+    "<map>.ipl inst line",
+    "object.dat (breakables, physics)"
+   ],
+   "material_roles": [
+    "map"
+   ],
+   "col": {
+    "where": "<model>.col",
+    "name": "<model>",
+    "recipe": "box or hull"
+   },
+   "lod": {
+    "recipe": "none"
+   },
+   "notes": [
+    "needs an object.dat line (mass, damage effect); the breakable plugin holds the broken pieces"
+   ]
+  },
+  "animated_object": {
+   "group": "world",
+   "summary": "animated map object (IDE anim section + IFP; names only, posing is later)",
+   "ide": {
+    "file": "<map>.ide",
+    "sec": "anim"
+   },
+   "like": "model:3425",
+   "like_name": "nt_windmill",
+   "peers": 77,
+   "size_m": [
+    12.52,
+    21.13,
+    70.02
+   ],
+   "tris_hd": [
+    13.0,
+    274.0,
+    856.0
+   ],
+   "frames": {
+    "required": [
+     "<model>",
+     "<animated part frames, named like the IFP bones>"
+    ],
+    "common": [],
+    "optional": {}
+   },
+   "slots": [],
+   "game_ready_class": "prop",
+   "pipeline": "map: prelit day colours + night colours (0x253F2F9), no normals, lit by the timecyc ambient",
+   "txd": {
+    "class": "map",
+    "name": "<shared map TXD>",
+    "levels": "full chain from 256 px",
+    "formats": {
+     "DXT1": "opaque",
+     "DXT3": "alpha"
+    }
+   },
+   "data_lines": [
+    "<map>.ide objs/tobj line (id, model, txd, draw distance, flags)",
+    "<map>.ipl inst line",
+    "object.dat (breakables, physics)"
+   ],
+   "material_roles": [
+    "map"
+   ],
+   "col": {
+    "where": "<model>.col",
+    "name": "<model>",
+    "recipe": "static parts only"
+   },
+   "lod": {
+    "recipe": "none"
+   }
+  },
+  "weapon": {
+   "group": "character",
+   "summary": "hand-held weapon (weapon.dat + peds.ide-like weap line)",
+   "ide": {
+    "file": "default.ide",
+    "sec": "weap"
+   },
+   "like": "model:346",
+   "like_name": "colt45",
+   "peers": 50,
+   "examples": [
+    "colt45",
+    "desert_eagle",
+    "ak47",
+    "m4",
+    "shotgspa",
+    "katana"
+   ],
+   "size_m": [
+    0.2,
+    0.72,
+    1.75
+   ],
+   "tris_hd": [
+    60.0,
+    193.0,
+    578.0
+   ],
+   "frames": {
+    "required": [
+     "<model>"
+    ],
+    "common": [
+     "gunflash"
+    ],
+    "optional": {}
+   },
+   "slots": [],
+   "material_roles": [
+    "weapon",
+    "gunflash"
+   ],
+   "col": {
+    "where": "<model>.col (pickups use it)",
+    "name": "<model>",
+    "recipe": "one sphere or box"
+   },
+   "lod": {
+    "recipe": "none (draw 30-100)"
+   },
+   "draw": [
+    30.0,
+    50.0,
+    100.0
+   ],
+   "txd": {
+    "class": "weapon",
+    "name": "<model>",
+    "levels": 1,
+    "formats": {
+     "DXT1": "opaque",
+     "DXT3": "alpha"
+    }
+   },
+   "data_lines": [
+    "default.ide weap line",
+    "weapon.dat (per skill)",
+    "ID-bound: fire type, animations"
+   ],
+   "pipeline": "lit like peds: normals, no prelight; the gunflash atomic is hidden until the shot"
+  },
+  "ped": {
+   "group": "character",
+   "summary": "skinned pedestrian (32 bones, one material, one texture); names and ids only",
+   "ide": {
+    "file": "peds.ide",
+    "sec": "peds"
+   },
+   "like": "model:7",
+   "like_name": "male01",
+   "peers": 265,
+   "anchors": {
+    "height_m": 1.84
+   },
+   "tris_hd": [
+    944.0,
+    1079.0,
+    1274.0
+   ],
+   "frames": {
+    "required": [
+     "Root",
+     "Pelvis",
+     "R Thigh",
+     "L Thigh",
+     "Spine",
+     "Belly",
+     "Spine1",
+     "R breast",
+     "L breast",
+     "Neck",
+     "Bip01 R Clavicle",
+     "Bip01 L Clavicle",
+     "Head",
+     "R Brow",
+     "L Brow",
+     "Jaw",
+     "L UpperArm",
+     "L ForeArm",
+     "L Hand",
+     "L Finger",
+     "L Finger01",
+     "R UpperArm",
+     "R ForeArm",
+     "R Hand",
+     "R Finger",
+     "R Finger01",
+     "L Calf",
+     "L Foot",
+     "L Toe0",
+     "R Calf",
+     "R Foot",
+     "R Toe0"
+    ],
+    "common": [],
+    "optional": {}
+   },
+   "bones": [
+    {
+     "name": "",
+     "id": null,
+     "parent": -1
+    },
+    {
+     "name": "Root",
+     "id": 0,
+     "parent": 0
+    },
+    {
+     "name": "Pelvis",
+     "id": 1,
+     "parent": 1
+    },
+    {
+     "name": "R Thigh",
+     "id": 51,
+     "parent": 2
+    },
+    {
+     "name": "L Thigh",
+     "id": 41,
+     "parent": 2
+    },
+    {
+     "name": "Spine",
+     "id": 2,
+     "parent": 2
+    },
+    {
+     "name": "Belly",
+     "id": 201,
+     "parent": 5
+    },
+    {
+     "name": "Spine1",
+     "id": 3,
+     "parent": 5
+    },
+    {
+     "name": "R breast",
+     "id": 301,
+     "parent": 7
+    },
+    {
+     "name": "L breast",
+     "id": 302,
+     "parent": 7
+    },
+    {
+     "name": "Neck",
+     "id": 4,
+     "parent": 7
+    },
+    {
+     "name": "Bip01 R Clavicle",
+     "id": 21,
+     "parent": 10
+    },
+    {
+     "name": "Bip01 L Clavicle",
+     "id": 31,
+     "parent": 10
+    },
+    {
+     "name": "Head",
+     "id": 5,
+     "parent": 10
+    },
+    {
+     "name": "R Brow",
+     "id": 7,
+     "parent": 13
+    },
+    {
+     "name": "L Brow",
+     "id": 6,
+     "parent": 13
+    },
+    {
+     "name": "Jaw",
+     "id": 8,
+     "parent": 13
+    },
+    {
+     "name": "L UpperArm",
+     "id": 32,
+     "parent": 12
+    },
+    {
+     "name": "L ForeArm",
+     "id": 33,
+     "parent": 17
+    },
+    {
+     "name": "L Hand",
+     "id": 34,
+     "parent": 18
+    },
+    {
+     "name": "L Finger",
+     "id": 35,
+     "parent": 19
+    },
+    {
+     "name": "L Finger01",
+     "id": 36,
+     "parent": 20
+    },
+    {
+     "name": "R UpperArm",
+     "id": 22,
+     "parent": 11
+    },
+    {
+     "name": "R ForeArm",
+     "id": 23,
+     "parent": 22
+    },
+    {
+     "name": "R Hand",
+     "id": 24,
+     "parent": 23
+    },
+    {
+     "name": "R Finger",
+     "id": 25,
+     "parent": 24
+    },
+    {
+     "name": "R Finger01",
+     "id": 26,
+     "parent": 25
+    },
+    {
+     "name": "L Calf",
+     "id": 42,
+     "parent": 4
+    },
+    {
+     "name": "L Foot",
+     "id": 43,
+     "parent": 27
+    },
+    {
+     "name": "L Toe0",
+     "id": 44,
+     "parent": 28
+    },
+    {
+     "name": "R Calf",
+     "id": 52,
+     "parent": 3
+    },
+    {
+     "name": "R Foot",
+     "id": 53,
+     "parent": 30
+    },
+    {
+     "name": "R Toe0",
+     "id": 54,
+     "parent": 31
+    }
+   ],
+   "slots": [],
+   "material_roles": [
+    "ped"
+   ],
+   "col": {
+    "where": "none (peds use the engine capsule)",
+    "recipe": "none"
+   },
+   "lod": {
+    "recipe": "none"
+   },
+   "txd": {
+    "class": "ped",
+    "name": "<model>",
+    "levels": 1,
+    "formats": {
+     "X8R8G8B8": 75,
+     "A8R8G8B8": 9,
+     "DXT1": 5,
+     "DXT3": 2
+    },
+    "max_side": {
+     "256": 76,
+     "128": 10,
+     "64": 5
+    }
+   },
+   "data_lines": [
+    "peds.ide line (model, txd, type, stat, anim group, car mask, voices)",
+    "pedgrp.dat (optional)"
+   ],
+   "pipeline": "skinned: normals, no prelight, at most 4 weights per vertex, bind pose Y-up (posing is later)"
+  },
+  "pickup": {
+   "group": "world",
+   "summary": "pickup icon object (health, armour, money...): tiny, map pipeline, one sphere COL",
+   "ide": {
+    "file": "default.ide",
+    "sec": "objs"
+   },
+   "like": "model:1240",
+   "like_name": "health",
+   "peers": 13,
+   "examples": [
+    "briefcase",
+    "Money",
+    "info",
+    "health",
+    "adrenaline",
+    "bodyarmour",
+    "bribe",
+    "camerapickup"
+   ],
+   "size_m": [
+    0.28,
+    0.31,
+    0.48
+   ],
+   "tris_hd": [
+    29.0,
+    88.0,
+    170.0
+   ],
+   "draw": [
+    52.0,
+    100.0,
+    100.0
+   ],
+   "frames": {
+    "required": [
+     "<model>"
+    ],
+    "common": [],
+    "optional": {}
+   },
+   "slots": [],
+   "material_roles": [
+    "map"
+   ],
+   "game_ready_class": "pickup",
+   "col": {
+    "where": "<model>.col",
+    "name": "<model>",
+    "recipe": "one sphere"
+   },
+   "lod": {
+    "recipe": "none"
+   },
+   "txd": {
+    "class": "map",
+    "name": "icons<N>",
+    "levels": 1,
+    "formats": {
+     "DXT1": "opaque",
+     "DXT3": "alpha"
+    }
+   },
+   "data_lines": [
+    "default.ide objs line (flags 128 typical)"
+   ],
+   "pipeline": "map: prelit, few normals, no night colours"
+  },
+  "vehicle_upgrade": {
+   "group": "vehicle",
+   "summary": "tuning part (spoiler, skirts, exhaust, hood, wheels) attached at a ug_* frame",
+   "ide": {
+    "file": "veh_mods.ide",
+    "sec": "objs"
+   },
+   "like": "model:1039",
+   "like_name": "wg_l_c_l",
+   "peers": 194,
+   "examples": [
+    "bbb_lr_slv1",
+    "bbb_lr_slv2",
+    "bnt_b_sc_l",
+    "bnt_b_sc_m",
+    "bnt_b_sc_p_l",
+    "bnt_b_sc_p_m",
+    "bnt_lr_slv1",
+    "bnt_lr_slv2"
+   ],
+   "size_m": [
+    0.93,
+    2.0,
+    2.44
+   ],
+   "tris_hd": [
+    31.0,
+    161.0,
+    575.0
+   ],
+   "draw": [
+    70.0,
+    100.0,
+    100.0
+   ],
+   "frames": {
+    "required": [
+     "<model>"
+    ],
+    "common": [],
+    "optional": {}
+   },
+   "slots": [
+    "ok",
+    "dam"
+   ],
+   "material_roles": [
+    "paint1",
+    "chrome",
+    "trim",
+    "black"
+   ],
+   "col": {
+    "where": "none (the car's COL covers it)",
+    "recipe": "none"
+   },
+   "lod": {
+    "recipe": "none"
+   },
+   "txd": {
+    "class": "vehicle",
+    "name": "<car> or vehicle",
+    "levels": 1,
+    "formats": {
+     "DXT1": "opaque",
+     "DXT3": "alpha"
+    }
+   },
+   "data_lines": [
+    "veh_mods.ide objs line",
+    "carmods.dat (which cars take it)",
+    "shopping.dat (price)"
+   ],
+   "pipeline": "vehicle: lit, normals, paint keys like a car body"
+  }
+ }
+}

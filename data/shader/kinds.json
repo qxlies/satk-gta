@@ -1,0 +1,101 @@
+{
+ "format": "satk-shader-kinds",
+ "version": 1,
+ "about": "Texture kinds of 'satk shader textures --kind'. A name belongs to a kind when it is in the kind's scope and one rule path holds: 'names' (name globs, MTA syntax), 'surfaces' (collision surface of the texture from data/colgen/tex_surface.json: ids, share %, votes), 'models' (share of the name's model uses on models with IDE flags 'flags' or names 'model_names'), 'lod' (share of uses on LOD models), 'paint' (material of a recolourable vehicle colour slot) or 'all'; 'exclude' globs always win. Scopes: world = used by an objs/tobj/anim model; vehicle = in a TXD of a vehicle model or vehicle.txd; ped = in a TXD of a ped model or player.img; any = every texture. 'fallback' are the patterns used without an index. Heuristics: check the list before shipping a shader.",
+ "kinds": {
+  "road": {
+   "about": "driving surfaces: asphalt, junctions, crossings, freeway lanes and road blends of world models",
+   "scope": "world",
+   "names": ["*road*", "tar_*", "*tarmac*", "*asphalt*", "*hiway*", "*freew*", "*junction*", "*crossing*", "*stopline*", "*roadline*", "*carpark*"],
+   "surfaces": {"ids": [1, 2, 3], "share": 60, "votes": 100},
+   "exclude": ["*sign*", "*post*", "*wall*", "*brick*", "*house*", "*rail*", "*font*", "*body*", "*wheel*", "*interior*", "*shop*", "*roof*", "*door*", "*target*", "*tarp*", "*tart*"],
+   "fallback": {"apply": ["*road*", "tar_*", "*tarmac*", "*asphalt*", "*hiway*", "*freew*", "*junction*", "*crossing*"], "remove": ["*sign*", "*post*", "*rail*", "*body*", "*wheel*"]}
+  },
+  "pavement": {
+   "about": "sidewalks, kerbs and paved squares of world models",
+   "scope": "world",
+   "names": ["*pave*", "*sidewalk*", "*kerb*", "*curb*", "*footpath*"],
+   "surfaces": {"ids": [4, 5], "share": 75, "votes": 300},
+   "exclude": ["*sneaker*", "*lakerb*", "*bikerb*", "*sign*"]
+  },
+  "grass": {
+   "about": "lawns, meadows, golf and dry grass of world models",
+   "scope": "world",
+   "names": ["*grass*", "*lawn*", "*gras0*", "*turf*", "*meadow*"],
+   "surfaces": {"ids": [9, 10, 11, 12, 13, 14, 15, 16, 17, 20], "share": 60, "votes": 50},
+   "exclude": ["*sign*", "*mower*"]
+  },
+  "dirt": {
+   "about": "dirt, mud and gravel ground of world models",
+   "scope": "world",
+   "names": ["*dirt*", "*mud*", "*gravel*"],
+   "surfaces": {"ids": [6, 24, 25, 26, 27, 21], "share": 60, "votes": 50},
+   "exclude": ["*dirty*", "*sign*"]
+  },
+  "sand": {
+   "about": "sand and beach ground of world models",
+   "scope": "world",
+   "names": ["*sand*", "*beach*", "*dune*"],
+   "surfaces": {"ids": [28, 29, 30, 31, 32, 33, 34], "share": 60, "votes": 50},
+   "exclude": ["*sandwich*", "*sign*", "*sandbag*"]
+  },
+  "rock": {
+   "about": "rock and cliff faces of world models",
+   "scope": "world",
+   "names": ["*rock*", "*cliff*", "*boulder*"],
+   "surfaces": {"ids": [18, 35, 36, 37], "share": 70, "votes": 200},
+   "exclude": ["*rockstar*", "*rocket*", "*sign*"]
+  },
+  "glass": {
+   "about": "windows and glass panes of world models (vehicle glass shares vehiclegeneric256 with other parts: use kind vehicle)",
+   "scope": "world",
+   "names": ["*glass*", "*window*", "*wndw*", "*_gls*", "*_win_*", "*shopwin*", "*carshowwin*"],
+   "surfaces": {"ids": [45, 46, 47], "share": 50, "votes": 20},
+   "models": {"flags": 1536, "share": 0.5},
+   "exclude": ["*glasses*", "*windmill*"],
+   "fallback": {"apply": ["*glass*", "*window*"], "remove": ["*glasses*"]}
+  },
+  "water": {
+   "about": "water surfaces: the sea and pools (waterclear256), waterfalls, dirty water and boat wakes",
+   "scope": "any",
+   "names": ["*water*", "*aterfal*"],
+   "exclude": ["*cool*", "*tower*", "*tank*", "*support*", "*spark*", "*bottle*"],
+   "fallback": {"apply": ["waterclear256"], "remove": []}
+  },
+  "tree": {
+   "about": "trees, palms, bushes and hedges: leaves and bark of world models",
+   "scope": "world",
+   "names": ["*tree*", "*leaf*", "*leaves*", "*bark*", "*branch*", "*brnch*", "*palm*", "*bush*", "*foliage*", "*hedge*", "veg_*", "*cedar*", "*cypress*", "*spruce*", "*ivy*"],
+   "models": {"flags": 24576, "share": 0.5},
+   "exclude": ["*street*", "*sign*", "*ceiling*", "*medical*", "*sheriff*", "*bandana*", "*gameleaf*", "*barkeep*"],
+   "fallback": {"apply": ["*tree*", "*leaf*", "*leaves*", "*bark*", "*palm*", "*bush*", "*hedge*", "veg_*"], "remove": ["*street*", "*sign*"]}
+  },
+  "lod": {
+   "about": "textures only LOD models use (the low-detail distant versions)",
+   "scope": "world",
+   "lod": {"share": 1.0},
+   "fallback": {"apply": ["*lod*"], "remove": []}
+  },
+  "vehicle": {
+   "about": "every texture of vehicle TXDs and vehicle.txd; pair with dxCreateShader elementTypes 'vehicle'",
+   "scope": "vehicle",
+   "all": true,
+   "element_types": "vehicle",
+   "fallback": {"apply": ["*"], "remove": []}
+  },
+  "vehicle_paint": {
+   "about": "textures of recolourable vehicle paint materials (colour slots 1-4); untextured paint materials cannot be matched by name",
+   "scope": "vehicle",
+   "paint": true,
+   "element_types": "vehicle",
+   "fallback": {"apply": ["vehiclegrunge256", "*body*"], "remove": ["*interior*"]}
+  },
+  "ped": {
+   "about": "every texture of ped TXDs and player.img (clothes of CJ); pair with dxCreateShader elementTypes 'ped'",
+   "scope": "ped",
+   "all": true,
+   "element_types": "ped",
+   "fallback": {"apply": ["*"], "remove": []}
+  }
+ }
+}

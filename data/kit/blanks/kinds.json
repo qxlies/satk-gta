@@ -1,0 +1,240 @@
+{
+  "format": "satk.kit-blanks/1",
+  "_comment": [
+    "Catalog of kit.blank: what each blank builds. Dimensions are class medians of the style guides (metres, L = along",
+    "Y, W = across X, H = up Z); a --like model or --dims replaces them. Parts name the vanilla frames the pieces fill."
+  ],
+  "kinds": {
+    "automobile": {
+      "group": "vehicle",
+      "kit_kind": "automobile",
+      "peer": "car.sedan",
+      "summary": "Half body with a MIRROR modifier: wheel arches, belt line, pillars, bumper loops, cut into chassis, bonnet, boot, doors, bumpers and windscreen by a face attribute; plus seats and a dash.",
+      "dims": {
+        "L": 5.82,
+        "W": 2.27,
+        "H": 1.53
+      },
+      "split": "kit.blank_split cuts the parts out (doors per side) and fills the kit slots",
+      "notes": [
+        "shape the body by moving loops (mesh.transform with a face selector) and by modifiers; the part regions follow the loops",
+        "tier sets the density: vanilla about 1,300 triangles in the chassis, sa_plus about 2,400"
+      ]
+    },
+    "bike": {
+      "group": "vehicle",
+      "kit_kind": "bike",
+      "peer": "bike",
+      "summary": "Half body of a motorbike (tank, seat, tail, fairing loops) with a MIRROR modifier, fork, handlebar and two wheel discs at the wheelbase.",
+      "dims": {
+        "L": 2.31,
+        "W": 0.77,
+        "H": 1.31
+      },
+      "parts": [
+        {
+          "name": "chassis",
+          "slot": "chassis"
+        },
+        {
+          "name": "forks_front",
+          "slot": "forks_front"
+        },
+        {
+          "name": "handlebars",
+          "slot": "handlebars"
+        },
+        {
+          "name": "wheel_front",
+          "slot": "wheel_front"
+        },
+        {
+          "name": "wheel_rear",
+          "slot": "wheel_rear"
+        }
+      ],
+      "tiers": {
+        "vanilla": {
+          "rows": 6,
+          "sides": 12
+        },
+        "sa_plus": {
+          "rows": 8,
+          "sides": 16
+        }
+      }
+    },
+    "boat": {
+      "group": "vehicle",
+      "kit_kind": "boat",
+      "peer": "boat",
+      "summary": "Half hull with a MIRROR modifier: keel, chine and gunwale loops, a deck line and a windscreen console.",
+      "dims": {
+        "L": 8.0,
+        "W": 2.8,
+        "H": 2.3
+      },
+      "parts": [
+        {
+          "name": "boat",
+          "slot": "chassis",
+          "alt": [
+            "boat"
+          ]
+        }
+      ],
+      "tiers": {
+        "vanilla": {
+          "rows": 6
+        },
+        "sa_plus": {
+          "rows": 8
+        }
+      }
+    },
+    "heli": {
+      "group": "vehicle",
+      "kit_kind": "heli",
+      "peer": "heli",
+      "summary": "Half fuselage with a MIRROR modifier (cabin pod, tail boom, fin, stabiliser), skid tubes and a rotor mast.",
+      "dims": {
+        "L": 14.1,
+        "W": 3.2,
+        "H": 3.8
+      },
+      "parts": [
+        {
+          "name": "chassis",
+          "slot": "chassis"
+        },
+        {
+          "name": "static_rotor",
+          "slot": "static_rotor"
+        }
+      ],
+      "tiers": {
+        "vanilla": {
+          "rows": 6
+        },
+        "sa_plus": {
+          "rows": 8
+        }
+      }
+    },
+    "plane": {
+      "group": "vehicle",
+      "kit_kind": "plane",
+      "peer": "plane",
+      "summary": "Half fuselage with a MIRROR modifier, a wing, a tailplane and a fin with loops at the control surfaces.",
+      "dims": {
+        "L": 10.7,
+        "W": 11.3,
+        "H": 3.8
+      },
+      "parts": [
+        {
+          "name": "chassis",
+          "slot": "chassis"
+        }
+      ],
+      "tiers": {
+        "vanilla": {
+          "rows": 6
+        },
+        "sa_plus": {
+          "rows": 8
+        }
+      }
+    },
+    "prop_box": {
+      "group": "world",
+      "kit_kind": "prop",
+      "summary": "A box with edge loops on every axis, one chamfer ring, tiling UVs (metres per repeat) and a flat shading seam on every edge.",
+      "dims": {
+        "L": 1.0,
+        "W": 1.0,
+        "H": 1.0
+      },
+      "parts": [
+        {
+          "name": "prop",
+          "slot": "{model}"
+        }
+      ],
+      "tiers": {
+        "vanilla": {
+          "cell_m": 0.9,
+          "chamfer_m": 0.03,
+          "uv_tile_m": 1.0
+        },
+        "sa_plus": {
+          "cell_m": 0.45,
+          "chamfer_m": 0.04,
+          "uv_tile_m": 1.0
+        }
+      }
+    },
+    "prop_cyl": {
+      "group": "world",
+      "kit_kind": "prop",
+      "summary": "A cylinder with the tier's side count, a ring per cap chamfer and tiling UVs; poles, bins, barrels, hydrants.",
+      "dims": {
+        "L": 0.6,
+        "W": 0.6,
+        "H": 1.1
+      },
+      "parts": [
+        {
+          "name": "prop",
+          "slot": "{model}"
+        }
+      ],
+      "tiers": {
+        "vanilla": {
+          "sides": 8,
+          "cell_m": 0.8,
+          "chamfer_m": 0.03,
+          "uv_tile_m": 1.0
+        },
+        "sa_plus": {
+          "sides": 14,
+          "cell_m": 0.5,
+          "chamfer_m": 0.04,
+          "uv_tile_m": 1.0
+        }
+      }
+    },
+    "building_box": {
+      "group": "world",
+      "kit_kind": "building",
+      "summary": "A building box with a floor loop per storey, a bay loop per window column, a plinth, a cornice ledge and a roof slab; tiling UVs.",
+      "dims": {
+        "L": 14.0,
+        "W": 10.0,
+        "H": 12.0
+      },
+      "parts": [
+        {
+          "name": "building",
+          "slot": "{model}"
+        }
+      ],
+      "tiers": {
+        "vanilla": {
+          "storey_m": 3.2,
+          "bay_m": 4.0,
+          "plinth_m": 0.5,
+          "cornice_m": 0.5,
+          "uv_tile_m": 3.0
+        },
+        "sa_plus": {
+          "storey_m": 3.2,
+          "bay_m": 3.0,
+          "plinth_m": 0.5,
+          "cornice_m": 0.5,
+          "uv_tile_m": 3.0
+        }
+      }
+    }
+  }
+}

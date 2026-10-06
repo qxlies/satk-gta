@@ -1,6 +1,6 @@
 # Developing satk (for agents and people)
 
-<!-- Contributor guide. <= 150 lines (tests/e2e/test_docs_layout.py). English only. Checked 2026-10-05. -->
+<!-- Contributor guide. <= 150 lines (tests/e2e/test_docs_layout.py). English only. Checked 2026-10-06. -->
 
 This is the contributor guide of the satk repository. Using satk (not developing it): `docs/en/README.md`
 (Russian mirror `docs/ru/README.md`); for AI agents `docs/agent/SKILL.md`. Paths below use `<workspace>` for the
@@ -40,7 +40,9 @@ data). It runs assetguard, the generated- and agent-docs checks, all tests, `mcp
 in a private `work\tmp\gate-<checkout hash>\work` (one per worktree: parallel gates do not collide) with the golden
 checks, and the game-data tests. Do not set `SATK_PATHS_WORK` for the gate itself. A green gate is enough to
 merge; a model review only for risky changes (write protection, parsing other people's mod files, network
-protocols), and only once.
+protocols), and only once. While working use `satk dev gate --changed`: cheap steps plus tests affected by changed
+files, each with its reason (`--with-game` adds the game steps, `--dry-run` shows the plan); it is not the acceptance.
+At most 2 full gates run per machine (`SATK_GATE_SLOTS`; a third waits); TEMP is `work\tmp\gate-<hash>\tmp`.
 
 ## Ownership
 
@@ -56,6 +58,8 @@ package owns `src/satk/<pkg>/**`, `tests/<pkg>/**` and its page (`docs/en/<pkg>.
 | `README*`, `docs/en/**` (except `ai.md`), `docs/ru/{README,install,quickstart,troubleshooting,faq,legal}.md`, `src/satk/docs/**`, `tests/{docs,e2e}/**` | docs |
 | `src/satk/mcp/**`, `docs/agent/**` (except the generated `tools.md`, `schema.md`), `docs/{en,ru}/ai.md`, `.claude-plugin/**`, `tests/mcp/**` | AI clients |
 | other `src/satk/core/**` (frozen contracts), `scripts/`, `.gitignore`, `LICENSE`, shims | the maintainers |
+| `blender/satk_blender/**`: `studio/`; `kit/`, `exporter.py`, `gameready.py`; the rest (`look/`, `agent_cli.py`, `render.py`, ...). `src/satk/blender/`: `ops.py`, `gameready.py`, `packaging.py` (kit); `runner.py`, `resolve.py`, `contract.py` (look) | studio; kit; look |
+| `data/style/**` except `topics/` (style), `data/kit/**` (kit); `data/style/topics/**` with `docs/agent/style/**` | style, kit; AI clients |
 | `tests/conftest.py` | nobody |
 | `NOTICE.md`, `.assetguard-allow` | append only; a merge conflict is resolved by union |
 | `CLAUDE.md` (this file) | the merge step |
@@ -110,7 +114,8 @@ change only through their owners: index (`index`), symdb (`re`), notes (`notes`)
   `run_cli` (in-process CLI), `isolated_ops`, `clean_root`, `installed_root`, `repo_root`. Live runs write into
   their own `SATK_PATHS_WORK` (example: `tests/e2e/test_scenario.py`), not into the shared `work\`, and remove
   it with `satk.docs.cleanup.remove_tree` (retries + an error on leftovers), never `rmtree(ignore_errors=True)`.
-- Golden numbers live in `tests/golden/*.json` (numbers only, no assets).
+- Golden numbers live in `tests/golden/*.json` (numbers only, no assets). In a restricted sandbox (the Codex
+  one) the gate works around what is denied; direct runs: `PYTHONPATH=src;tests` and `-p sandbox_compat`.
 - Full run: `python -m pytest -q -p no:cacheprovider` (~4 min; keep TEMP on a drive with free space);
   the end-to-end scenario with a window: `SATK_TEST_LIVE=1 python -m pytest -m e2e`.
 

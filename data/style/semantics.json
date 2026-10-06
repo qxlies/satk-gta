@@ -1,0 +1,182 @@
+{
+  "format": "satk.style-semantics/1",
+  "_comment": [
+    "Engine conventions that asset.check verifies (structure and semantics). Every rule names what it checks,",
+    "why (the engine behaviour) and the fix. Numbers are vanilla facts; 'vanilla' says how vanilla models do it.",
+    "sev: error = the game shows it wrong or crashes; warn = it looks wrong next to vanilla; info = worth a look."
+  ],
+  "paint_keys": {
+    "60,255,0": "paint1",
+    "255,0,175": "paint2",
+    "0,255,255": "paint3",
+    "255,0,255": "paint4"
+  },
+  "lamp_keys": {
+    "255,175,0": "headlight left",
+    "0,255,200": "headlight right",
+    "185,255,0": "taillight left",
+    "255,60,0": "taillight right"
+  },
+  "dirt_texture": "vehiclegrunge256",
+  "lamp_texture": "vehiclelights128",
+  "env_texture": "xvehicleenv128",
+  "vehicle_txd_textures": [
+    "vehiclegrunge256",
+    "vehiclegeneric256",
+    "vehiclelights128",
+    "vehiclelightson128",
+    "vehicletyres128",
+    "vehiclesteering128",
+    "vehiclespecdot64",
+    "vehicleshatter128",
+    "vehiclescratch64",
+    "vehiclepoldecals128",
+    "vehicleenvmap128",
+    "xvehicleenv128",
+    "vehiclebackdoor128",
+    "vehiclewheel128",
+    "vehiclesmoke128"
+  ],
+  "rules": {
+    "veh.paint_dirt": {
+      "sev": "warn",
+      "ref": "style_vehicle",
+      "what": "Paint (key colours paint1/paint2) sits on the dirt texture vehiclegrunge256 (so the car gets dirty and the key colour picks up the grain) or on the model's own body texture (paint jobs, liveries); never on the other shared vehicle.txd textures.",
+      "min_share": 0.25,
+      "hint": "map the painted faces onto vehiclegrunge256 (vehicle.txd) and keep the key colour as the material colour",
+      "types": [
+        "car",
+        "mtruck",
+        "quad",
+        "bike"
+      ]
+    },
+    "veh.lamp_tex": {
+      "sev": "error",
+      "ref": "style_vehicle",
+      "what": "Lamp key colours only work on vehiclelights128 (the engine swaps it for vehiclelightson128 when a lamp is on).",
+      "hint": "give the lamp materials the texture vehiclelights128 and keep the lamp key colour"
+    },
+    "veh.env_uv2": {
+      "sev": "warn",
+      "ref": "style_vehicle",
+      "what": "The body sheen (MatFX env map xvehicleenv128 on the paint) reads UV set 2; a painted geometry with one UV set gets a flat sheen. Vanilla wheels and exhausts carry env with one UV set; only painted geometries are checked.",
+      "hint": "export the body with two UV sets (DragonFF: UV2 on) or drop the env effect",
+      "types": [
+        "car",
+        "mtruck",
+        "quad"
+      ]
+    },
+    "veh.sheen_missing": {
+      "sev": "info",
+      "ref": "style_vehicle",
+      "what": "Paint without the env sheen (MatFX env + reflection material) looks matt next to vanilla cars.",
+      "hint": "use the paint material preset (env xvehicleenv128, coefficient and reflection intensity like vanilla)"
+    },
+    "veh.wheel_scale": {
+      "sev": "warn",
+      "ref": "style_vehicle",
+      "what": "The game scales the wheel mesh to wheel_scale of the IDE line; the mesh diameter should equal it (vanilla cars 0.99-1.03).",
+      "lo": 0.85,
+      "hi": 1.15,
+      "hint": "model the wheel at the IDE wheel_scale diameter (or change wheel_scale)",
+      "types": [
+        "car",
+        "mtruck",
+        "quad"
+      ]
+    },
+    "veh.dummy_side": {
+      "sev": "error",
+      "ref": "style_vehicle",
+      "what": "Frames named *_l*/*_r* (wheel_lf_dummy, door_rr_dummy, ...) sit on their side (left x < 0, right x > 0) and ped_arm is on the driver side (x < 0, every vanilla car).",
+      "min_offset": 0.25,
+      "types": [
+        "car",
+        "mtruck",
+        "quad",
+        "bike",
+        "bmx",
+        "trailer",
+        "train"
+      ],
+      "hint": "mirror the frame to its side or rename it"
+    },
+    "veh.bumper_corner": {
+      "sev": "info",
+      "ref": "style_vehicle",
+      "what": "bump_front_dummy and bump_rear_dummy sit at a front/rear corner (|x| > 15 % of the width), where the bumper hinges when damaged (125 of 132 vanilla cars).",
+      "min_x_share": 0.15,
+      "hint": "put the bumper dummy at the corner where the bumper hangs from",
+      "types": [
+        "car",
+        "mtruck",
+        "quad"
+      ]
+    },
+    "veh.frames": {
+      "sev": "error",
+      "ref": "style_vehicle",
+      "what": "Frames every vanilla model of the type has; the engine looks them up by name (critical ones are errors, the others warnings).",
+      "required_share": 0.97,
+      "hint": "add the frame (satk kit template --like <vanilla model> builds the full tree)",
+      "critical": [
+        "chassis",
+        "chassis_dummy",
+        "wheel_lf_dummy",
+        "wheel_rf_dummy",
+        "wheel_lb_dummy",
+        "wheel_rb_dummy",
+        "wheel_front",
+        "wheel_rear",
+        "forks_front",
+        "forks_rear"
+      ]
+    },
+    "veh.frame_parent": {
+      "sev": "info",
+      "ref": "style_vehicle",
+      "what": "Parts hang from the same parent frame as in vanilla (<root> = the clump root frame).",
+      "hint": "reparent the frame like the vanilla model",
+      "min_parent_share": 0.98
+    },
+    "geom.normals": {
+      "sev": "error",
+      "ref": "style_shading",
+      "what": "Vehicles, peds and weapons need vertex normals (the game lights them per vertex).",
+      "hint": "export with normals (DragonFF: normals on)"
+    },
+    "geom.prelit": {
+      "sev": "warn",
+      "ref": "style_world",
+      "what": "Map models carry prelight (vertex colours); without it they render too bright or black.",
+      "hint": "bake prelight (satk blender game-ready) and export vertex colours"
+    },
+    "ide.draw_hd_col": {
+      "sev": "error",
+      "ref": "style_world",
+      "what": "An HD map model with collision has draw distance <= 300; above 300 the engine treats it as a big building (no collision streaming).",
+      "max_draw": 300,
+      "hint": "set draw distance <= 300 and give the model a LOD for the distance"
+    },
+    "col.face_light": {
+      "sev": "warn",
+      "ref": "style_world",
+      "what": "Collision face light 0 makes peds and cars on it about 3x darker by day (ambient only).",
+      "hint": "take face light from the prelight (satk col gen derives it)"
+    },
+    "col.missing": {
+      "sev": "warn",
+      "ref": "style_vehicle",
+      "what": "Vehicles carry an embedded COL3 (spheres + mesh + shadow mesh).",
+      "hint": "satk col gen <dff> --mode spheres --shadow"
+    },
+    "txd.vehicle_format": {
+      "sev": "warn",
+      "ref": "style_texture",
+      "what": "Vehicle, ped and weapon textures are DXT1/DXT3 (or 32-bit) with one mip level; vanilla never uses DXT5 there.",
+      "hint": "satk texture pack --class vehicle"
+    }
+  }
+}

@@ -8,7 +8,13 @@ written back byte for byte. Operations (all return a list of change records ``(k
 * :meth:`DffDoc.restamp` - RW version III/VC/SA with librw's struct conversions (Geometry surface
   properties below 3.4, Clump light/camera counts above 3.3, old/new Skin PLG format);
 * :meth:`DffDoc.night_colors` - add (copy of the prelit day colours) or remove ``ExtraVertColour``;
-* :meth:`DffDoc.recalc_normals` - area-weighted smooth vertex normals, sets the NORMALS flag;
+* :meth:`DffDoc.recalc_normals` - area-weighted smooth vertex normals per vertex record, sets the NORMALS
+  flag (no weld: a flat-shaded export whose faces have their own vertices stays flat);
+* :meth:`DffDoc.smooth_normals` - seam-aware smoothing: vertices at the same position (``weld``) share their
+  face normals unless the faces meet above ``angle`` or across a material/UV seam (``split_at``); the
+  vertex count does not change, normals only;
+* :meth:`DffDoc.recalc_bsphere` - geometry bounding spheres from the frame-local vertices (exporters such as
+  DragonFF write world-space spheres; atomics take their sphere from the geometry at run time);
 * :meth:`DffDoc.set_material_color` - material RGBA, sets MODULATE_MATERIAL_COLOR on the geometry.
 
 Materials are numbered like ``satk formats dump --level full``: geometries in stream order (global over
@@ -27,7 +33,8 @@ from .chunk import (ATOMIC, BREAKABLE, CAMERA, CLUMP, EXTENSION, FX2D, GEOMETRY,
                     MATLIST, NIGHT, SKIN, SPECULAR, STRING, STRUCT, TEXTURE, Chunk, RwStream, chunk_name, pack_libid,
                     parse)
 
-__all__ = ["DffDoc", "GeomRef", "MatRef", "PatchError", "TYPED", "typed_roundtrip", "first_difference"]
+__all__ = ["DffDoc", "GeomRef", "MatRef", "PatchError", "TYPED", "typed_roundtrip", "first_difference",
+           "smooth_geometry", "tight_sphere"]
 
 NIGHT_MAGIC = 1           # "has colours" word written for added night colours (any non-zero value works)
 
@@ -306,6 +313,81 @@ class DffDoc:
             n += 1
         return [("normals", n)] if n else []
 
+    # ------------------------------------------------------------------ seam-aware smoothing
+    def smooth_normals(self, angle: float = 45.0, weld: float = 0.001, split_at: tuple[str, ...] = ("material",),
+                       warn: list[str] | None = None, keep_worse: bool = False) -> list[tuple[str, int]]:
+        """Rebuild vertex normals with a seam-aware weld (see :func:`smooth_geometry`).
+
+        Geometries whose shading would get flatter (lower area-weighted normal bend) keep their normals
+        unless ``keep_worse``; they are counted as ``kept``.
+        """
+        if not 0 < angle <= 180:
+            raise PatchError(f"angle must be in (0, 180] degrees, got {angle}")
+        if weld < 0:
+            raise PatchError(f"weld must be >= 0, got {weld}")
+        done = kept = 0
+        for gr in self.geometries():
+            g = gr.data()
+            if g.is_native:
+                raise PatchError(f"geometry {gr.index} is platform-native; normals cannot be rebuilt")
+            if not g.num_verts or not g.morphs:
+                continue
+            tris = _triangles_mat(g, gr)
+            if not tris:
+                if warn is not None:
+                    warn.append(f"NO_TRIANGLES: geometry {gr.index} has no triangles; normals left as they are")
+                continue
+            uv = _floats(g.uvs[0]) if "uv" in split_at and g.uvs else None
+            changed = False
+            for m in g.morphs:
+                if not m.has_verts:
+                    continue
+                pos = _floats(m.verts)
+                new = smooth_geometry(pos, tris, angle=angle, weld=weld, split_material="material" in split_at,
+                                      uv=uv)
+                if m.has_normals and len(m.normals) == len(new.tobytes()) and not keep_worse:
+                    old = _floats(m.normals)
+                    if _bend(pos, tris, new) + 1e-6 < _bend(pos, tris, old):
+                        kept += 1
+                        continue
+                m.normals = new.tobytes()
+                m.has_normals = 1
+                changed = True
+            if changed:
+                g.flags |= C.GEO_NORMALS
+                gr.store(g)
+                done += 1
+        return [x for x in (("smooth_normals", done), ("kept_normals", kept)) if x[1]]
+
+    # ------------------------------------------------------------------ bounding spheres
+    def recalc_bsphere(self, oversize: float = 2.0) -> list[tuple[str, int]]:
+        """Recompute geometry bounding spheres that do not enclose their vertices (or are more than
+        ``oversize`` times the tight radius): centre = bounding-box centre, radius = farthest vertex."""
+        n = 0
+        for gr in self.geometries():
+            g = gr.data()
+            if g.is_native or not g.num_verts:
+                continue
+            changed = False
+            for m in g.morphs:
+                if not m.has_verts:
+                    continue
+                pos = _floats(m.verts)
+                cx, cy, cz, r = tight_sphere(pos)
+                ox, oy, oz, orad = struct.unpack("<4f", m.sphere)
+                far = max(math.sqrt((pos[i] - ox) ** 2 + (pos[i + 1] - oy) ** 2 + (pos[i + 2] - oz) ** 2)
+                          for i in range(0, len(pos), 3))
+                if far <= orad + 1e-3 and orad <= oversize * r + 1e-3:
+                    continue
+                new = struct.pack("<4f", cx, cy, cz, r)
+                if new != m.sphere:
+                    m.sphere = new
+                    changed = True
+            if changed:
+                gr.store(g)
+                n += 1
+        return [("bsphere", n)] if n else []
+
     # ------------------------------------------------------------------ RW version
     def restamp(self, target: int) -> list[tuple[str, int]]:
         """Re-stamp every chunk with RW version ``target`` and convert the version-dependent structs."""
@@ -430,6 +512,167 @@ def _triangles(g: C.GeometryData, gr: GeomRef) -> list[tuple[int, int, int]]:
         else:
             out += [(ix[i], ix[i + 1], ix[i + 2]) for i in range(0, len(ix) - 2, 3)]
     return [t for t in out if max(t) < nv]
+
+
+def _floats(b: bytes) -> array:
+    a = array("f")
+    a.frombytes(b)
+    return a
+
+
+def _triangles_mat(g: C.GeometryData, gr: GeomRef) -> list[tuple[int, int, int, int]]:
+    """Triangles ``(v0, v1, v2, material slot)`` from the struct, else from the BinMesh."""
+    nv = g.num_verts
+    out: list[tuple[int, int, int, int]] = []
+    if g.num_tris:
+        w = g.triangles()
+        for i in range(0, len(w), 4):
+            a, b, m, c = w[i + 1], w[i], w[i + 2], w[i + 3]
+            if a < nv and b < nv and c < nv:
+                out.append((a, b, c, m))
+        return out
+    ext = gr.ext()
+    bm = next((k for k in (ext.kids or ()) if k.type == 0x50E), None) if ext is not None else None
+    if bm is None or not bm.data:
+        return out
+    try:
+        b = C.decode_binmesh(bm.data)
+    except C.CodecError:
+        return out
+    for mat, raw in b.meshes:
+        ix = array("I")
+        ix.frombytes(raw)
+        if b.flags & 1:
+            for i in range(len(ix) - 2):
+                a, bb, c = ix[i], ix[i + 1], ix[i + 2]
+                if a == bb or bb == c or a == c:
+                    continue
+                out.append((a, bb, c, mat) if i % 2 == 0 else (bb, a, c, mat))
+        else:
+            out += [(ix[i], ix[i + 1], ix[i + 2], mat) for i in range(0, len(ix) - 2, 3)]
+    return [t for t in out if max(t[:3]) < nv]
+
+
+def tight_sphere(pos) -> tuple[float, float, float, float]:
+    """``(cx, cy, cz, r)``: bounding-box centre and the distance to the farthest vertex (xyz interleaved)."""
+    xs, ys, zs = pos[0::3], pos[1::3], pos[2::3]
+    cx, cy, cz = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, (min(zs) + max(zs)) / 2
+    r = max(math.sqrt((x - cx) ** 2 + (y - cy) ** 2 + (z - cz) ** 2) for x, y, z in zip(xs, ys, zs))
+    return cx, cy, cz, r * (1 + 1e-6) + 1e-5
+
+
+def _face_normals(pos, tris) -> list[tuple[float, float, float, float]]:
+    """``(nx, ny, nz, |cross|)`` per triangle (unit normal and twice the area; zero for degenerate)."""
+    out = []
+    for a, b, c, _m in tris:
+        ax, ay, az = pos[3 * a], pos[3 * a + 1], pos[3 * a + 2]
+        ux, uy, uz = pos[3 * b] - ax, pos[3 * b + 1] - ay, pos[3 * b + 2] - az
+        vx, vy, vz = pos[3 * c] - ax, pos[3 * c + 1] - ay, pos[3 * c + 2] - az
+        nx, ny, nz = uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx
+        ln = math.sqrt(nx * nx + ny * ny + nz * nz)
+        out.append((nx / ln, ny / ln, nz / ln, ln) if ln > 1e-12 and math.isfinite(ln) else (0.0, 0.0, 0.0, 0.0))
+    return out
+
+
+def _bend(pos, tris, normals) -> float:
+    """Area-weighted mean angle (degrees) between corner normals and face normals (``shade.normal_bend``)."""
+    fn = _face_normals(pos, tris)
+    a_sum = b_sum = 0.0
+    for (a, b, c, _m), (fx, fy, fz, ln) in zip(tris, fn):
+        if not ln:
+            continue
+        s = 0.0
+        for i in (a, b, c):
+            nx, ny, nz = normals[3 * i], normals[3 * i + 1], normals[3 * i + 2]
+            nl = math.sqrt(nx * nx + ny * ny + nz * nz) or 1.0
+            d = max(-1.0, min(1.0, (fx * nx + fy * ny + fz * nz) / nl))
+            s += math.acos(d)
+        a_sum += ln
+        b_sum += ln * math.degrees(s / 3)
+    return b_sum / a_sum if a_sum else 0.0
+
+
+def _corner_angles(pos, tris) -> list[tuple[float, float, float]]:
+    """Interior angles (radians) at the three corners of every triangle (0 for degenerate ones)."""
+    out = []
+    for a, b, c, _m in tris:
+        p = [(pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]) for i in (a, b, c)]
+        ang = []
+        for k in range(3):
+            o, u, w = p[k], p[(k + 1) % 3], p[(k + 2) % 3]
+            ux, uy, uz = u[0] - o[0], u[1] - o[1], u[2] - o[2]
+            wx, wy, wz = w[0] - o[0], w[1] - o[1], w[2] - o[2]
+            lu = math.sqrt(ux * ux + uy * uy + uz * uz)
+            lw = math.sqrt(wx * wx + wy * wy + wz * wz)
+            if lu < 1e-12 or lw < 1e-12:
+                ang.append(0.0)
+                continue
+            d = max(-1.0, min(1.0, (ux * wx + uy * wy + uz * wz) / (lu * lw)))
+            ang.append(math.acos(d))
+        out.append(tuple(ang))
+    return out
+
+
+def smooth_geometry(pos, tris: list[tuple[int, int, int, int]], *, angle: float = 45.0, weld: float = 0.001,
+                    split_material: bool = True, uv=None) -> array:
+    """Seam-aware smooth normals of one mesh (xyz interleaved positions; triangles with material slots).
+
+    Positions are snapped to a ``weld`` grid: vertices in one cell are one position. The normal of a vertex
+    is the corner-angle-weighted sum of the normals of every face at its position that (1) is one of its own
+    faces, or (2) lies within ``angle`` degrees of the mean normal of its own faces, has the same material
+    (``split_material``) and, with ``uv``, the same texture coordinates at that position (a UV seam stays
+    hard). Vertex records are never merged, so the topology, UVs, prelight and skin weights are untouched.
+    """
+    nv = len(pos) // 3
+    fn = _face_normals(pos, tris)
+    ca = _corner_angles(pos, tris)
+    cos_lim = math.cos(math.radians(angle))
+    q = 1.0 / weld if weld > 0 else None
+
+    def key(i: int):
+        x, y, z = pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]
+        return (round(x * q), round(y * q), round(z * q)) if q else (x, y, z)
+
+    group = [key(i) for i in range(nv)]
+    corners: dict = {}                          # position key -> [(face, vertex at that corner, corner angle)]
+    own: list[list[tuple[int, float]]] = [[] for _ in range(nv)]
+    for f, (a, b, c, _m) in enumerate(tris):
+        for k, v in enumerate((a, b, c)):
+            corners.setdefault(group[v], []).append((f, v, ca[f][k]))
+            own[v].append((f, ca[f][k]))
+    out = array("f")
+    for v in range(nv):
+        mine = own[v]
+        if not mine:
+            out.extend((0.0, 0.0, 1.0))
+            continue
+        sx = sum(fn[f][0] * w for f, w in mine)
+        sy = sum(fn[f][1] * w for f, w in mine)
+        sz = sum(fn[f][2] * w for f, w in mine)
+        rl = math.sqrt(sx * sx + sy * sy + sz * sz)
+        ref = (sx / rl, sy / rl, sz / rl) if rl > 1e-12 else None
+        mats = {tris[f][3] for f, _w in mine}
+        uvv = (uv[2 * v], uv[2 * v + 1]) if uv is not None else None
+        used = {f for f, _w in mine}
+        for f, u, w in corners.get(group[v], ()):
+            if f in used:
+                continue
+            nx, ny, nz, ln = fn[f]
+            if not ln or ref is None:
+                continue
+            if nx * ref[0] + ny * ref[1] + nz * ref[2] < cos_lim:
+                continue
+            if split_material and tris[f][3] not in mats:
+                continue
+            if uvv is not None and (abs(uv[2 * u] - uvv[0]) > 1e-4 or abs(uv[2 * u + 1] - uvv[1]) > 1e-4):
+                continue
+            used.add(f)
+            sx += nx * w
+            sy += ny * w
+            sz += nz * w
+        ln = math.sqrt(sx * sx + sy * sy + sz * sz)
+        out.extend((sx / ln, sy / ln, sz / ln) if ln > 1e-12 and math.isfinite(ln) else (0.0, 0.0, 1.0))
+    return out
 
 
 def _smooth_normals(verts: bytes, nv: int, tris: list[tuple[int, int, int]]) -> bytes:

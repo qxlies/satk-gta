@@ -42,6 +42,7 @@ class ColFacts:
     label: str
     bbox: tuple[float, ...]
     embedded: bool
+    prims: int = 0            # spheres + boxes + mesh faces (0 = no collision at all)
 
 
 @dataclass(slots=True)
@@ -54,6 +55,7 @@ class _Prims:
     v1_verts: array | None  # COLL float vertices (for the ±256 m check)
     verts: array | None = None   # all vertices, xyz interleaved, in units of ``scale`` metres
     scale: float = 1.0
+    face_light: bytes | None = None  # COL2+: the lighting byte of every mesh face (low nibble day, high night)
 
 
 def _finite(vals) -> bool:
@@ -101,7 +103,7 @@ def _decode(buf, rec: int, m: ColModel) -> _Prims:
         return _Prims(None, spheres, boxes, ext[0] if ext else None, ext[1] if ext else None, verts, verts, 1.0)
     v = _V2.unpack_from(buf, o)
     flags = v[14]
-    o_sph, o_box, _o_lin, o_vrt, _o_face, _o_pln = v[15:21]
+    o_sph, o_box, _o_lin, o_vrt, o_face, _o_pln = v[15:21]
     base = rec + 4
     for i in range(m.spheres):
         cx, cy, cz, r = _SPH.unpack_from(buf, base + o_sph + 20 * i)[:4]
@@ -111,6 +113,10 @@ def _decode(buf, rec: int, m: ColModel) -> _Prims:
         boxes.append((b[0:3], b[3:6]))
     vmin = vmax = None
     raw = None
+    light = None
+    if m.faces:
+        fb = bytes(buf[base + o_face:base + o_face + 8 * m.faces])
+        light = fb[7::8]
     if m.verts:
         raw = array("h")
         raw.frombytes(bytes(buf[base + o_vrt:base + o_vrt + 6 * m.verts]))
@@ -118,7 +124,7 @@ def _decode(buf, rec: int, m: ColModel) -> _Prims:
         if ext:
             vmin = tuple(x / 128.0 for x in ext[0])
             vmax = tuple(x / 128.0 for x in ext[1])
-    return _Prims(flags, spheres, boxes, vmin, vmax, None, raw, 1.0 / 128.0)
+    return _Prims(flags, spheres, boxes, vmin, vmax, None, raw, 1.0 / 128.0, light)
 
 
 def _beyond_sphere(pr: _Prims, sphere) -> tuple[float, str]:
@@ -206,7 +212,7 @@ def check_col(c: Collector, label: str, buf, *, colfile: bool = False, only_idx:
             c.add("col.name_len", label, name=name, n=len(name))
         if colfile and m.size - 32 > cbuf:
             c.add("col.colfile_buffer", label, name=shown, size=m.size - 32)
-        out.append(ColFacts(name, label, tuple(m.bbox), embedded))
+        out.append(ColFacts(name, label, tuple(m.bbox), embedded, m.spheres + m.boxes + m.faces))
         if err is not None:
             c.add("col.body", label, idx=m.idx, err=err)
             continue
@@ -264,6 +270,10 @@ def check_col(c: Collector, label: str, buf, *, colfile: bool = False, only_idx:
             d, what = _beyond_sphere(pr, m.bsphere)
             if d > stol:
                 c.add("col.bsphere", label, name=shown, what=what, d=round(d, 2))
+        if pr.face_light is not None and not embedded:
+            c.seen("col.face_light_zero")
+            if not any(pr.face_light):
+                c.add("col.face_light_zero", label, name=shown, n=m.faces)
         odd = {k: v for k, v in m.surfaces.items() if k > smax}
         for mat, n in sorted(odd.items()):
             c.add("col.surface", label, name=shown, mat=mat, n=n)

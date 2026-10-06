@@ -18,7 +18,7 @@ from ..core.envelope import obj, table
 from ..core.errors import SatkError
 
 __all__ = ["kb_path", "connect", "fts_query", "search", "sym", "struct", "opcode", "fact", "status", "parse_addr",
-           "SOURCE_ORDER"]
+           "enum_members", "func_location", "source_rev", "class_bases", "SOURCE_ORDER"]
 
 SOURCE_ORDER = ("gta-reversed", "plugin-sdk", "mta-upstream", "mta-neon", "cleo-ai", "research", "facts")
 KIND_ORDER = ("func", "global", "struct", "vtable", "limit", "const", "enum", "define", "hookpos")
@@ -191,6 +191,8 @@ def search(q: str, *, source: str | None = None, kind: str | None = None, limit:
                 for r in con.execute("SELECT f.key, f.title, f.value, f.status FROM fact_fts JOIN fact f ON f.key = fact_fts.key "
                                      "WHERE fact_fts MATCH ? ORDER BY bm25(fact_fts) LIMIT ?", (fq, want)):
                     facts.append(["fact", r["key"], None, "facts", _cut(f"{r['title']}: {r['value']} [{r['status']}]")])
+                for f in _asset_match(q)[:want]:
+                    facts.append(["fact", f["key"], None, "facts", _cut(f"{f['title']}: {f['value']} [{_ASSET_STATUS}]")])
             if kind in (None, "opcode") and source in (None, "cleo-ai"):
                 for r in con.execute("SELECT o.op, o.name, o.ext, o.descr, o.line, f.path FROM opcode_fts "
                                      "JOIN opcode o ON o.id = opcode_fts.rowid LEFT JOIN file f ON f.id = o.file_id "
@@ -250,13 +252,92 @@ def _search_addr(con: sqlite3.Connection, addr: int, source: str | None, limit: 
 _KINDS = ("func", "global", "struct", "vtable", "limit", "const", "enum", "define", "hookpos")
 
 
+def _enum_rows(con: sqlite3.Connection, owner: str, source: str | None) -> tuple[str | None, list[sqlite3.Row]]:
+    """``(owner as stored, member rows in declaration order)`` of an enum type; exact name, then ``::name``."""
+    sf, sp = _src_filter(source)
+    for cond, arg in (("s.owner = ? COLLATE NOCASE", owner), ("s.owner LIKE ? ESCAPE '\\'",
+                                                               "%::" + owner.replace("_", "\\_"))):
+        rows = con.execute(f"{_SYM_SELECT} WHERE s.kind = 'enum' AND {cond}{sf}", [arg, *sp]).fetchall()
+        if rows:
+            best = min({r["src"] for r in rows}, key=lambda k: _SRC_RANK.get(k, 99))
+            rows = [r for r in rows if r["src"] == best]
+            first = min((r["path"] or "", r["line"] or 0) for r in rows)
+            rows = [r for r in rows if (r["path"] or "") == first[0]]   # one declaration (the first file)
+            rows.sort(key=lambda r: r["line"] or 0)
+            return rows[0]["owner"], rows
+    return None, []
+
+
+def enum_members(owner: str, *, source: str | None = None, path: Path | None = None) -> list[tuple[str, int | None]]:
+    """Members of an enum type as ``[(name, value)]`` in declaration order (gta-reversed first);
+    ``[]`` when the type is unknown. ``NOT_READY`` when the KB is not built."""
+    with closing(connect(path)) as con:
+        _own, rows = _enum_rows(con, owner, source)
+    out = []
+    for r in rows:
+        try:
+            v: int | None = int(str(r["sig"]), 0)
+        except (TypeError, ValueError):
+            v = None
+        out.append((r["name"], v))
+    return out
+
+
+def func_location(name_or_addr: str | int, *, path: Path | None = None) -> dict | None:
+    """Where a function lives in the indexed sources: ``{name, addr, sig, loc, path, line, src, hook,
+    reversed}`` (gta-reversed first, then plugin-sdk); ``None`` if no source declares it."""
+    with closing(connect(path)) as con:
+        if isinstance(name_or_addr, int):
+            cond, args = "s.addr = ?", [name_or_addr]
+        else:
+            a = parse_addr(name_or_addr)
+            cond, args = ("s.addr = ?", [a]) if a is not None else ("s.name = ? COLLATE NOCASE", [name_or_addr.strip()])
+        where = f"{_SYM_SELECT} WHERE s.kind = 'func' AND src.key IN ('gta-reversed', 'plugin-sdk') AND "
+        rows = con.execute(where + cond, args).fetchall()
+        if not rows and cond.startswith("s.name"):   # unqualified: Class::Name with exactly one class
+            esc = str(args[0]).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            rows = con.execute(where + "s.name LIKE ? ESCAPE '\\'", [f"%::{esc}"]).fetchall()
+            if len({r["name"].lower() for r in rows}) != 1:
+                rows = []
+    if not rows:
+        return None
+    r = sorted(rows, key=lambda r: (_SRC_RANK.get(r["src"], 99), r["path"] or "", r["line"] or 0))[0]
+    flags = json.loads(r["flags"]) if r["flags"] else {}
+    return {"name": r["name"], "addr": r["addr"], "sig": r["sig"], "loc": _loc(r["path"], r["line"]),
+            "path": r["path"], "line": r["line"], "src": r["src"], "hook": flags.get("hook"),
+            "reversed": flags.get("reversed")}
+
+
+def source_rev(key: str, *, path: Path | None = None) -> dict | None:
+    """``{"repo", "ref", "rev"}`` the KB read source ``key`` from (``repo`` as stored: workspace-relative or
+    absolute); ``None`` when the source is not in the KB."""
+    with closing(connect(path)) as con:
+        r = con.execute("SELECT repo, ref, rev FROM source WHERE key = ?", (key,)).fetchone()
+    if r is None or not r["repo"] or not r["rev"]:
+        return None
+    return {"repo": r["repo"], "ref": r["ref"], "rev": r["rev"]}
+
+
 def sym(name: str, *, kind: str | None = None, source: str | None = None, limit: int = 20,
         cursor: str | None = None, path: Path | None = None) -> dict:
-    """Symbols by name (exact, ``::member``, prefix, substring) or by address."""
+    """Symbols by name (exact, ``::member``, prefix, substring) or by address.
+
+    An enum type name (``eCarPiece``) lists the members of that enum in declaration order.
+    """
     off = _offset(cursor)
     if kind is not None and kind not in _KINDS:
         raise SatkError("BAD_PARAMS", f"unknown kind {kind!r}", did_you_mean=list(_KINDS))
     with closing(connect(path)) as con:
+        if kind in (None, "enum") and parse_addr(name) is None:
+            owner, members = _enum_rows(con, name.strip(), source)
+            if members and not con.execute("SELECT 1 FROM sym WHERE name = ? COLLATE NOCASE AND kind != 'enum' "
+                                           "LIMIT 1", (name.strip(),)).fetchone():
+                page = members[off:off + limit]
+                env = table(["name", "value", "loc", "src"],
+                            [[r["name"], r["sig"], _loc(r["path"], r["line"]), r["src"]] for r in page],
+                            total=len(members), next=f"o:{off + limit}" if len(members) > off + limit else None)
+                env.update({"enum": owner, "match": "enum type"})
+                return env
         sf, sp = _src_filter(source)
         kf, kp = (" AND s.kind = ?", [kind]) if kind else ("", [])
         addr = parse_addr(name)
@@ -329,6 +410,26 @@ def _pick_struct(con: sqlite3.Connection, name: str, source: str | None) -> sqli
         return (not exact, _SRC_RANK.get(r["src"], 99), verdict.get(r["layout"], 9), -(r["nfields"] or 0), r["id"])
 
     return sorted(rows, key=key)[0]
+
+
+def class_bases(name: str, *, depth: int = 8, path: Path | None = None) -> list[str]:
+    """Base classes of ``name``, nearest first (``CAutomobile`` -> ``CVehicle, CPhysical, CEntity, CPlaceable``).
+
+    First base only per level (single-inheritance chain of the engine classes); ``[]`` without a hit.
+    """
+    out: list[str] = []
+    with closing(connect(path)) as con:
+        cur = name
+        while len(out) < depth:
+            st = _pick_struct(con, cur, None)
+            if st is None or not st["bases"]:
+                break
+            nxt = st["bases"].split(",")[0].strip()
+            if not nxt or nxt in out or nxt == name:
+                break
+            out.append(nxt)
+            cur = nxt
+    return out
 
 
 def _fields(con: sqlite3.Connection, sid: int) -> list[sqlite3.Row]:
@@ -512,19 +613,95 @@ def opcode(q: str, *, ext: str | None = None, limit: int = 20, path: Path | None
 # --------------------------------------------------------------------------- fact
 
 
+_ASSET_STATUS = "tested"
+
+
+def _asset_facts() -> list[dict]:
+    from .facts import ASSET_FACTS
+
+    return ASSET_FACTS
+
+
+def _asset_text(f: dict) -> str:
+    return " ".join([f["key"], f["title"], f["value"], f.get("note") or "", *f.get("refs", [])]).lower()
+
+
+def _asset_match(q: str) -> list[dict]:
+    """Authoring facts whose key/title/value/refs hold every word of ``q`` (key prefix first)."""
+    q = q.strip()
+    facts = _asset_facts()
+    pre = [f for f in facts if f["key"].lower() == q.lower() or f["key"].lower().startswith(q.lower().rstrip(".") + ".")]
+    if pre:
+        return pre
+    words = [t.lower() for t in _TOKEN.findall(q)]
+    return [f for f in facts if words and all(w in _asset_text(f) for w in words)]
+
+
+def _asset_obj(f: dict) -> dict:
+    from .facts import CONFIDENCE
+
+    return obj(None, key=f["key"], title=f["title"], value=f["value"], refs=f.get("refs") or None,
+               sources=f.get("sources") or None, confidence=CONFIDENCE.get(f["conf"], f["conf"]),
+               status=_ASSET_STATUS, note=f.get("note"), verify=f.get("verify") or None,
+               checks={"cols": ["check"], "rows": [[" ".join(str(x) for x in c)] for c in f["checks"]]}
+               if f.get("checks") else None)
+
+
+def _asset_rows(facts: list[dict]) -> list[list]:
+    from .facts import CONFIDENCE
+
+    return [[f["key"], f["title"], _cut(f["value"], 140), CONFIDENCE.get(f["conf"], f["conf"]), _ASSET_STATUS]
+            for f in facts]
+
+
 def fact(key: str | None = None, *, status_filter: str | None = None, limit: int = 50,
          path: Path | None = None) -> dict:
-    """One fact (exact key) or a table of facts (topic prefix, words, or all)."""
+    """One fact (exact key) or a table of facts (topic prefix, words, or all).
+
+    Engine facts come from the built KB. Authoring facts (``asset.*``, :data:`satk.kb.facts.ASSET_FACTS`,
+    status ``tested``) are served from the package: ``asset`` lists them, words match them too, and the
+    full list names how many there are (``asset_facts``).
+    """
+    if key and key.strip().lower().startswith("asset"):
+        hits = _asset_match(key)
+        if len(hits) == 1 and hits[0]["key"].lower() == key.strip().lower():
+            return _asset_obj(hits[0])
+        if hits and status_filter in (None, _ASSET_STATUS):
+            return table(["key", "title", "value", "confidence", "status"], _asset_rows(hits)[:limit], total=len(hits))
+    if status_filter == _ASSET_STATUS:
+        hits = _asset_match(key) if key else _asset_facts()
+        return table(["key", "title", "value", "confidence", "status"], _asset_rows(hits)[:limit], total=len(hits))
+    try:
+        return _db_fact(key, status_filter=status_filter, limit=limit, path=path)
+    except SatkError as e:
+        if e.code != "NOT_FOUND" or not key:
+            raise
+        hits = _asset_match(key)
+        if not hits:
+            raise
+        return table(["key", "title", "value", "confidence", "status"], _asset_rows(hits)[:limit], total=len(hits))
+
+
+def _code_facts() -> dict[str, dict]:
+    """Engine facts of this package by key: their text wins over a KB built before a wording change
+    (the facts were translated to English; ``status``/``checks`` still come from the build)."""
+    from .facts import FACTS
+
+    return {f["key"]: f for f in FACTS}
+
+
+def _db_fact(key: str | None, *, status_filter: str | None, limit: int, path: Path | None) -> dict:
     with closing(connect(path)) as con:
         if key:
             r = con.execute("SELECT * FROM fact WHERE key = ? COLLATE NOCASE", (key,)).fetchone()
             if r is not None:
                 checks = json.loads(r["checks"]) if r["checks"] else []
-                return obj(None, key=r["key"], title=r["title"], value=r["value"],
+                cur = _code_facts().get(r["key"]) or {}
+                return obj(None, key=r["key"], title=cur.get("title") or r["title"], value=cur.get("value") or r["value"],
                            addrs=json.loads(r["addrs"]) if r["addrs"] else None,
                            refs=json.loads(r["refs"]) if r["refs"] else None,
                            sources=json.loads(r["sources"]) if r["sources"] else None,
-                           confidence=r["confidence"], status=r["status"], note=r["note"],
+                           confidence=r["confidence"], status=r["status"], note=cur.get("note") or r["note"],
                            checks={"cols": ["check", "expected", "got", "ok"], "rows": checks} if checks else None)
         where, params = [], []
         if key:
@@ -545,8 +722,15 @@ def fact(key: str | None = None, *, status_filter: str | None = None, limit: int
         sql = "SELECT key, title, value, confidence, status FROM fact" + (" WHERE " + " AND ".join(where) if where else "") \
             + " ORDER BY rowid"
         rows = con.execute(sql, params).fetchall()
-        out = [[r["key"], r["title"], _cut(r["value"], 140), r["confidence"], r["status"]] for r in rows[:limit]]
-        return table(["key", "title", "value", "confidence", "status"], out, total=len(rows))
+        code = _code_facts()
+        out = [[r["key"], (code.get(r["key"]) or {}).get("title") or r["title"],
+                _cut((code.get(r["key"]) or {}).get("value") or r["value"], 140), r["confidence"], r["status"]]
+               for r in rows[:limit]]
+        env = table(["key", "title", "value", "confidence", "status"], out, total=len(rows))
+        if not key and not status_filter:
+            env["asset_facts"] = len(_asset_facts())
+            env["hint"] = "authoring facts (asset.*): satk kb fact asset"
+        return env
 
 
 # --------------------------------------------------------------------------- status

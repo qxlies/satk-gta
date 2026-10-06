@@ -123,3 +123,24 @@ def test_schema_topic_lists_notes_tables():
 def test_op_signature():
     sig = H.op_signature(R.op_by_mcp("note"))
     assert sig.startswith('note(action="add", id=null, text=null')
+
+
+def test_find_topics_and_operations():
+    env = H.find("crash address", limit=50)
+    rows = env["rows"]
+    assert env["cols"] == ["kind", "name", "run", "summary"]
+    assert ["topic", "re", "satk help re"] in [r[:3] for r in rows]
+    ops = [r[1] for r in rows if r[0] == "op"]
+    assert "re.addr" in ops and "crash.analyze" in ops
+    assert rows.index(next(r for r in rows if r[0] == "op")) > 0       # topics first
+    gate = H.find("acceptance gate")
+    assert any(r[1] == "dev.gate" and "(CLI only:" in r[3] for r in gate["rows"])
+    with pytest.raises(SatkError):
+        H.find("   ")
+    none = H.find("zzqqxx")
+    assert none["total"] == 0 and "satk help --all" in none["hint"]
+
+
+def test_ops_topic_names_the_cli_aliases():
+    text = H.render("ops")["text"]
+    assert "`satk ops <words>`" in text and "satk help --find" in text and "--out FILE" in text

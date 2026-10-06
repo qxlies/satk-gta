@@ -45,8 +45,10 @@ in degrees; `cover` is the share of model pixels in each view (close to 0 means 
 | `satk model image --all --size 128 --views 1 [--jobs 12] [--force]` | `model_image` (`all`; long-running) | thumbnails of every model with a DFF; finished ones are skipped; manifest `<work>/out/models/thumbs-<profile>-<size>x<views>.json` |
 | `satk asset export ID --format glb\|obj\|png\|raw [--out DIR]` | `asset_export` | exports a model; `png` = its textures, `raw` = DFF + TXD chain + COL as in the game |
 
-`ID` is `model:411`, `model:infernus`, plain `411` or `infernus`, `dff:infernus` (the model with that DFF name)
-or `inst:lae2_stream0#4` (the model of that placement). Every command takes `--profile` (default `vanilla`).
+`ID` is `model:411`, `model:infernus`, plain `411` or `infernus`, `dff:infernus` (the model with that DFF name),
+`inst:lae2_stream0#4` (the model of that placement) or the path of your own `.dff` file (the `.txd` of the same
+name next to it is used; a vehicle also gets the game's `vehicle.txd` and satk's default paint; no index is
+needed except for that `vehicle.txd`). Every command takes `--profile` (default `vanilla`).
 `--out` is accepted only inside `<work>`.
 
 ## How it works
@@ -56,14 +58,17 @@ or `inst:lae2_stream0#4` (the model of that placement). Every command takes `--p
   car); the azimuth grows counter-clockwise seen from above. Four views are 45/135/225/315° at 25° elevation.
   Each view is framed to the model with a 5% margin.
 - Colour = texture (nearest texel, mip level chosen by the triangle's size on screen) × material colour ×
-  vertex prelit colour. On top of that a soft two-sided "headlamp" from the camera; models without prelit
-  (vehicles, peds) get ambient + diffuse light.
+  light, with the numbers of the game look ([look.md](look.md)): lit models (vehicles, peds, objects) get the
+  object ambient plus the directional light of noon in the profile's `timecyc.dat` (one fixed light direction,
+  shared with the Blender previews), prelit models get their day prelight plus the ambient; then the game's
+  colour filter and display gamma. Car bodies on `vehiclegrunge256` show dirt level 2.
 - Alpha: textures with alpha are clipped at 0.5; a translucent material colour (vehicle glass) is blended as one
   layer over the nearest opaque surface.
 - Up to 256 px per view, 2× supersampling is used. The background is `#b2bac4`.
 - As in the game: vehicles hide `*_dam` and `*_vlo`, the `wheel` is copied onto the empty `wheel_??_dummy`
   frames, the paint colour keys are replaced with the first colour pair from `data\carcols.dat`, and the light
-  keys with white and red. Peds (skinned, `Pelvis` bone) are stood upright facing +Y.
+  lamp materials on `vehiclelights128` are drawn white (the engine's rule; a lamp key on another texture stays as
+  it is). Peds (skinned, `Pelvis` bone) are stood upright facing +Y.
 - A model without a DFF (for example `model:300` `cutobj01`, `hier`) gives a grey placeholder and the warning
   `NO_DFF`, not an error.
 
@@ -97,7 +102,8 @@ not stop the run: they are listed in the answer (`errors`, the first 50) and in 
 
 ## Limitations and known issues
 
-- The lighting is schematic (no shadows, reflections or night mode); for a "pretty" frame use `--backend blender`.
+- No shadows, reflections or night mode in `soft`; the full game look (glass, env, day/night, lineups) is
+  `satk blender preview` ([look.md](look.md)).
 - Animations are not applied: peds and `anim` objects stay in the pose of the DFF.
 - `--backend ariane` draws one view per call; the viewer may fail to load vehicles and peds, and then the
   fallback to `soft` kicks in.
@@ -112,6 +118,13 @@ not stop the run: they are listed in the answer (`errors`, the first 50) and in 
 from satk.model3d import api
 api.image("model:411", views=4, size=384)            # envelope: file, backend, legend, stats
 api.export("model:411", "glb")                        # envelope: files, stats
+m = api.load("model:426")                             # the decoded model, no rendering
+m.src.txd_chain                                       # [BlobRef] own TXD, txdp parents, vehicle.txd
+for part in m.scene.parts:                            # one per atomic: name, geometry, model-space matrix
+    mesh = m.scene.meshes[part.geom]                  # positions, tris, normals, uv sets, prelit, mat_ids
+for f in m.scene.frames:                              # frame tree: idx, parent, name, local and model matrices
+    print(f.name, f.model[9:12])                      # matrices are (right, up, at, pos) 12-float tuples
+m.mats[0][0].rgba, m.mats[0][0].tex                   # per geometry and slot: colour (paint applied), texture
 from satk.model3d.batch import thumbnails
 thumbnails(size=128, views=1, jobs=12)                # thumbnails of every model
 ```

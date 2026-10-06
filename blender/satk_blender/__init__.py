@@ -314,6 +314,7 @@ class SATK_OT_export(bpy.types.Operator):
             r = exporter.export({"objects": names}, str(out))
             prof = context.scene.get("satk_profile") or _profile()
             warn = resolve.fill_export_defs(r["models"], profile=prof)
+            warn += packaging.pack_txds(out, r["models"])      # the TXD of the own textures: DXT through satk.texmod
             atomic_write(out / "export.json", json.dumps({"target": p.target, "name": nm, "profile": prof,
                                                           "models": r["models"]}, ensure_ascii=False, indent=1) + "\n")
             warn += packaging.write_package(out, p.target, nm)["warn"]

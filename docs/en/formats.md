@@ -35,14 +35,23 @@ What comes back (shortened, third command):
 | Command | MCP | What it does |
 |---|---|---|
 | `satk formats selftest [--root R] [--profile vanilla\|installed\|samp] [--quick] [--bench] [--geometry] [--dxt]` | — | parses the whole game and compares 99 counters with the reference numbers of the vanilla game (about 5 s; `--quick` skips TXD and DFF, about 1 s; `--geometry` decodes every gta3/gta_int geometry; `--dxt` compares the DXT decoder backends on reference textures and measures their speed) |
-| `satk formats ls IMG [--name S] [--ext E] [--limit N] [--cursor C] [--profile P]` | — | entries of an IMG archive (the path is absolute or relative to the profile's game root, any case) |
-| `satk formats dump TARGET [--level stats\|full\|tree] [--limit N] [--profile P]` | — | describes a file or an `<img>/<entry>`: IMG, TXD, DFF, COL, IFP, IDE, IPL, ZON, DAT; `tree` is the raw RW chunk tree (of a broken file too). A file under the profile's root gets its canonical SID in `id` (`file:data/maps/la/lae2.ipl`, however the path was spelled); a file outside the root gets `path` (and `entry` for an IMG entry) without a SID |
+| `satk formats ls IMG [--name S] [--ext E] [--limit N] [--cursor C] [--profile P]` | — | entries of an IMG archive (the path is absolute, relative to the current folder, or relative to the profile's game root, any case) |
+| `satk formats dump TARGET [--level stats\|full\|tree] [--limit N] [--cursor C] [--profile P]` | — | describes a file or an `<img>/<entry>`: IMG, TXD, DFF, COL, IFP, IDE, IPL, ZON, DAT; `tree` is the raw RW chunk tree (of a broken file too). A file under the profile's root gets its canonical SID in `id` (`file:data/maps/la/lae2.ipl`, however the path was spelled); a file outside the root gets `path` (and `entry` for an IMG entry) without a SID |
 
 None of the three has an MCP tool of its own: an agent runs them through `satk_op` (for example
 `satk_op("formats.dump", {"target": "models/gta3.img/infernus.dff"})`). From Blender:
 `selftest.main(['--root', r'<game folder>', '--quick'])` (exit code 0/1, JSON on stdout).
 
 ## How it works
+
+- **Paths.** A relative path is looked up in the current folder first, then under the profile's game root;
+  `resolved_from` says which (`cwd`, `profile`, `absolute`). When both have the file, the current folder wins
+  with a `PATH_SHADOWS` warning; a `file:` SID always means the game file. `model:`, `dff:`, `inst:` and `txd:`
+  SIDs are looked up in the profile's index (`satk formats dump model:426` dumps the premier DFF;
+  `resolved_from` is `index`).
+- **Paging.** `--level full` and `tree` cut every list (rows, `geom_rows`, `frame_names`, `effects_list`) at
+  `--limit` (20, at most 500). A cut answer names the lists in `truncated` (`"frames 20 of 51"`), warns with
+  `TRUNCATED` and gives `next`: repeat with `--cursor <next>` for the following page of every list.
 
 | Module | What |
 |---|---|

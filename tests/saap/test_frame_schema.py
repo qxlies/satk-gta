@@ -121,7 +121,7 @@ def test_invalid_unicode_token_is_rejected(token):
 
 def test_methods_and_capabilities():
     m = S.methods()
-    assert len(m) == 21
+    assert len(m) == 30  # 23 core methods + 7 scene.*
     assert m["capture"] == "capture" and m["raycast"] == "pick" and m["hello"] == "core"
     assert m["world.settle"] == "world.settle" and m["mem.read"] == "mem.read"
     for method in m:
@@ -244,8 +244,8 @@ def test_envelopes():
 def test_spec_document_matches_schemas():
     r = specdoc.check()
     assert r["errors"] == []
-    assert r["methods"] == r["documented"] == 21
-    assert r["examples"] >= 42
+    assert r["methods"] == r["documented"] == 30
+    assert r["examples"] >= 60
 
 
 def test_spec_document_check_finds_problems(tmp_path):

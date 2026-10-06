@@ -112,3 +112,36 @@ def test_plugin_skill_is_the_published_skill():
     copy = PLUGIN / "satk" / "skills" / "satk" / "SKILL.md"
     assert copy.read_bytes() == SKILL.read_bytes(), \
         "refresh it: satk agent install-skill --dest .claude-plugin/satk/skills"
+
+
+# --------------------------------------------------------------------------- companion files (style guides, brief)
+
+
+def _companions() -> list[str]:
+    from satk.docs.sync import skill_files
+
+    return skill_files(SKILL.parent)
+
+
+def test_companion_files_travel_with_the_skill(home, tmp_path, run_cli):
+    rels = _companions()
+    assert "style/README.md" in rels and "briefs/asset-brief.md" in rels
+    dest = tmp_path / "other"
+    env = run_cli(["agent", "install-skill", "--dest", str(dest)]).json
+    assert env["rows"][0][2:] == ["ok", "installed"]
+    for rel in rels:
+        assert (dest / "satk" / rel).read_bytes() == (SKILL.parent / rel).read_bytes(), rel
+    assert run_cli(["agent", "install-skill", "--dest", str(dest), "--check"]).code == 0
+    (dest / "satk" / "style" / "README.md").write_text("stale\n", encoding="utf-8")
+    r = run_cli(["agent", "install-skill", "--dest", str(dest), "--check"])
+    assert r.code == 1 and r.json["error"]["code"] == "REVISION"
+    env = run_cli(["agent", "install-skill", "--dest", str(dest)]).json
+    assert env["rows"][0][2:] == ["ok", "updated"]
+    assert (dest / "satk" / "style" / "README.md").read_bytes() == (SKILL.parent / "style" / "README.md").read_bytes()
+
+
+def test_plugin_carries_the_companion_files():
+    root = PLUGIN / "satk" / "skills" / "satk"
+    for rel in _companions():
+        assert (root / rel).read_bytes() == (SKILL.parent / rel).read_bytes(), \
+            f"refresh it: satk agent install-skill --dest .claude-plugin/satk/skills ({rel})"

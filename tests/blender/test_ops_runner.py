@@ -20,7 +20,8 @@ from satk.core.registry import all_ops, get_op, op_by_mcp
 
 
 def test_ops_registered():
-    names = {o.name for o in all_ops() if o.name.startswith("blender.")}
+    # satk.studio adds blender.session/call/methods (CLI only); this package's own operations:
+    names = {o.name for o in all_ops() if o.name.startswith("blender.") and o.module == "satk.blender.ops"}
     assert names == {"blender.doctor", "blender.import_model", "blender.import_area", "blender.render",
                      "blender.export", "blender.addon_build", "blender.run", "blender.game_ready"}
     mcp = [o for o in all_ops() if o.name.startswith("blender.") and o.mcp_name]

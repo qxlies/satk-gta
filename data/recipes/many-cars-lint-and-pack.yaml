@@ -1,0 +1,54 @@
+# satk recipe (shipped). Run: satk recipe run many-cars-lint-and-pack --var cars=<folder> [--var img=mycars.img]
+name: many-cars-lint-and-pack
+summary: Lint every DFF and TXD under a folder of cars (one batch each, in threads), audit textures, check ids, pack all files into one new IMG and list it; optionally make an add-on folder per car (mod add).
+description: |
+  Subfolders are included (one folder per car is fine; file names must stay unique for the IMG).
+  Outputs in out_dir: lint-dff.jsonl and lint-txd.jsonl (one record per file; 'satk batch report <file>
+  --status fail' lists the files that failed) and the new IMG. Packing runs even when some files failed:
+  the recipe then still answers CHECK_FAILED. With 'addons' (a list file such as
+  {"kind": "vehicle", "dff": "<cars>/alpha/alpha.dff", "txd": "<cars>/alpha/alpha.txd", "like": "infernus", "name": "alpha"}
+  per line) each car also becomes a Mod Loader add-on folder with a free id (skipped when 'mod add' is not installed).
+vars:
+  cars: {required: true, help: "folder with the cars' DFF and TXD files"}
+  img: {default: cars.img, help: "file name of the new IMG"}
+  out_dir: {default: "${work}/out/cars-pack", help: "folder for the lint results and the IMG"}
+  fail_on: {default: error, help: "lint severity that fails a file: info, warn, error or fatal"}
+  profile: {default: vanilla, help: "index profile for names outside the folder (vanilla TXDs and COLs)"}
+  jobs: {default: 4, help: "lint threads"}
+  addons: {default: null, help: "optional list file, one JSON line of 'mod add' arguments per car (kind, dff, txd, like, name): a Mod Loader add-on folder per car"}
+steps:
+  - id: lint_dff
+    op: batch
+    args: {op: asset.lint, over: "${cars}/**/*.dff", arg: ["fail_on=${fail_on}"], profile: "${profile}",
+           jobs: "${jobs}", keep: brief, allow_empty: true, out: "${out_dir}/lint-dff.jsonl"}
+    on_error: continue
+  - id: lint_txd
+    op: batch
+    args: {op: asset.lint, over: "${cars}/**/*.txd", arg: ["fail_on=${fail_on}"], profile: "${profile}",
+           jobs: "${jobs}", keep: brief, allow_empty: true, out: "${out_dir}/lint-txd.jsonl"}
+    on_error: continue
+  - id: textures
+    op: texture.audit
+    input: ${cars}
+    args: {profile: "${profile}", limit: 20}
+    on_error: continue
+  - id: ids
+    op: id.conflicts
+    input: ${cars}
+    args: {profile: "${profile}"}
+    on_error: continue
+    fail_if: "${steps.ids.errors|default:0}"
+  - id: pack
+    op: img.build
+    input: ${cars}
+    args: {out: "${out_dir}/${img}", recursive: true, overwrite: true}
+  - id: verify
+    op: formats.ls
+    input: ${steps.pack.path}
+    args: {limit: 20}
+  - id: addons
+    op: batch
+    requires: mod.add
+    args: {op: mod.add, over: "@${addons}", out: "${out_dir}/addons.jsonl", keep: brief}
+    when: "${addons}"
+    on_error: continue

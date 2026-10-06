@@ -206,6 +206,8 @@ def agent_install_skill(client: Literal["claude", "codex", "all"] = "all",
     Claude Code reads ``~/.claude/skills`` (``$CLAUDE_CONFIG_DIR/skills``) and ``<project>/.claude/skills``;
     Codex reads ``~/.agents/skills`` and ``<project>/.agents/skills``. A different existing copy there is kept
     as ``SKILL.md.satk-backup``. Other AI clients: ``--dest`` (no backup; or reference the file from AGENTS.md).
+    The skill's companion files (the style guides ``style/*.md`` and the brief template ``briefs/*.md`` next to
+    the source) are copied into the same ``satk`` folder; a copy is current only when they are too.
 
     Args:
         client: claude, codex or all.
@@ -227,7 +229,10 @@ def agent_install_skill(client: Literal["claude", "codex", "all"] = "all",
     rows = []
     for who, d in targets:
         r = S.install(d, text, check=check, backup=dest is None)
-        rows.append([who, r["path"], r["status"], r["action"]])
+        current, wrote = _install_companions(S.source().parent, d / S.SKILL_NAME, check=check)
+        status = "differs" if r["status"] == "ok" and not current and check else r["status"]
+        action = "updated" if r["action"] == "none" and wrote else r["action"]
+        rows.append([who, r["path"], status, action])
     bad = [r for r in rows if r[2] != "ok"]
     if check and bad:
         raise SatkError("NOT_FOUND" if all(r[2] == "missing" for r in bad) else "REVISION",
@@ -235,6 +240,26 @@ def agent_install_skill(client: Literal["claude", "codex", "all"] = "all",
                         hint="satk agent install-skill" + ("" if dest is None else f" --dest {dest}"),
                         data={"cols": ["client", "path", "status"], "rows": [r[:3] for r in rows]})
     return {"source": jpath(S.source()), **table(["client", "path", "status", "action"], rows)}
+
+
+def _install_companions(src_dir: Path, dst_dir: Path, *, check: bool) -> tuple[bool, bool]:
+    """Copy (or with ``check`` only compare) the skill's companion files: ``(were all current, wrote any)``."""
+    from satk.docs.sync import skill_files
+
+    current, wrote = True, False
+    for rel in skill_files(src_dir):
+        data = (src_dir / rel).read_bytes()
+        dst = dst_dir / rel
+        try:
+            same = dst.read_bytes() == data
+        except FileNotFoundError:
+            same = False
+        if not same:
+            current = False
+            if not check:
+                atomic_write(dst, data)
+                wrote = True
+    return current, wrote
 
 
 @op("mcp.ops",

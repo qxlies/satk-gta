@@ -261,10 +261,10 @@ def blender_render(blend: str | None = None, pos: list[float] | None = None, loo
 
 
 @op("blender.export",
-    summary="Export models of a .blend with DragonFF (DFF, TXD RGBA8888, COL) plus IDE/IPL and, for "
-            "mta-resource, meta.xml + client.lua; only into work/out/exports, never into an IMG.",
-    summary_ru="Экспорт моделей .blend через DragonFF (DFF, TXD RGBA8888, COL) + IDE/IPL, для mta-resource — "
-               "meta.xml и client.lua; только в work/out/exports, никогда в IMG.",
+    summary="Export models of a .blend with DragonFF (DFF, COL) and satk.texmod (TXD of own textures, DXT) plus IDE/IPL "
+            "and, for mta-resource, meta.xml + client.lua; only into work/out/exports, never into an IMG.",
+    summary_ru="Экспорт моделей .blend через DragonFF (DFF, COL) и satk.texmod (TXD своих текстур, DXT) + IDE/IPL, для "
+               "mta-resource — meta.xml и client.lua; только в work/out/exports, никогда в IMG.",
     mcp=False, long_running=True,
     examples=("satk blender export --blend <scene.blend> --objects lae2_roads89 --target mta-resource",))
 def blender_export(blend: str | None = None, objects: list[str] | None = None,
@@ -305,6 +305,7 @@ def blender_export(blend: str | None = None, objects: list[str] | None = None,
     manifest = json.loads(manifest_p.read_text(encoding="utf-8"))
     # .blend files imported before the IDE data was kept: complete it from the game data
     warn = resolve.fill_export_defs(manifest.get("models") or [], profile=manifest.get("profile") or "vanilla")
+    warn += packaging.pack_txds(d, manifest.get("models") or [])      # DXT through satk.texmod, own textures only
     atomic_write(manifest_p, json.dumps(manifest, ensure_ascii=False, indent=1) + "\n")
     pkg = packaging.write_package(d, target, nm)
     files = dict(resp.get("files") or {})
@@ -317,77 +318,103 @@ def blender_export(blend: str | None = None, objects: list[str] | None = None,
 # --------------------------------------------------------------------------- game-ready (M2-08)
 
 
+GrClass = Literal["prop", "building", "terrain", "vegetation", "interior_prop", "interior_shell", "pickup", "overlay"]
+
+
 @op("blender.game_ready",
-    summary="Make a mesh (.blend/.obj/.glb/.fbx/.ply/.stl) game-ready: decimate to a triangle budget, UV, bake "
-            "day/night prelight, COL hull/box/mesh, LOD; DFF + COL via DragonFF (+ TXD or PNGs) into "
-            "work/out/blender/<name>, checked with satk.formats.",
-    summary_ru="Сделать меш (.blend/.obj/.glb/.fbx/.ply/.stl) игровым: decimate под бюджет, UV, prelight день/ночь, "
-               "COL (оболочка/бокс/меш), LOD; DFF + COL через DragonFF (+ TXD или PNG) в work/out/blender/<имя>.",
+    summary="Make a mesh (.blend/.obj/.glb/.fbx/.ply/.stl) game-ready: decimate to a triangle budget, UV at the "
+            "class texel density, bake day/warm-night prelight, COL hull/box/mesh with face light, LOD, draw <= 300 "
+            "with COL; DFF + COL via DragonFF (+ TXD) into work/out/blender/<name>, checked.",
+    summary_ru="Сделать меш (.blend/.obj/.glb/.fbx/.ply/.stl) игровым: decimate под бюджет, UV по плотности класса, "
+               "prelight день/тёплая ночь, COL со светом граней, LOD, draw <= 300 с COL; DFF + COL (+ TXD).",
     mcp=False, long_running=True,
-    examples=("satk blender game-ready <workspace>/work/tmp/crate.obj --name crate --col box",
+    examples=("satk blender game-ready <workspace>/work/tmp/crate.obj --name crate --asset-class prop",
               "satk blender game-ready scene.blend --objects Statue --budget 600 --height 2.5 --render"))
-def blender_game_ready(src: str, name: str | None = None, objects: list[str] | None = None, budget: int = 1040,
+def blender_game_ready(src: str, name: str | None = None, objects: list[str] | None = None, budget: int | None = None,
                        height: float | None = None, scale: float = 1.0,
                        origin: Literal["base", "center", "keep"] = "base",
                        uv: Literal["auto", "keep", "smart", "box"] = "auto",
                        bake: Literal["auto", "always", "never"] = "auto", tex_size: int = 256,
                        prelight: Literal["bake", "simple", "none"] = "bake",
-                       col: Literal["hull", "box", "mesh", "none"] = "hull", surface: int = 0, lod: float = 0.25,
-                       draw: float = 150.0, out: str | None = None, render: bool = False,
-                       timeout: float = 600) -> dict:
+                       col: Literal["hull", "box", "mesh", "none"] | None = None, surface: int = 0,
+                       lod: float | None = None, draw: float | None = None, out: str | None = None,
+                       render: bool = False, asset_class: GrClass | None = None,
+                       tier: Literal["vanilla", "sa_plus"] = "vanilla", timeout: float = 600) -> dict:
     """Make a model game-ready (report 22 §7: budget, UV, prelight, COL, LOD, export).
 
     Args:
         src: source file: .blend (opened read-only, saved elsewhere), .obj, .glb, .gltf, .fbx, .ply or .stl.
         name: model name, 1-21 characters a-z 0-9 _ (default: the file name); also the TXD and COL name.
         objects: objects of a .blend to take (default: every visible mesh); children are included.
-        budget: HD triangle budget (vanilla map models: p50 216, p90 1040).
+        budget: HD triangle budget (default: the class p90, else 1040 = vanilla map p90).
         height: scale the model to this height in metres (instead of scale).
         scale: uniform scale factor.
         origin: base (bottom centre), center (bounding box centre) or keep.
-        uv: auto (keep existing UVs, else smart), keep, smart or box (cube projection, 32 px/m).
+        uv: auto (keep existing UVs, else smart), keep, smart or box (cube projection at the class texel density).
         bake: auto (bake procedural/vertex colours or re-unwrapped textures into one texture), always, never.
         tex_size: largest texture side (power of two, 16..1024).
-        prelight: bake (Cycles AO + sun/sky, day and night), simple (normals only) or none.
-        col: hull (convex hull), box (AABB), mesh (the decimated mesh) or none.
+        prelight: bake (Cycles AO + sun/sky, day and a warm night), simple (normals only) or none.
+        col: hull (convex hull), box (AABB), mesh (the decimated mesh) or none (default: the class's, else hull).
         surface: COL surface type 0..178 (eSurfaceType: 0 default, 4 pavement, 43 solid wood, 51 metal plate).
-        lod: share of triangles in the LOD model lod<name> (0 = no LOD).
-        draw: IDE draw distance of the model (the LOD gets 800).
+        lod: share of triangles in the LOD model lod<name> (0 = no LOD; default: the class's, else 0.25).
+        draw: IDE draw distance (default: the class's, else 150); at most 300 with collision (big-building rule).
         out: output folder under work/ (default work/out/blender/<name>).
         render: also render a preview PNG of the result.
+        asset_class: vanilla class: texel density by size bucket (228 px/m at 0.5-1 m ... 33 px/m above 128 m),
+            draw distance, collision, LOD and IDE flags (satk kit kinds --classes).
+        tier: vanilla or sa_plus (1.5x the class texel density).
         timeout: seconds to wait for Blender.
     """
-    from . import contract as C
     from . import gameready, runner
 
     sp = Path(src).expanduser()
     if not sp.is_file():
         raise SatkError("NOT_FOUND", f"no source file at {jpath(sp)}",
                         hint="a .blend, .obj, .glb, .gltf, .fbx, .ply or .stl file")
-    a = _contract("game_ready", {"src": jpath(sp.resolve()), "name": name, "objects": objects, "budget": budget,
+    cls: dict[str, Any] = {}
+    gr_plan: dict[str, Any] | None = None
+    if asset_class:
+        from ..kit import kinds as K
+
+        cls = K.game_ready_class(asset_class)
+        doc = K.classes()
+        gr_plan = {"game_ready_class": {
+            "name": cls["name"], "texel_px_m": cls.get("texel_px_m"), "texel_by_size": doc["texel_px_m_by_size"],
+            "tier_factor": float(doc["tier_texel_factor"].get(tier, 1.0)), "night": cls.get("night", "unlit"),
+            "face_light": doc["face_light"], "flags": int(cls.get("flags") or 0)}}
+    warn: list[str] = []
+    col_v = col or cls.get("col") or "hull"
+    draw_v = float(draw if draw is not None else cls.get("draw") or 150.0)
+    if col_v != "none" and draw_v > gameready.BIG_BUILDING_DRAW:
+        warn.append(f"DRAW_CLAMPED: draw {draw_v:g} -> {gameready.BIG_BUILDING_DRAW} (a model with collision and draw "
+                    "> 300 becomes a big building without collision)")
+        draw_v = float(gameready.BIG_BUILDING_DRAW)
+    a = _contract("game_ready", {"src": jpath(sp.resolve()), "name": name, "objects": objects,
+                                 "budget": int(budget if budget is not None else cls.get("budget") or 1040),
                                  "height": height, "scale": scale, "origin": origin, "uv": uv, "bake": bake,
-                                 "tex_size": tex_size, "prelight": prelight, "col": col, "surface": surface,
-                                 "lod": lod, "draw": draw, "render": render})
+                                 "tex_size": tex_size, "prelight": prelight, "col": col_v, "surface": surface,
+                                 "lod": float(lod if lod is not None else (cls.get("lod") if cls else 0.25)),
+                                 "draw": draw_v, "render": render})
     d = gameready.out_dir(a["name"], out)  # PROTECTED_PATH before Blender starts; nothing is created
     a["out"] = jpath(d)
     blend = sp.resolve() if sp.suffix.lower() == ".blend" else None
     report_progress(0, 2, "Blender: make game-ready")
     existed = d.exists()
     try:
-        resp = runner.run_job("game_ready", a, blend=blend, timeout=timeout)
+        resp = runner.run_job("game_ready", a, blend=blend, timeout=timeout, plan=gr_plan)
     except SatkError:
         if not existed and d.is_dir() and not any(d.iterdir()):
             d.rmdir()  # an empty folder of this failed job
         raise
     report_progress(1, 2, "TXD, IDE and checks")
-    fin = gameready.finalize(d)
+    fin = gameready.finalize(d, flags=int(cls.get("flags") or 0) if cls else 0)
     files = dict(resp.get("files") or {})
     files.update(fin["files"])
     resp["files"] = files
     resp["stats"] = {**(resp.get("stats") or {}), **fin["stats"]}
-    resp["warnings"] = list(resp.get("warnings") or []) + fin["warn"]
+    resp["warnings"] = warn + list(resp.get("warnings") or []) + fin["warn"]
     report_progress(2, 2, "done")
-    return _payload(resp, name=a["name"], lod=resp.get("lod"), out=jpath(d),
+    return _payload(resp, name=a["name"], lod=resp.get("lod"), out=jpath(d), asset_class=asset_class,
                     checks={"cols": ["check", "status", "detail"], "rows": fin["checks"]})
 
 

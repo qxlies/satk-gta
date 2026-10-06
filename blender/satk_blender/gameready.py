@@ -37,6 +37,7 @@ import json
 import math
 import os
 import re
+import sys
 import time
 
 import bmesh
@@ -48,7 +49,7 @@ from . import common
 RESULT = "SATK_gameready"
 #: Below this many HD triangles a LOD model is pointless (it is skipped with LOD_SKIPPED).
 LOD_MIN_TRIS = 48
-#: Box UVs: texel density (px/m) of props in vanilla (report 22 §3.2).
+#: Box UVs without a class: texel density (px/m); with ``asset_class`` the vanilla size-bucket density is used.
 BOX_DENSITY = 32.0
 DAY_ATTR, NIGHT_ATTR, AO_ATTR = "satk_day", "satk_night", "satk_ao"
 #: Prelight light model (sRGB 0..1): sky ambient and sun for the day colours, ambient for the night.
@@ -56,7 +57,11 @@ DAY_ATTR, NIGHT_ATTR, AO_ATTR = "satk_day", "satk_night", "satk_ao"
 #: night p50 26/255 (p90 64) - the engine adds its own ambient and directional light on top.
 SKY_DAY = (0.40, 0.41, 0.44)
 SUN_DAY = (0.32, 0.30, 0.26)
-AMB_NIGHT = (0.16, 0.17, 0.24)
+#: Night ambient: darker and WARM like vanilla (unlit night vertices average (30, 27, 23), 50 % of night-coloured
+#: models R > B, 10 % cool); the old blue (0.16, 0.17, 0.24) glowed next to vanilla.
+AMB_NIGHT = (0.15, 0.135, 0.115)
+#: COL face light nibbles from the mean prelit brightness 0..255 (data/colgen/tex_surface.json fit).
+FACE_LIGHT = {"day": (0.0809, 2.385), "night": (0.0889, 0.8793)}
 #: A convex hull with more triangles is decimated to this many (round shapes give ~1 hull face per face).
 HULL_MAX_TRIS = 256
 SUN_DIR = Vector((-0.45, -0.55, 0.70)).normalized()
@@ -305,14 +310,57 @@ def _in_edit(obj, fn) -> None:
         bpy.ops.object.mode_set(mode="OBJECT")
 
 
-def unwrap(obj, mode: str, tex_size: int) -> str:
+def class_spec() -> dict:
+    """The ``game_ready_class`` of the job request (``blender.game_ready --asset-class``), ``{}`` without one."""
+    argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    for a in argv:
+        if a.lower().endswith(".json") and os.path.isfile(a):
+            try:
+                with open(a, encoding="utf-8") as f:
+                    req = json.load(f)
+            except (OSError, ValueError):
+                return {}
+            return dict((req.get("plan") or {}).get("game_ready_class") or {})
+    return {}
+
+
+def texel_target(spec: dict, size_m: float) -> float:
+    """Texel density (px/m) of the class for a model whose largest side is ``size_m``."""
+    if not spec:
+        return BOX_DENSITY
+    base = spec.get("texel_px_m")
+    if not base:
+        rows = spec.get("texel_by_size") or []
+        base = rows[-1]["px_m"] if rows else BOX_DENSITY
+        for r in rows:
+            if size_m <= float(r["max_m"]):
+                base = r["px_m"]
+                break
+    return float(base) * float(spec.get("tier_factor") or 1.0)
+
+
+def texel_density(me, tex_size: int) -> float:
+    """Achieved texel density (px/m) of UV layer 0 for a ``tex_size`` square texture."""
+    if not me.uv_layers:
+        return 0.0
+    me.calc_loop_triangles()
+    uvl = me.uv_layers[0].data
+    ua = wa = 0.0
+    for t in me.loop_triangles:
+        a, b, c = (uvl[i].uv for i in t.loops)
+        ua += abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2
+        wa += t.area
+    return math.sqrt(ua * tex_size * tex_size / wa) if wa > 1e-12 else 0.0
+
+
+def unwrap(obj, mode: str, tex_size: int, density: float = BOX_DENSITY) -> str:
     """New single UV layer by ``smart`` projection or ``box`` (cube) projection; returns the mode."""
     me = obj.data
     for uv in list(me.uv_layers):
         me.uv_layers.remove(uv)
     me.uv_layers.new(name="UVMap")
     if mode == "box":
-        _in_edit(obj, lambda: bpy.ops.uv.cube_project(cube_size=tex_size / BOX_DENSITY, correct_aspect=True,
+        _in_edit(obj, lambda: bpy.ops.uv.cube_project(cube_size=tex_size / density, correct_aspect=True,
                                                        scale_to_bounds=False))
     else:
         _in_edit(obj, lambda: (bpy.ops.uv.smart_project(angle_limit=math.radians(66.0), island_margin=0.02),
@@ -537,17 +585,21 @@ def textures(hi, lo, args: dict, out: str, uv: str, warn: list[str]) -> dict:
 # --------------------------------------------------------------------------- 5. prelight
 
 
-def _ground(z: float, size: float):
+def _ground(z: float, size: float, cx: float = 0.0, cy: float = 0.0):
     me = bpy.data.meshes.new("satk_gr_ground")
     s = size
-    me.from_pydata([(-s, -s, z), (s, -s, z), (s, s, z), (-s, s, z)], [], [(0, 1, 2, 3)])
+    me.from_pydata([(cx - s, cy - s, z), (cx + s, cy - s, z), (cx + s, cy + s, z), (cx - s, cy + s, z)], [],
+                   [(0, 1, 2, 3)])
     o = bpy.data.objects.new("satk_gr_ground", me)
     bpy.context.scene.collection.objects.link(o)
     return o
 
 
-def prelight(obj, mode: str) -> dict:
-    """Day/night prelight in ``satk_day``/``satk_night`` (CORNER, byte colours, the only colour attributes)."""
+def prelight(obj, mode: str, ao=None) -> dict:
+    """Day/night prelight in ``satk_day``/``satk_night`` (CORNER, byte colours, the only colour attributes).
+
+    ``ao`` = ambient occlusion per loop (0 covered .. 1 open) from the caller (``kit.export`` ray casts it, so a
+    session never starts a Cycles bake); without it ``bake`` bakes with Cycles."""
     import numpy as np
 
     me = obj.data
@@ -557,14 +609,24 @@ def prelight(obj, mode: str) -> dict:
         obj.dff.day_cols = obj.dff.night_cols = False
         return {"prelight": "none"}
     n = len(me.loops)
-    ao = np.ones(n, dtype=np.float32)
-    if mode == "bake":
+    given = ao is not None
+    if given:
+        ao = np.asarray(ao, dtype=np.float32)
+        if ao.shape != (n,):
+            raise GameReadyError("BAD_PARAMS", f"prelight: ao has {ao.shape} values for {n} loops")
+    else:
+        ao = np.ones(n, dtype=np.float32)
+    if mode == "bake" and not given:
         scene = bpy.context.scene
         lo_b, up_b = _bounds(me)
         diag = max((up_b - lo_b).length, 1e-3)
         ca = me.color_attributes.new(AO_ATTR, "BYTE_COLOR", "CORNER")
         me.color_attributes.active_color = ca
-        ground = _ground(lo_b.z - diag * 0.002, diag * 4)
+        # the ground sits under the model in WORLD space (a kit part hangs on a frame that may be moved)
+        mw = obj.matrix_world
+        corners = [mw @ Vector((x, y, z)) for x in (lo_b.x, up_b.x) for y in (lo_b.y, up_b.y) for z in (lo_b.z, up_b.z)]
+        ground = _ground(min(c.z for c in corners) - diag * 0.002, diag * 4,
+                         sum(c.x for c in corners) / 8, sum(c.y for c in corners) / 8)
         if scene.world is None:
             scene.world = bpy.data.worlds.new("satk_world")
         dist = scene.world.light_settings.distance
@@ -611,14 +673,24 @@ def prelight(obj, mode: str) -> dict:
 # --------------------------------------------------------------------------- 6. COL
 
 
-def _col_material(surface: int):
+def face_light(day: float | None, night: float | None) -> tuple[int, int]:
+    """Day/night COL light nibbles from mean prelit colours (0..1); never 0 by day (0 = ambient only)."""
+    a, b = FACE_LIGHT["day"]
+    d = 15 if day is None else int(min(15, max(1, round(a * day * 255 + b))))
+    a, b = FACE_LIGHT["night"]
+    n = 3 if night is None else int(min(15, max(0, round(a * night * 255 + b))))
+    return d, n
+
+
+def _col_material(surface: int, light: tuple[int, int] = (15, 3)):
     m = bpy.data.materials.new(f"satk_col_{surface}")
     m.dff.col_mat_index = surface
+    m.dff.col_day_light, m.dff.col_night_light = int(light[0]), int(light[1])
     m["satk_gameready"] = "col"
     return m
 
 
-def make_col(lo, kind: str, surface: int, name: str, warn: list[str]) -> list:
+def make_col(lo, kind: str, surface: int, name: str, warn: list[str], light: tuple[int, int] = (15, 3)) -> list:
     """COL objects (``dff.type = 'COL'``) in model space."""
     if kind == "none":
         return []
@@ -660,6 +732,7 @@ def make_col(lo, kind: str, surface: int, name: str, warn: list[str]) -> list:
         o.scale = half
         o.dff.type = "COL"
         o.dff.col_material = surface
+        o.dff.col_day_light, o.dff.col_night_light = int(light[0]), int(light[1])
     else:
         if kind == "mesh":
             me = lo.data.copy()
@@ -669,7 +742,7 @@ def make_col(lo, kind: str, surface: int, name: str, warn: list[str]) -> list:
             for a in list(me.color_attributes):
                 me.color_attributes.remove(a)
         me.materials.clear()
-        me.materials.append(_col_material(surface))
+        me.materials.append(_col_material(surface, light))
         for p in me.polygons:
             p.material_index = 0
         o = bpy.data.objects.new(f"{name}_col", me)
@@ -721,6 +794,9 @@ def _export_dff(obj, path: str) -> None:
     })
     if not os.path.isfile(path) or os.path.getsize(path) == 0:
         raise GameReadyError("EXTERNAL_TOOL", f"DragonFF wrote no {os.path.basename(path)}")
+    from .exporter import fix_bspheres
+
+    fix_bspheres(path)
 
 
 # --------------------------------------------------------------------------- main
@@ -785,8 +861,15 @@ def make_game_ready(args: dict, out: str, *, hide_sources: str = "all") -> dict:
         warn.append("UV_MISSING: the source has no UVs; smart UV projection used")
         uv = "smart"
     uv_new = uv in ("smart", "box")
+    spec = class_spec()
+    lo_b, up_b = _bounds(lo.data)
+    size_m = max((up_b - lo_b).x, (up_b - lo_b).y, (up_b - lo_b).z)
+    density = texel_target(spec, size_m)
+    if spec:
+        stats["asset_class"] = spec.get("name")
+        stats["texel_target_px_m"] = round(density, 1)
     if uv_new:
-        unwrap(lo, uv, int(args["tex_size"]))
+        unwrap(lo, uv, int(args["tex_size"]), density)
     else:  # keep only the render UV layer (DragonFF exports up to two)
         for u in [u for u in lo.data.uv_layers if u.name != "UVMap"]:
             lo.data.uv_layers.remove(u)
@@ -795,8 +878,14 @@ def make_game_ready(args: dict, out: str, *, hide_sources: str = "all") -> dict:
     stats.update(uv=tx["uv"], baked=tx["baked"], materials=tx["materials"], textures=len(tx["textures"]))
     t = lap("textures_s", t)
     stats.update(prelight(lo, args["prelight"]))
+    if spec.get("night") == "none" and lo.data.color_attributes:
+        lo.dff.night_cols = False  # vanilla pickups: no night colours
+    if spec:
+        stats["texel_px_m"] = round(texel_density(lo.data, int(args["tex_size"])), 1)
     t = lap("prelight_s", t)
-    cols = make_col(lo, args["col"], int(args["surface"]), name, warn)
+    light = face_light(stats.get("day_mean"), stats.get("night_mean") if lo.dff.night_cols else None)
+    stats["col_light"] = list(light)
+    cols = make_col(lo, args["col"], int(args["surface"]), name, warn, light)
     stats["col"] = str(cols[0]["satk_col_kind"]) if cols else "none"
     if cols and cols[0].type == "MESH":
         stats["col_tris"] = _tris(cols[0].data)

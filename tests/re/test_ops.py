@@ -16,7 +16,7 @@ def test_registration():
     R.discover()
     assert "satk.re.ops" not in R.import_errors()
     names = {o.name: o for o in R.all_ops() if o.name.startswith("re.")}
-    assert set(names) == {"re.build", "re.addr", "re.find", "re.src", "re.patches", "re.limits", "re.export"}
+    assert set(names) == {"re.build", "re.addr", "re.find", "re.src", "re.patches", "re.limits", "re.nodes", "re.export"}
     assert {o.mcp_name for o in names.values() if o.mcp_name} == {"re_addr", "re_find", "re_src", "re_patches"}
     assert all(o.mcp_group == "re" for o in names.values())
     assert names["re.build"].long_running
@@ -96,7 +96,7 @@ def test_re_addr_split_module_offset_keeps_spaces(built, module):
 
 
 def test_build_json_includes_scan_counts(world, satk_home, monkeypatch, run_cli):
-    from conftest import make_sources
+    from re_synth import make_sources
     from satk.re import build
 
     monkeypatch.setattr(build, "default_sources", lambda **kw: make_sources(world))

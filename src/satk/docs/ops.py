@@ -298,37 +298,109 @@ def sync_agent_docs(check: bool = False, force: bool = False) -> dict:
     summary_ru="Проверка перед слиянием в main: assetguard, сгенерированные и агентные документы, тесты, MCP selftest; "
                "без --quick ещё тесты на данных игры и сборка индекса vanilla с эталонными числами (в своём work).",
     mcp=False, group="dev", long_running=True,
-    examples=("satk dev gate", "satk dev gate --quick", "satk dev gate --stop-on-fail"))
-def gate(quick: bool = False, stop_on_fail: bool = False) -> dict:
+    examples=("satk dev gate", "satk dev gate --quick", "satk dev gate --changed", "satk dev gate --stop-on-fail"))
+def gate(quick: bool = False, stop_on_fail: bool = False, changed: bool = False, base: str = "main",
+         with_game: bool = False, dry_run: bool = False) -> dict:
     """Run every acceptance step in a subprocess; exit 1 (CHECK_FAILED) if any step fails.
+
+    Progress goes to stderr (a line per step, a heartbeat with the pytest percentage while a long step runs); the
+    complete output of every step is kept in ``work/tmp/gate-<checkout hash>/logs`` and a failed step names its file.
+    A full gate takes one of at most two machine-wide gate slots (``SATK_GATE_SLOTS`` overrides, 0 = unlimited) and
+    waits with a message while both are busy; ``--quick`` and ``--changed`` never wait (except a ``--changed`` whose
+    selection degenerates to everything, game steps included: that is a full gate). Every step runs with TEMP/TMP in
+    ``work/tmp/gate-<checkout hash>/tmp``, not on the system drive.
 
     Args:
         quick: skip the steps that read game data (about 3 minutes instead of 6).
         stop_on_fail: stop at the first failing step instead of running all of them.
+        changed: intermediate check: the cheap steps (assetguard, docs, MCP selftest) plus only the tests that the
+            files changed since the merge-base with ``--base`` can affect (printed with the reason for each); the game
+            steps only when index, formats or game code changed. The merge acceptance stays the full gate.
+        base: branch the merge-base is taken against for ``--changed``.
+        with_game: with ``--changed``, run the game steps (private index build, golden verify, game tests) anyway.
+        dry_run: print the planned steps and the test selection without running anything.
     """
-    import hashlib
-    import shutil
+    import sys
 
-    from ..core.config import REPO_ROOT
-    from ..core.log import get_logger
-    from ..core.paths import tmp
-    from .gate import plan, run
+    from .changed import select_from_git
+    from .gate import claim_workdirs, detect_restrictions, plan, run
+    from .gateslots import hold, slot_limit
 
-    log = get_logger("gate")
-    # One private work dir per checkout: gates of different worktrees run concurrently and
-    # must never share (or wipe) each other's index and caches.
-    key = hashlib.blake2b(str(REPO_ROOT).lower().encode("utf-8"), digest_size=4).hexdigest()
-    private = tmp(f"gate-{key}") / "work"
-    if private.exists():
-        shutil.rmtree(private)  # a fresh private work dir: no stale index or caches between runs
-    results = run(plan(quick=quick, private_work=private), keep_going=not stop_on_fail, log=log.info)
+    def say(msg: str) -> None:
+        sys.stderr.write(msg + "\n")
+        sys.stderr.flush()
+
+    selection = select_from_git(REPO_ROOT, base) if changed else None
+    if selection is not None:
+        for line in selection.lines():
+            say(f"gate: {line}")
+    restrictions = detect_restrictions()
     cols = ["step", "ok", "seconds", "summary"]
-    rows = [[r.name, r.ok, r.seconds, r.summary] for r in results]
+    if dry_run:
+        steps = plan(quick=quick, private_work=Path("<private work>"), restrictions=restrictions, selection=selection,
+                     with_game=with_game)
+        env = table(cols, [[st.name, True, 0.0, "planned: " + st.describe()] for st in steps])
+        env["dry_run"] = True
+        if selection is not None:
+            env["selection"] = selection.summary()
+        return env
+
+    key = _checkout_key(REPO_ROOT)
+    # A full gate (everything, game steps included) is the heavy kind the slots limit; --quick and --changed are light.
+    heavy = not quick and (selection is None or (selection.all_tests and (selection.game or with_game)))
+    label = f"gate-{key}"
+    slot_note = []
+    with hold(label, root=str(REPO_ROOT), say=say) if heavy else _no_slot() as slot:
+        if heavy and slot.waited >= 1.0:
+            slot_note.append(f"waited {slot.waited:g} s for a gate slot ({slot_limit()} at most at once)")
+        dirs = claim_workdirs(key)
+        notes: list[str] = list(dirs.notes) + restrictions.notes
+        results: list = []
+        try:
+            steps = plan(quick=quick, private_work=dirs.work, restrictions=restrictions, selection=selection,
+                         with_game=with_game)
+            results = run(steps, keep_going=not stop_on_fail, log=say, temp_dir=dirs.temp, log_dir=dirs.logs)
+        finally:
+            dirs.release(clean=bool(results) and all(r.ok for r in results))
+        notes += [n for n in dirs.notes if n not in notes]
+    rows = [[r.name, r.ok, r.seconds, r.summary + (f"; output: {r.log}" if r.log and not r.ok else "")] for r in results]
     failed = [r.name for r in results if not r.ok]
+    total = round(sum(r.seconds for r in results), 1)
+    say(f"gate: {'FAILED: ' + ', '.join(failed) if failed else 'ok'} ({len(results)} steps, {total:g} s)")
     if failed:
+        data: dict = {"cols": cols, "rows": rows}
+        if notes:
+            data["restricted_environment"] = notes
+        if selection is not None:
+            data["selection"] = selection.summary()
         raise SatkError("CHECK_FAILED", f"gate failed: {', '.join(failed)}",
                         hint="fix the failing steps; details: rerun the step's command shown in docs/ru/workflows.md",
-                        data={"cols": cols, "rows": rows})
+                        data=data)
     env = table(cols, rows)
     env["seconds"] = round(sum(r.seconds for r in results), 1)
+    if selection is not None:
+        env["selection"] = selection.summary()
+    if slot_note:
+        env["slot"] = slot_note[0]
+    if notes:
+        env.setdefault("warn", []).extend(f"UNSUPPORTED: restricted environment: {n}" for n in notes)
     return env
+
+
+def _checkout_key(root: Path) -> str:
+    """Short stable id of a checkout: its private gate folders are named after it."""
+    import hashlib
+
+    return hashlib.blake2b(str(root).lower().encode("utf-8"), digest_size=4).hexdigest()
+
+
+class _no_slot:
+    """The slot of a run that does not take one (``--quick``, ``--changed``)."""
+
+    def __enter__(self):
+        from .gateslots import Slot
+
+        return Slot(None)
+
+    def __exit__(self, *exc) -> None:
+        return None

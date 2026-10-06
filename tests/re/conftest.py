@@ -9,20 +9,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from re_synth import World, make_world  # noqa: E402
-
-
-def make_sources(world: World):
-    """Build inputs for the synthetic world (all trees are plain directories)."""
-    from satk.re.build import Sources
-    from satk.re.gitsrc import DirTree
-
-    return Sources(exe=world.exe, gtarev=DirTree(world.gtarev), pluginsdk=DirTree(world.psdk),
-                   upstream=DirTree(world.mta), neon=DirTree(world.mta), trunk=DirTree(world.trunk),
-                   limits=DirTree(world.trunk),
-                   repo_names={"gta-reversed": world.gtarev.as_posix(), "plugin-sdk": world.psdk.as_posix(),
-                               "mta-upstream": world.mta.as_posix(), "neon": world.mta.as_posix(),
-                               "mta-trunk": world.trunk.as_posix(), "exe": world.exe.as_posix()})
+# make_sources lives in re_synth: tests import it from there, never from ``conftest`` (a bare ``conftest`` is
+# whichever package's conftest pytest imported last, so such an import depends on the order of the test folders)
+from re_synth import World, make_sources, make_world  # noqa: E402,F401
 
 
 @pytest.fixture

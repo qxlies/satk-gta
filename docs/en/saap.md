@@ -22,7 +22,7 @@ satk view conformance --target mock
 What comes back (shortened):
 
 ```json
-{"ok":true,"cols":["file","kind","items","errors"],"rows":[["camera.jsonl","cases",5,0],["SAAP-v1.md","spec",21,0]],"valid":true,"schemas":21}
+{"ok":true,"cols":["file","kind","items","errors"],"rows":[["camera.jsonl","cases",5,0],["SAAP-v1.md","spec",23,0]],"valid":true,"schemas":23}
 {"ok":true,"cols":["case","caps","result","ms","detail"],"rows":[["auth.bad_token","core","skip",0.0,"needs the SAAP transport"]],"total":48,"pass":38,"fail":0,"skip":10,"percent":100.0}
 ```
 
@@ -41,7 +41,7 @@ are skipped. With the endpoint running (`satk view start --target mock`) all 48 
 
 ## How it works
 
-- `proto/schema/<method>.json` is a JSON Schema 2020-12 for the `params` and `result` of each of the 21 methods;
+- `proto/schema/<method>.json` is a JSON Schema 2020-12 for the `params` and `result` of each of the 23 methods;
   shared types (`Pose`, `Env`, `EntityRef`) are in `common.json`. The validator in `satk.saap.schema` uses only
   the stdlib (it also works inside Blender's Python); the tests cross-check it with the `jsonschema` package.
 - `proto/conformance/*.jsonl` holds 48 "request → expectation" cases, negative ones included: a wrong token →
@@ -57,12 +57,15 @@ are skipped. With the endpoint running (`satk view start --target mock`) all 48 
   start time (`pid_created`). Windows reuses pids, so the client checks not only "the process is alive" but also
   that it is the same process (`satk.saap.client.verify_pid`); files that point to another process are stale.
 - The mock is a deterministic synthetic world near Grove Street: every capability of the protocol, identical
-  requests give byte-identical PNGs, streaming is simulated (without a settle the frame has holes).
+  requests give byte-identical PNGs, streaming is simulated (without a settle the frame has holes). Its `author`
+  methods work on a small fake scene (`satk.studio.mock`).
+- Blender studio sessions ([studio.md](studio.md)) are endpoints with the role `blender` and the capabilities
+  `core` + `author`; each session has its own pair of files, `blender-<name>.json`.
 - `proto/cpp/saap_frame.hpp` (MIT, C++14, header-only): the frame, the limits, a constant-time token compare, an
   atomic descriptor write. Native endpoints vendor it: the Ariane fork
   (`viewer\ariane\tools\euryopa\saap\`) and later the MTA fork. <!-- linkcheck: ignore -->
 - The native Ariane endpoint passes every applicable case: `satk view conformance --target ariane` →
-  43 pass, 0 fail, 5 skip (Ariane has no `log`, `console`, `lua` or `mem.read`). It writes
+  43 pass, 0 fail, 11 skip (Ariane has no `log`, `console`, `lua`, `mem.read` or `author`). It writes
   `work\run\endpoints\ariane.json` itself, listens on an ephemeral port and accepts a `path_prefix` only inside
   `work\` (`SATK_AGENT_OUT_ROOT`).
 

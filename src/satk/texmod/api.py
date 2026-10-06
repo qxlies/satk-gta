@@ -34,8 +34,9 @@ from ..formats.txd import TexInfo, Txd, mip0_bytes, palette_bytes, parse_txd
 from .txdwrite import FILTER_TRILINEAR, ADDR_WRAP, MAX_NAME, NativeSpec, mip_filter, native_chunk, rewrite_txd, \
     txd_chunk
 
-__all__ = ["FORMAT_CHOICES", "IMAGE_EXTS", "MANIFEST", "README", "TxdSource", "Built", "load_txd", "find_input",
-           "load_image", "prepare", "build_texture", "extract", "pack", "replace", "texmod_root", "mod_dir"]
+__all__ = ["FORMAT_CHOICES", "IMAGE_EXTS", "MANIFEST", "README", "CLASS_PRESETS", "TxdSource", "Built", "load_txd",
+           "find_input", "load_image", "prepare", "build_texture", "extract", "pack", "replace", "texmod_root",
+           "mod_dir", "class_format"]
 
 #: ``--format`` values (``auto`` picks per image, see :func:`satk.texmod.encode.auto_format`).
 FORMAT_CHOICES = ("auto", "dxt1", "dxt3", "dxt5", "a8r8g8b8", "x8r8g8b8", "r5g6b5", "a1r5g5b5", "a4r4g4b4")
@@ -45,6 +46,21 @@ MANIFEST = "texmod.json"
 README = "README.txt"
 #: Largest side :func:`prepare` lets through without a ``BIG`` warning (D3D9 cards of the SA era).
 BIG_SIDE = 2048
+#: ``texture pack --asset-class``: formats and mip levels as in the vanilla game (index of the 1.0 US game,
+#: 2026-10-05). ``opaque``/``binary``/``smooth`` = format by the image's alpha; ``mips_from`` = smallest side
+#: that gets a full mip chain (0 = never); ``max_side`` = the largest vanilla texture of the class.
+CLASS_PRESETS: dict[str, dict] = {
+    # 593 vehicle textures: DXT1 467 + DXT1 1-bit 20 + DXT3 86, none with mipmaps, at most 256 px
+    "vehicle": {"opaque": "dxt1", "binary": "dxt1", "smooth": "dxt3", "mips_from": 0, "max_side": 256},
+    # 289 ped textures: X8R8G8B8 253 + A8R8G8B8 20 (+16 DXT), none with mipmaps, at most 256 px
+    "ped": {"opaque": "x8r8g8b8", "binary": "a8r8g8b8", "smooth": "a8r8g8b8", "mips_from": 0, "max_side": 256},
+    # 114 weapon textures: DXT1 51 + DXT3 63, no mipmaps, at most 128 px
+    "weapon": {"opaque": "dxt1", "binary": "dxt1", "smooth": "dxt3", "mips_from": 0, "max_side": 128},
+    # map textures: DXT1/DXT3; mipmaps on 57 % of the 256 px and 77 % of the 512 px ones, 3-7 % below
+    "map": {"opaque": "dxt1", "binary": "dxt1", "smooth": "dxt3", "mips_from": 256, "max_side": 512},
+    # LOD textures: DXT1 5,007 of 5,374 with one level, at most 512 px
+    "lod": {"opaque": "dxt1", "binary": "dxt1", "smooth": "dxt3", "mips_from": 0, "max_side": 512},
+}
 _MOD_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 _FILE_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}\.txd$", re.I)
 _SECTION = re.compile(r"^== (.+) ==$")
@@ -444,11 +460,30 @@ def _manifest(d: Path) -> dict:
     return m if isinstance(m, dict) else {}
 
 
+def class_format(img, asset_class: str) -> tuple[str, int]:
+    """``(format choice, mip levels)`` of an image for a :data:`CLASS_PRESETS` class (99 = full chain)."""
+    from .encode import alpha_kind
+
+    pre = CLASS_PRESETS[asset_class]
+    fmt = pre[alpha_kind(img)]
+    h, w = img.shape[:2]
+    levels = 99 if pre["mips_from"] and max(w, h) >= pre["mips_from"] else 1
+    return fmt, levels
+
+
 def pack(src_dir: str, name: str | None = None, file: str | None = None, choice: str = "auto",
-         mips: int | None = None, quality: str = "normal", pot: bool = True, max_size: int = 0) -> dict:
-    """Images of a folder -> ``work/out/mods/<name>/<file>.txd`` (one texture per image, named by its file)."""
+         mips: int | None = None, quality: str = "normal", pot: bool = True, max_size: int = 0,
+         asset_class: str | None = None, out: str | None = None) -> dict:
+    """Images of a folder -> ``work/out/mods/<name>/<file>.txd`` (one texture per image, named by its file).
+
+    ``asset_class`` picks formats and mip levels like the vanilla game (:data:`CLASS_PRESETS`; an explicit
+    ``choice``/``mips`` still wins); ``out`` writes ``<out>/<file>.txd`` into any writable folder (a mod
+    folder) instead, without a README."""
     from ..core.registry import report_progress
 
+    if asset_class is not None and asset_class not in CLASS_PRESETS:
+        raise SatkError("BAD_PARAMS", f"unknown asset class {asset_class!r}",
+                        did_you_mean=difflib.get_close_matches(asset_class, list(CLASS_PRESETS), n=3, cutoff=0.4))
     d = find_input(src_dir, folder=True)
     mod = _check_mod(name or d.name)
     fname = _check_file(file or mod)
@@ -471,15 +506,49 @@ def pack(src_dir: str, name: str | None = None, file: str | None = None, choice:
         seen[tname.lower()] = p.name
         report_progress(i, len(imgs), p.name)
         img, w1 = prepare(load_image(p), tname, pot=pot, max_size=max_size)
-        b = build_texture(tname, img, choice=choice, base_fmt=meta.get("format"),
-                          base_levels=meta.get("levels"), mips=mips, quality=quality)
+        c_choice, c_mips, base_fmt, base_levels = choice, mips, meta.get("format"), meta.get("levels")
+        if asset_class is not None:
+            cf, cl = class_format(img, asset_class)
+            c_choice = choice if choice != "auto" else cf
+            c_mips = mips if mips is not None else cl
+            base_fmt = base_levels = None
+            side = CLASS_PRESETS[asset_class]["max_side"]
+            if max(img.shape[:2]) > side:
+                w1.append(f"CLASS_SIZE: {tname}: {img.shape[1]}x{img.shape[0]} is above the largest vanilla "
+                          f"{asset_class} texture ({side} px; tier sa_plus allows about 2x)")
+        b = build_texture(tname, img, choice=c_choice, base_fmt=base_fmt, base_levels=base_levels, mips=c_mips,
+                          quality=quality)
         b.source, b.sha, b.warn = jpath(p), _sha(p), w1 + b.warn
         built.append(b)
     data = txd_chunk([b.native for b in built])
-    head = ["built by: satk texture pack", f"images: {jpath(d)} ({len(built)} files)"]
+    head = ["built by: satk texture pack" + (f" --asset-class {asset_class}" if asset_class else ""),
+            f"images: {jpath(d)} ({len(built)} files)"]
     if man.get("source"):
         head.append(f"extracted from: {man['source']}")
-    return _finish(mod, fname, data, built, head, warn)
+    if out:
+        return _finish_out(out, fname, data, built, warn, asset_class)
+    env = _finish(mod, fname, data, built, head, warn)
+    if asset_class:
+        env["asset_class"] = asset_class
+    return env
+
+
+def _finish_out(out: str, file: str, data: bytes, built: list[Built], warn: list[str], asset_class: str | None) -> dict:
+    """Verify and write ``data`` as ``<out>/<file>`` (any writable folder, e.g. a modloader mod folder)."""
+    from ..core.envelope import table
+
+    _verify(data, built)
+    p = Path(out)
+    d = ensure_writable(p if p.is_absolute() else Path.cwd() / p)
+    d.mkdir(parents=True, exist_ok=True)
+    target = atomic_write(d / file, data)
+    for b in built:
+        warn.extend(b.warn)
+    env = table(_COLS, _rows(built), warn=warn)
+    env.update(file=jpath(target), bytes=len(data))
+    if asset_class:
+        env["asset_class"] = asset_class
+    return env
 
 
 def _parse_swaps(swaps: list[str]) -> list[tuple[str, str]]:

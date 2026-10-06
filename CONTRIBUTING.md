@@ -95,7 +95,8 @@ the tool is missing.
 
 CI (GitHub Actions, Windows, Python 3.12) runs the commands of step 1 on every push to `main` and every pull request.
 Before merging, maintainers also run `satk dev gate`: the same checks plus the game-data tests and an index of the
-stock game checked against golden numbers.
+stock game checked against golden numbers. The gate also runs inside a restricted sandbox (for example the Codex
+Windows sandbox): it works around what is denied there and reports it, see `docs/en/troubleshooting.md`.
 
 ## Code
 

@@ -17,6 +17,7 @@ outside the game folders). Existing IMG archives are never opened for writing.
 
 ```powershell
 satk rw patch models/gta3.img/infernus.dff --rename-tex vehiclelights128=mylights128 --out docs-demo
+satk rw patch models/gta3.img/infernus.dff --smooth-normals --recalc-bsphere --dry-run
 satk formats ls models/gta3.img --name infernus
 satk img build docs-demo --base models/gta3.img --include infernus.txd --out docs-demo --overwrite
 satk img diff models/gta3.img docs-demo.img --change changed
@@ -40,7 +41,7 @@ After `rw patch`, `satk formats dump <path from out>` shows the new texture name
 
 | Command | MCP | What it does |
 |---|---|---|
-| `satk rw patch DFF… [--rename-tex OLD=NEW…] [--rw-version iii\|vc\|sa] [--night-colors add\|remove] [--recalc-normals] [--material-color N=R,G,B[,A]…] [--out DIR] [--dry-run]` | — | edits DFFs: files, folders (their `*.dff`), a whole IMG (all DFFs) or `<img>/<entry>`; copies of the changed files go to `<work>/out/rw/<DIR>/` (default `patch`) |
+| `satk rw patch DFF… [--rename-tex OLD=NEW…] [--rw-version iii\|vc\|sa] [--night-colors add\|remove] [--recalc-normals \| --smooth-normals [--angle 45] [--weld 0.001] [--split-at material,uv\|none]] [--recalc-bsphere] [--material-color N=R,G,B[,A]…] [--out DIR] [--dry-run]` | — | edits DFFs: files, folders (their `*.dff`), a whole IMG (all DFFs) or `<img>/<entry>`; copies of the changed files go to `<work>/out/rw/<DIR>/` (default `patch`) |
 | `satk rw roundtrip [TARGET] [--kind dff\|col\|all] [--engine satk\|rwfury] [--no-restamp] [--step N]` | — | measures bit-for-bit round trips: the whole game, an IMG, a folder or a file; mismatch classes; `--no-restamp` skips the SA → VC → SA cycle |
 | `satk col write SRC [--out NAME] [--version 1\|2\|3\|4]` | — | a COL from a JSON file or a JSON string; the result is re-read by an independent parser (`verified`) |
 | `satk col export TARGET [--model NAME] [--out NAME] [--no-raw]` | — | a `.col`, an IMG entry or a vehicle's embedded COL → the JSON that `col write` accepts |
@@ -65,7 +66,27 @@ with `img build x`. The sources of `img build` are positional arguments: write `
   the clump's RW lights are removed (`lights_dropped`): format 3.1 does not count them.
 - `--night-colors add` copies the day prelit colours into night colours where they are missing (no prelit →
   warning `NO_PRELIT`); `remove` deletes the plugin.
-- `--recalc-normals` computes smooth normals (the sum of face normals weighted by area) and sets the NORMALS flag.
+- `--recalc-normals` computes normals per vertex record (the sum of the normals of its own faces, weighted by
+  area) and sets the NORMALS flag. It does **not** weld: in a flat-shaded export every face has its own
+  vertices, so the result stays flat (the benchmark cars got flatter: normal bend 0.81 → 0.71° and 2.42 → 1.70°,
+  and vanilla `premier` drops from 10.64 to 4.97°). Use `--smooth-normals` for such files.
+- `--smooth-normals` is the seam-aware weld: vertices at one position (snapped to a `--weld` grid, default
+  1 mm) share the normals of the faces around them that lie within `--angle` degrees (default 45, the vanilla
+  rule) of each other and do not cross a `--split-at` seam (default `material`; `uv` also keeps UV seams hard;
+  `none` lets only the angle decide). Faces are weighted by their corner angle. Vertex records, UVs, prelight and
+  skin are untouched (only normals change), and a geometry whose shading would get flatter keeps its normals
+  (`kept_normals`). On vanilla `premier` it moves the normal bend by 0.2° (10.64 → 10.86); on the benchmark cars
+  it raises 0.81 → 1.50° and 2.42 → 3.47° and lowers the flat share 0.465 → 0.392 and 0.315 → 0.228. Most of
+  their faceting is in the geometry (59 % of the chassis edges of one of them meet at less than 10°, 23 % at
+  80-90°), which normals cannot round off; `--angle 89` rounds those folds too (3.47 → 7.97°), at the price of
+  rounded box edges.
+- With `--smooth-normals` or `--recalc-normals` the `changes` column also shows the shading of the undamaged
+  high-detail parts before and after (`bend:0.81->1.50`, the area-weighted normal bend in degrees, the same number
+  as lint `dff.flat_shading`); when `--recalc-normals` makes it flatter the answer warns `FLATTER`.
+- `--recalc-bsphere` recomputes the bounding sphere of every geometry whose stored sphere does not enclose its
+  vertices or is more than twice the tight one: centre = bounding-box centre, radius = the farthest vertex, in the
+  frame's own space (atomics take their sphere from the geometry at run time). DragonFF writes these spheres in
+  world space: a re-export of `premier` had 12 `dff.bsphere` lint warnings, 0 after the patch.
 - `--material-color`: `N` is the row number from `satk formats dump … --level full`, `G:I` is geometry and
   slot; the colour is `R,G,B[,A]` or `#RRGGBB[AA]`. The geometry gets the MODULATE_MATERIAL_COLOR flag,
   otherwise the colour is not visible.
@@ -88,6 +109,14 @@ with `img build x`. The sources of `img build` are positional arguments: write `
 - A surface is a number, a name from the rwfury table (`TARMAC`, `GRASS_SHORT_LUSH`…, case-insensitive),
   `[material, flag, brightness, light]` or `{"material": …, "light": …}`. A COL2/3 face is `[a, b, c,
   material, light]`, a COLL face is `[a, b, c, material, flag, brightness, light]`.
+- Face lighting: the last byte of a COL2/3 face is `light`, low nibble = day, high nibble = night (0..15 each;
+  the game lights peds and cars standing on it with `light x 0.95 + 0.05`, and cars switch their headlights on
+  below 0.05). A face without its own `light` takes the model's `"light"` (a byte, or `{"day": 15, "night": 3}`),
+  else the value fitted from the model's `"prelight"` (the brightness 0..255 or `[r, g, b]` of the render mesh
+  above it, or `{"day": …, "night": …}`), else `0x3F` (day 15, the dominant vanilla value; night 3) with the
+  warning `FACE_LIGHT_DEFAULT`. A light of 0 makes peds dark and cars light up their headlights in daylight.
+- In a sphere or box surface `[material, flag, brightness, light]` of a vehicle collision, `flag` is the car
+  piece the primitive belongs to (`eCarPiece`: bumpers, doors, wheels...).
 - When `bounds`, `flags` or `face_groups` are not given, they are computed the way Rockstar's files have them:
   flags `0x02` (spheres, boxes or faces present), `0x08` (face groups), `0x10` (shadow); face groups from
   81 faces on, contiguous ranges of at most 50 faces (faces are reordered); `"face_groups": "none"` means
@@ -102,7 +131,7 @@ with `img build x`. The sources of `img build` are positional arguments: write `
 |---|---|
 | `chunk` | lossless chunk tree: librw containers are split into children, everything else is kept as bytes; sizes are recomputed on write |
 | `codecs` | typed codecs: geometry, material and clump Struct, frames, strings, Skin, night colours, MatFX, specular, BinMesh, 2dEffect |
-| `dff` | `DffDoc`: texture renaming, RW version, night colours, normals, material colour |
+| `dff` | `DffDoc`: texture renaming, RW version, night colours, normals (seam-aware smoothing), bounding spheres, material colour |
 | `col` | exact COLL/COL2/COL3/COL4 codec, JSON, bounds, flags and face groups for new models |
 | `img` | VER2/VER1 building and archive comparison |
 | `roundtrip` | measurements on the game install (`rw roundtrip`, `tests/golden/rw_roundtrip.json`) |

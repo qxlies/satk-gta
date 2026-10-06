@@ -12,6 +12,9 @@ from pathlib import Path
 
 import pytest
 
+sys.path.append(str(Path(__file__).resolve().parents[1]))  # tests/: sandbox helper; appended, so it never shadows a conftest
+import sandbox_compat  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[2]
 WINDOWS = os.name == "nt"
 
@@ -84,6 +87,7 @@ def test_satk_sh_worktree_anywhere_finds_the_main_venv(tmp_path):
     sh = _find_sh()
     if py is None or sh is None:
         pytest.skip("no main .venv or no sh")
+    sandbox_compat.skip_unless_shell_runs(sh)
     wt = _fake_worktree(tmp_path, "satk.sh")
     r = subprocess.run([sh, (wt / "satk.sh").as_posix(), "version"], cwd=tmp_path, capture_output=True,
                        env=_clean_env(), timeout=60)
@@ -177,6 +181,7 @@ SH = _find_sh()
 
 @pytest.mark.skipif(SH is None, reason="no POSIX sh (Git Bash) found")
 def test_satk_sh_version(tmp_path):
+    sandbox_compat.skip_unless_shell_runs(SH)
     env = _clean_env()
     ws = _shared_workspace()
     if ws is not None:

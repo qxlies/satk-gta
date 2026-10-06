@@ -59,7 +59,7 @@ def test_build_tables_and_stats(built):
 
 def test_rebuild_is_deterministic(built, world, satk_home):
     out, _ = built
-    from conftest import make_sources  # noqa: F401 - tests/re/conftest.py is on sys.path
+    from re_synth import make_sources
     from satk.re import db as dbm
     from satk.re.build import build_db
 
@@ -362,7 +362,7 @@ def test_function_patch_counts_and_pages_agree(built, start):
 
 
 def test_build_adds_source_only_entries_and_unlisted_thunks(world, satk_home):
-    from conftest import make_sources
+    from re_synth import make_sources
     from satk.re.build import build_db
     from satk.re.db import SymDb
     from satk.re.pe import PeImage
@@ -408,7 +408,7 @@ def test_unbounded_hoodlum_tail_is_not_high_confidence(built):
 
 
 def test_unaligned_source_hook_does_not_split_named_function(world, satk_home):
-    from conftest import make_sources
+    from re_synth import make_sources
     from satk.re.build import build_db
     from satk.re.db import SymDb
 

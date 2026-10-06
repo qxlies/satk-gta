@@ -10,6 +10,8 @@ The `satk view` commands drive a target: `ariane` (the offline viewer, an Ariane
 copy), `mock` (a synthetic world for tests) and later `game` (the MTA client). You can fly to a SID, take a frame
 with numbered marks and a grid, ask "what is at this point" and get the stable SID of a placement
 (`inst:lae2_stream0#4`). Everything is written to `work\out\captures\<yyyymmdd>\` (PNG + a sidecar `.json`).
+Your own models, vehicles and peds can be placed next to the map ([viewscene.md](viewscene.md)); behaviour in the
+real game is checked by [ingame.md](ingame.md).
 
 ## Quick example
 

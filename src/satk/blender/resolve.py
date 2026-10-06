@@ -16,6 +16,11 @@ in a COL archive is cut out as a one-model ``<name>.col`` (DragonFF would import
 
 Plans are plain JSON (they travel inside ``request.json``). World rotation = conjugated IPL
 quaternion (V9); ``q`` in a plan is already the world quaternion ``[x, y, z, w]``.
+
+A model can also be a file of one's own (:func:`plan_file`): ``<path>.dff`` with the TXD of the same name
+next to it (or ``txd=``); a vehicle (chassis/wheel dummies) also gets the game's ``vehicle.txd`` and paint
+colours (of ``like``, else satk's defaults). The files are copied into the blob cache first, so Blender
+reads only under ``work``.
 """
 
 from __future__ import annotations
@@ -30,8 +35,9 @@ from ..core.errors import SatkError
 from ..core.paths import ensure_writable, jpath, work
 from ..formats.rw import rw_payload_size
 
-__all__ = ["open_source", "plan_model", "plan_area", "cache_blob", "cache_col", "parse_model_spec",
-           "carcols_for", "parse_carcols", "SLOT_COLORS", "zone_rect", "rect_of", "def_info", "fill_export_defs"]
+__all__ = ["open_source", "plan_model", "plan_area", "plan_file", "is_file_spec", "sibling_txd", "cache_blob",
+           "cache_col", "parse_model_spec", "carcols_for", "parse_carcols", "SLOT_COLORS", "zone_rect", "rect_of",
+           "def_info", "fill_export_defs"]
 
 #: Material colours that mark the paint slots 1-4 of a vehicle (VehicleModelInfo.cpp:805-812).
 SLOT_COLORS = ((60, 255, 0), (255, 0, 175), (0, 255, 255), (255, 0, 255))
@@ -317,8 +323,137 @@ def _root(profile: str) -> Path | None:
         return None
 
 
+def is_file_spec(spec) -> bool:
+    """True for a path to a ``.dff`` file (instead of a SID or model name)."""
+    s = str(spec).strip().strip('"')
+    return s.lower().endswith(".dff") and ("/" in s or "\\" in s or os.path.isfile(s))
+
+
+def sibling_txd(dff: Path) -> Path | None:
+    """``<stem>.txd`` next to ``dff`` (case-insensitive), else ``None``."""
+    want = dff.stem.lower() + ".txd"
+    try:
+        for p in dff.parent.iterdir():
+            if p.name.lower() == want and p.is_file():
+                return p
+    except OSError:
+        return None
+    return None
+
+
+def _cache_file(path: Path) -> Path:
+    from ..core.paths import open_ro
+
+    with open_ro(path) as f:
+        data = f.read()
+    n = rw_payload_size(data)
+    return _store(data[:n] if n else data, path.name.lower())
+
+
+def _vehicle_txd(src, like: str | None) -> Path | None:
+    """The game's ``vehicle.txd`` (from the TXD chain of ``like`` or of a stock car)."""
+    for spec in ([like] if like else []) + ["premier", 411]:
+        try:
+            mf = src.model_files(spec)
+        except SatkError:
+            continue
+        for t in mf.txd_chain:
+            if t.name.lower() == "vehicle.txd":
+                return cache_blob(src, t)
+    return None
+
+
+def plan_file(dff, txd=None, *, like: str | None = None, profile: str = "vanilla", source: str = "auto",
+              col: bool = False) -> dict:
+    """Plan of a DFF file of one's own (same shape as :func:`plan_model`).
+
+    Args:
+        dff: path of the ``.dff``.
+        txd: TXD path(s); default the ``<stem>.txd`` next to it.
+        like: a game model whose section and paint colours the file takes (``model:426``).
+        profile: game profile of the ``vehicle.txd`` and ``like``.
+        col: also take the ``<stem>.col`` next to the DFF (vehicles carry their collision inside the DFF).
+    """
+    from ..model3d.mesh import build_scene, is_vehicle
+    from ..formats.dff import F_SKIN
+    from ..formats.rw import FormatError
+
+    p = Path(str(dff).strip().strip('"')).expanduser()
+    if not p.is_file():
+        raise SatkError("NOT_FOUND", f"no DFF file at {jpath(p)}", hint="give a path to a .dff file")
+    warn: list[str] = []
+    txds = [Path(t) for t in ([txd] if isinstance(txd, (str, os.PathLike)) else list(txd or []))]
+    if not txds:
+        sib = sibling_txd(p)
+        if sib is not None:
+            txds = [sib]
+        else:
+            warn.append(f"NO_TXD: no {p.stem}.txd next to {p.name}; give --txd (textures render missing)")
+    for t in txds:
+        if not t.is_file():
+            raise SatkError("NOT_FOUND", f"no TXD file at {jpath(t)}")
+    from ..core.paths import open_ro
+
+    with open_ro(p) as f:
+        data = f.read()
+    try:
+        scene = build_scene(data, name=p.stem.lower())
+    except FormatError as e:
+        raise SatkError("UNSUPPORTED", f"{p.name}: cannot decode the DFF: {e}", hint=f"satk formats dump {jpath(p)}") from None
+    like_plan = None
+    src = None
+    if like:
+        src, w = open_source(profile, source)
+        warn += w
+        like_plan = _model_plan(src, like, col=False, root=_root(profile), warn=warn)
+    sec = (like_plan or {}).get("sec")
+    if sec is None:
+        if is_vehicle(None, scene.frames):
+            sec = "cars"
+        elif scene.info.flags & F_SKIN:
+            sec = "peds"
+        else:
+            sec = "objs"
+    name = p.stem.lower()
+    plan: dict[str, Any] = {
+        "sid": f"file:{p.name.lower()}", "id": None, "name": name, "sec": sec, "file": jpath(p),
+        "dff": jpath(_cache_file(p)), "txd": [jpath(_cache_file(t)) for t in txds],
+        "txd_names": [t.stem.lower() for t in txds],
+    }
+    if sec == "cars":
+        if src is None:
+            try:
+                src, w = open_source(profile, source)
+                warn += w
+            except SatkError as e:
+                warn.append(f"NO_VEHICLE_TXD: game data unavailable ({e.code}); vehicle.txd textures render missing")
+        vt = _vehicle_txd(src, like) if src is not None else None
+        if vt is not None and all(n != "vehicle" for n in plan["txd_names"]):
+            plan["txd"].append(jpath(vt))
+            plan["txd_names"].append("vehicle")
+        from ..look.gamelook import PAINT_DEFAULT
+
+        veh = (like_plan or {}).get("vehicle")
+        plan["vehicle"] = veh or {"combo": [], "colors": [list(c) for c in PAINT_DEFAULT],
+                                  "slots": [list(c) for c in SLOT_COLORS]}
+    if col:
+        want = p.stem.lower() + ".col"
+        cf = next((q for q in p.parent.iterdir() if q.name.lower() == want and q.is_file()), None)
+        if cf is not None:
+            with open_ro(cf) as f:
+                plan["col"] = jpath(_store(f.read(), cf.name.lower()))
+            plan["col_via"] = "colfile"
+    if like_plan is not None:
+        plan["like"] = like_plan["sid"]
+    return {"source": "file", "profile": profile, "model": plan, "warnings": warn}
+
+
 def plan_model(spec: str | int, *, profile: str = "vanilla", col: bool = False, source: str = "auto") -> dict:
-    """Plan of one model: cached DFF/TXD chain (+COL), vehicle colours. ``{"model": {...}, "warnings"}``."""
+    """Plan of one model: cached DFF/TXD chain (+COL), vehicle colours. ``{"model": {...}, "warnings"}``.
+
+    ``spec`` may also be the path of a ``.dff`` file (:func:`plan_file`)."""
+    if is_file_spec(spec):
+        return plan_file(spec, profile=profile, source=source, col=col)
     src, warn = open_source(profile, source)
     m = _model_plan(src, spec, col=col, root=_root(profile), warn=warn)
     return {"source": src.kind, "profile": profile, "model": m, "warnings": warn}

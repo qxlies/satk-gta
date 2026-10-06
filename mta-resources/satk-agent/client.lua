@@ -507,12 +507,25 @@ end, 500, 0)
 ---------------------------------------------------------------------------- start
 
 local function hidePed()
+    -- A camera-only agent hides its ped; a server that lets the player play (satk-testdrive) sets
+    -- the element data "satk.keep_ped" on the player and the ped stays as it is.
+    if getElementData and getElementData(localPlayer, "satk.keep_ped") then
+        return
+    end
     setElementAlpha(localPlayer, 0)
     setElementFrozen(localPlayer, true)
     setElementCollisionsEnabled(localPlayer, false)
 end
 
 addEventHandler("onClientPlayerSpawn", localPlayer, hidePed)
+
+addEventHandler("onClientElementDataChange", localPlayer, function(name, _, new)
+    if name == "satk.keep_ped" and new then
+        setElementAlpha(localPlayer, 255)
+        setElementFrozen(localPlayer, false)
+        setElementCollisionsEnabled(localPlayer, true)
+    end
+end)
 
 addEventHandler("onClientResourceStart", resourceRoot, function()
     local W, H_ = screenSize()

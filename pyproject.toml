@@ -18,7 +18,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "satk-gta"
-version = "0.2.1"
+version = "0.3.0"
 description = "San Andreas ToolKit: agent-first tools for GTA:SA engine/mod development"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -51,6 +51,8 @@ pythonpath = ["src"]
 # importlib mode: test files with the same basename in different tests/<pkg>/ dirs do not
 # clash, and tests/<pkg>/ need no __init__.py.
 addopts = "-ra --import-mode=importlib"
+# A passed test's tmp_path goes away at once; a full run used gigabytes on the system drive (kept for failed tests).
+tmp_path_retention_policy = "failed"
 markers = [
     "game: reads the game files (gta-sa-clean / original install), read-only",
     "viewer: needs the Ariane viewer",

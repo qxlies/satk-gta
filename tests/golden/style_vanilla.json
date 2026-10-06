@@ -1,0 +1,19 @@
+{
+  "_doc": "satk.style golden numbers on the vanilla game (gta-sa-clean, SA 1.0 US), numbers only, no assets. mesh_metrics: satk.style.dffmesh.dff_metrics(<model>.dff from models/gta3.img, select='hd') = every atomic except *_dam and *_vlo, the wheel once, merged in model space. profiles: [p10, p50, p90] of the style cache peer set with a relative tolerance. Limits: build seconds (cold, with the process pool; the plan target is 30 s, the test allows headroom for a loaded machine), warm profile seconds and answer bytes, leave-one-out pass shares. Values with a tolerance are [value, tolerance]. Checked by tests/style/test_game.py.",
+  "mesh_metrics": {
+    "premier": {
+      "geo.tris": 2250,
+      "shade.normal_bend": [10.64, 0.2],
+      "shade.flat_share": [0.103, 0.01]
+    }
+  },
+  "profiles": {
+    "car": {"n": 144, "veh.hd_tris": [[1677, 2168, 2473], 0.01]},
+    "car.sedan": {"n": 24},
+    "ped": {"geo.tris": [[944, 1079, 1274], 0.01]},
+    "weapon": {"n": 50}
+  },
+  "premier": {"model": "model:426", "frames": 51, "reflection_bytes": 24, "anatomy_md_max": 4096},
+  "limits": {"build_seconds": 45, "profile_seconds": 0.5, "profile_bytes": 3072},
+  "loo": {"cars": 0.9, "props_per_bucket": 0.9, "texture_interior": 0.9}
+}

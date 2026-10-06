@@ -4,13 +4,17 @@
 
 [![CI](https://github.com/qxlies/satk-gta/actions/workflows/ci.yml/badge.svg)](https://github.com/qxlies/satk-gta/actions/workflows/ci.yml)
 
-> **Статус: публичная предварительная версия (0.2.1).** satk работает и проходит свои проверки, но команды, ответы
+> **Статус: публичная предварительная версия (0.3.0).** satk работает и проходит свои проверки, но команды, ответы
 > и раскладка файлов ещё могут измениться до 1.0. Сообщения об ошибках и идеи ждём на странице
 > [Issues](https://github.com/qxlies/satk-gta/issues).
 
 satk — набор инструментов для тех, кто моддит GTA San Andreas (PC), разбирает её устройство и отлаживает игру. Он
 индексирует вашу игру и позволяет вам или ИИ-ассистенту находить и разглядывать модели, текстуры, расстановки на карте
-и адреса крэшей, собирать моды текстур и моделей, проверять моды на ошибки и конфликты, конвертировать карты. Это один
+и адреса крэшей, собирать моды текстур и моделей, добавлять машины, педов и оружие отдельными аддонами, настраивать
+handling, писать скрипты CLEO, генерировать коллизию, ужимать текстуры, проверять моды на ошибки и конфликты,
+конвертировать карты. Новое в 0.3.0: создание в Blender новых машин, пропов, зданий и других ассетов в духе стоковой
+игры, проверка их по ванильному стилю в цифрах, правка анимаций, игровых текстов, зон и цикла времени, проверка
+ресурсов MTA и шейдеры MTA, проверка своей модели рядом с картой во вьювере или в настоящей игре. Это один
 Python-пакет с одной командой `satk` и одним MCP-сервером, тоже `satk`: они выполняют одни и те же операции и дают
 одинаковые ответы.
 
@@ -69,13 +73,33 @@ tools\satk.cmd index build
 | `satk texture`, `map image`, `model` | листы текстур, карта сверху, превью моделей без GPU, экспорт в glTF/OBJ | [media.md](docs/ru/media.md), [models.md](docs/ru/models.md) |
 | `satk texture pack`, `rw`, `col`, `img` | моды текстур, запись DFF/COL/IMG без Blender | [texmod.md](docs/ru/texmod.md), [rw.md](docs/ru/rw.md) |
 | `satk asset lint`, `mod`, `id` | проверка модов, что меняет мод, конфликты Mod Loader, свободные id моделей | [lint.md](docs/ru/lint.md), [modinspect.md](docs/ru/modinspect.md), [idmgr.md](docs/ru/idmgr.md) |
+| `satk mod add`, `data` | новые машины, педы, оружие и объекты папками для Mod Loader; данные handling и оружия: чтение, объяснение, правка | [addon.md](docs/ru/addon.md) |
+| `satk col gen`, `fx2d` | коллизия из моделей, проверка коллизии; свет, частицы и точки входа 2dEffect в виде JSON | [colgen.md](docs/ru/colgen.md), [fx2d.md](docs/ru/fx2d.md) |
+| `satk texture optimize`, `audit`, `budget` | TXD поменьше, аудит текстур, бюджет памяти стриминга | [txdopt.md](docs/ru/txdopt.md) |
+| `satk script`, `kb mta`, `kb native` | скрипты CLEO и SCM: дизассемблер, ассемблер, проверки, шаблоны; справка по API MTA Lua и Pawn SA-MP | [script.md](docs/ru/script.md), [scriptapi.md](docs/ru/scriptapi.md) |
+| `satk batch`, `recipe` | одна операция на много файлов, сохранённые многошаговые проверки | [batch.md](docs/ru/batch.md) |
+| `satk anim` | анимации IFP: список, правка в JSON, запись, слияние с `ped.ifp`, проверка по скелету, перенос в Blender и обратно | [anim.md](docs/ru/anim.md) |
+| `satk gxt`, `zone`, `water`, `timecyc` | игровые тексты, зоны, вода, цикл времени, население и тайлы радара: чтение, правка, запись папками Mod Loader | [worldfiles.md](docs/ru/worldfiles.md) |
+| `satk limits plan` | какие лимиты движка нужны вашей игре и модам, с настройками лимит-аджастеров | [limits.md](docs/ru/limits.md) |
+| `satk mta`, `shader` | ресурсы MTA:SA: проверка Lua с сообщениями самого сервера, заготовки ресурсов, паки моделей, логи; шейдеры для текстур мира | [mta.md](docs/ru/mta.md), [shader.md](docs/ru/shader.md) |
 | `satk map convert`, `ipl`, `paths` | конвертация карт SA-MP/MTA/IPL, бинарный IPL, пути машин и пешеходов | [mapconv.md](docs/ru/mapconv.md), [paths.md](docs/ru/paths.md) |
 | `satk crash`, `re`, `kb` | дампы и логи крэшей, адреса `gta_sa.exe` → функции, база знаний о движке | [crash.md](docs/ru/crash.md), [re.md](docs/ru/re.md), [kb.md](docs/ru/kb.md) |
 | `satk view`, `saap` | вьювер с камерой, кадры с нумерованными объектами, «что это за объект» | [viewer.md](docs/ru/viewer.md) |
+| `satk view place`, `vehicle`, `ped` | свои модели, машины и педы рядом с картой во вьювере, с перезагрузкой при изменении файлов | [viewscene.md](docs/ru/viewscene.md) |
+| `satk ingame` | мод в настоящей игре на форке MTA: тестовые точки, проверки поведения против ванили с кадрами, горячая перезагрузка | [ingame.md](docs/ru/ingame.md) |
+| `satk sp` | `satk_sp.asi`: камера, скриншоты и выбор объектов в одиночной игре | [spbridge.md](docs/ru/spbridge.md) |
 | `satk blender`, `engine` | Blender без окна: импорт, рендер, экспорт в MTA; сборка форка MTA | [blender.md](docs/ru/blender.md), [engine.md](docs/ru/engine.md) |
+| `satk style`, `asset check` | стоковый стиль San Andreas в цифрах по классам и уровням детализации; проверка модели или текстуры по нему | [style.md](docs/ru/style.md), [sa-style.md](docs/ru/sa-style.md) |
+| `satk blender session`, `kit`, `blender preview` | новые машины, пропы, здания и другие ассеты в живой сессии Blender: шаблоны, заготовки, генераторы, превью как в игре, экспорт | [authoring.md](docs/ru/authoring.md), [studio.md](docs/ru/studio.md), [kit.md](docs/ru/kit.md), [look.md](docs/ru/look.md) |
+| `satk asset convert`, `texlib` | сторонняя модель, приведённая к масштабу, детализации и текстурам San Andreas; процедурные текстуры в стиле SA | [convert.md](docs/ru/convert.md), [texlib.md](docs/ru/texlib.md) |
 | `satk status`, `doctor`, `help`, `mcp` | обзор, диагностика с исправлениями, справка, MCP-сервер | [mcp.md](docs/ru/mcp.md), [ai.md](docs/ru/ai.md) |
 
 Все страницы по задачам: [docs/ru/README.md](docs/ru/README.md).
+
+Некоторым частям нужны инструменты, которых нет в zip релиза: вьювер (форк Ariane) для `satk view`, Blender 5.1 для
+команд Blender и создания ассетов, форк MTA для `satk ingame` и `satk mta server-check` (его клиенту нужна разовая
+настройка от администратора) и Visual Studio C++ build tools для сборки `satk_sp.asi`. Всё остальное работает с zip и
+папкой вашей игры.
 
 ## Документация
 

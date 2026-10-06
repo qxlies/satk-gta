@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import as_completed
 
 from ..core import paths
 from ..core.envelope import obj
@@ -92,9 +92,9 @@ def thumbnails(size: int = 128, views: int = 1, jobs: int = 12, profile: str = "
         src = str(SRC_ROOT)
         os.environ["PYTHONPATH"] = src + (os.pathsep + old if old else "")
         try:
-            import multiprocessing as mp
+            from ..core.procpool import pool
 
-            with ProcessPoolExecutor(max_workers=jobs, mp_context=mp.get_context("spawn")) as ex:
+            with pool(jobs, spawn=True) as ex:
                 futs = [ex.submit(render_chunk, ch, views, size, profile, force, el, bg) for ch in chunks]
                 for f in as_completed(futs):
                     results.extend(f.result())

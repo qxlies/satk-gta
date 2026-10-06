@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import sys
 from pathlib import Path
 
 import anyio
@@ -19,6 +20,9 @@ from satk.core import registry as R
 from satk.core.errors import SatkError
 from satk.mcp import adapter as A
 from satk.mcp import generic as G
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))  # tests/: sandbox helper; appended, so it never shadows a conftest
+import sandbox_compat  # noqa: E402
 
 FIXTURE = Path(__file__).with_name("fixture_ops.py")
 #: The generic operations of the real registry (re-registered inside isolated registries).
@@ -157,7 +161,7 @@ def test_prepare_validates_like_the_cli():
 
 def test_args_signature():
     assert G.args_signature(R.get_op("formats.dump")) == (
-        'target:str, level:stats|full|tree="stats", limit:int=20, profile:vanilla|installed|samp="vanilla"')
+        'target:str, level:stats|full|tree="stats", limit:int=20, cursor?:str, profile:vanilla|installed|samp="vanilla"')
     assert G.args_signature(R.get_op("re.addr")) == "text?:[str], text_file?:str, limit:int=50"
     assert G.args_signature(R.get_op("version")) == ""
     for o in R.all_ops():  # every operation has a signature and a JSON-serializable schema
@@ -329,6 +333,7 @@ def test_server_satk_ops_and_op_follow_server_groups(satk_home, sdk):
 
 def test_server_dispatch_thread_and_worker(isolated_ops, satk_home, sdk):
     """Ordinary target: this process (thread). long_running target: the worker subprocess, with progress."""
+    sandbox_compat.skip_unless_async_subprocess()
     from satk.mcp.server import SatkMcp
 
     _load_fixture_ops()
@@ -363,6 +368,7 @@ def test_server_dispatch_thread_and_worker(isolated_ops, satk_home, sdk):
 
 
 def test_server_generic_long_running_timeout(isolated_ops, satk_home, sdk):
+    sandbox_compat.skip_unless_async_subprocess()
     from satk.mcp.server import SatkMcp
 
     _load_fixture_ops()
@@ -411,3 +417,96 @@ def test_help_topics_for_generic_access():
     assert 'MCP: satk_op(op="formats.dump"' in H.render("formats.dump")["text"]
     assert "CLI only (UNSUPPORTED" in H.render("dev gate")["text"]
     assert "Long-running" not in H.render("dev gate")["text"]
+
+
+# --------------------------------------------------------------------------- A1-L7: task intents and the eval table
+
+#: Natural agent queries -> operations any of which must be in the top 5 (only registered ones count; a row
+#: whose operations are all missing in this checkout is skipped until their package is merged).
+EVAL: list[tuple[str, tuple[str, ...]]] = [
+    ("make txd from png", ("texture.pack",)),
+    ("create vehicle", ("kit.template", "blender.session", "mod.add")),
+    ("new car mod", ("kit.template", "blender.session", "mod.add")),
+    ("build a prop", ("kit.template", "blender.session")),
+    ("model a building with lod", ("kit.template", "blender.session")),
+    ("create a weapon model", ("kit.template", "blender.session")),
+    ("make a ped skin", ("kit.template", "blender.session")),
+    ("smooth faceted shading", ("rw.patch", "asset.check")),
+    ("recalculate normals of a dff", ("rw.patch",)),
+    ("package for modloader", ("mod.add", "kit.export")),
+    ("test drive my car in game", ("mta.testdrive", "engine.run")),
+    ("free vehicle id", ("id.free",)),
+    ("find a free ped slot", ("id.free",)),
+    ("vehicle frame names", ("re.nodes",)),
+    ("dummy positions of a bike", ("re.nodes", "asset.anatomy")),
+    ("engine pool limits", ("re.limits",)),
+    ("dump a dff", ("formats.dump",)),
+    ("list img entries", ("formats.ls",)),
+    ("replace a texture in a txd", ("texture.replace",)),
+    ("open a model in blender", ("blender.import_model",)),
+    ("export blender scene to dff", ("blender.export", "kit.export")),
+    ("check my mod for problems", ("mod.check",)),
+    ("lint a dff", ("asset.lint", "asset.check")),
+    ("resolve a crash address", ("re.addr", "crash.analyze")),
+    ("collision for my model", ("col.gen", "col.write", "col.export")),
+    ("preview my car like in game", ("blender.preview", "model.image")),
+    ("vanilla style profile", ("style.profile", "style.card")),
+    ("reference photos", ("ref.import",)),
+    ("resume my asset", ("asset.status",)),
+    ("handling line of a car", ("data.get", "data.explain")),
+    ("streaming memory budget", ("texture.budget",)),
+    ("2dfx lights of a model", ("fx2d.dump",)),
+]
+
+
+def _eval(groups=None) -> tuple[int, int, list[str]]:
+    names = {o.name for o in G.callable_ops(groups)}
+    hit = n = 0
+    missed = []
+    for q, want in EVAL:
+        present = [w for w in want if w in names]
+        if not present:
+            continue
+        n += 1
+        top = [r[0] for r in G.search(q, limit=5, groups=groups)["rows"]]
+        if any(w in top for w in present):
+            hit += 1
+        else:
+            missed.append(f"{q!r} -> {top}")
+    return hit, n, missed
+
+
+def test_eval_table_hits():
+    assert len(EVAL) >= 30
+    hit, n, missed = _eval()
+    assert n >= 18, f"only {n} evaluable rows"
+    assert hit >= 0.9 * n, f"{hit}/{n} hit; missed: {missed}"
+
+
+def test_intents_rank_creation_ops_first(isolated_ops):
+    for name, summary in [("kit.template", "Start a model of any kind from a template."),
+                          ("blender.session", "Live Blender session for step-by-step modelling."),
+                          ("mod.add", "Package a mod as a Mod Loader add-on with a free id."),
+                          ("texture.pack", "Pack a folder of images into a TXD."),
+                          ("rw.patch", "Patch a DFF in place (bounding spheres, normals)."),
+                          ("script.new", "New CLEO script from a template."),
+                          ("asset.lint", "Lint a DFF/TXD/COL file.")]:
+        R.op(name, summary=summary, summary_ru="x", mcp=False)(lambda: {})
+    rows = [r[0] for r in G.search("create vehicle")["rows"]]
+    assert rows[:3] == ["kit.template", "blender.session", "mod.add"]
+    assert [r[0] for r in G.search("new car")["rows"]][:3] == ["kit.template", "blender.session", "mod.add"]
+    assert [r[0] for r in G.search("make txd from png")["rows"]][0] == "texture.pack"
+    assert [r[0] for r in G.search("faceted shading")["rows"]][0] == "rw.patch"
+    assert [r[0] for r in G.search("new script")["rows"]][0] == "script.new"     # no creation kind: plain match
+    env = G.search("the of a")            # only filler words: they are searched as they are
+    assert env["ok"]
+
+
+def test_stopwords_synonyms_and_plurals():
+    assert G._words("how do I make a txd from my png") == ["make", "txd", "png"]
+    assert G._words("the of") == ["the", "of"]
+    assert "vehicle" in G._forms("cars") and "frame" in G._forms("frames")
+    assert G._intents(["create", "bike"])[0] == "kit.template"
+    assert G._intents(["dff"]) == []
+    env = G.search("cars handling")
+    assert env["rows"] and not env.get("warn")    # "cars" also matches "vehicle"

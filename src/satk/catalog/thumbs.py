@@ -17,7 +17,7 @@ from __future__ import annotations
 import io
 import os
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import as_completed
 from pathlib import Path
 
 from ..core.errors import SatkError
@@ -109,10 +109,9 @@ def _run(worker, chunks: list, args: tuple, jobs: int, total: int, what: str) ->
     src = str(SRC_ROOT)
     os.environ["PYTHONPATH"] = src + (os.pathsep + old if old else "")
     try:
-        import multiprocessing as mp
+        from ..core.procpool import pool
 
-        with ProcessPoolExecutor(max_workers=max(1, min(jobs, 61, len(chunks))),
-                                 mp_context=mp.get_context("spawn")) as ex:
+        with pool(max(1, min(jobs, 61, len(chunks))), spawn=True) as ex:
             futs = {ex.submit(worker, ch, *args): len(ch) for ch in chunks}
             for f in as_completed(futs):
                 out.extend(f.result())

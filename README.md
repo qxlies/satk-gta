@@ -4,14 +4,18 @@
 
 [![CI](https://github.com/qxlies/satk-gta/actions/workflows/ci.yml/badge.svg)](https://github.com/qxlies/satk-gta/actions/workflows/ci.yml)
 
-> **Status: public preview (0.2.1).** satk works and its checks pass, but commands, answers and file layouts may
+> **Status: public preview (0.3.0).** satk works and its checks pass, but commands, answers and file layouts may
 > still change before 1.0. Bug reports and ideas are welcome on the
 > [Issues](https://github.com/qxlies/satk-gta/issues) page.
 
 satk is a toolkit for GTA San Andreas (PC) modders, reverse engineers and people who debug the game. It indexes your
 game and lets you, or an AI assistant, find and inspect models, textures, map placements and crash addresses, build
-texture and model mods, check mods for errors and conflicts, and convert maps. It is one Python package with one
-command, `satk`, and one MCP server, also `satk`: both run the same operations and give the same answers.
+texture and model mods, register add-on cars, peds and weapons, tune handling, write CLEO scripts, generate
+collision, shrink textures, check mods for errors and conflicts, and convert maps. New in 0.3.0: create new cars,
+props, buildings and other assets in Blender that look like the stock game, check them against the vanilla style
+in numbers, edit animations, game text, zones and the time cycle, lint MTA resources and write MTA shaders, and
+check your model next to the map in the viewer or in the real game. It is one Python package with one command,
+`satk`, and one MCP server, also `satk`: both run the same operations and give the same answers.
 
 ## Security and privacy
 
@@ -65,13 +69,33 @@ Everything about installing (zip, git, Python package, where `work` lives, Windo
 | `satk texture`, `map image`, `model` | texture sheets, the top-down map, GPU-free model previews, export to glTF/OBJ | [media.md](docs/en/media.md), [models.md](docs/en/models.md) |
 | `satk texture pack`, `rw`, `col`, `img` | texture mods, DFF/COL/IMG writing without Blender | [texmod.md](docs/en/texmod.md), [rw.md](docs/en/rw.md) |
 | `satk asset lint`, `mod`, `id` | mod checks, what a mod changes, Mod Loader conflicts, free model ids | [lint.md](docs/en/lint.md), [modinspect.md](docs/en/modinspect.md), [idmgr.md](docs/en/idmgr.md) |
+| `satk mod add`, `data` | add-on vehicles, peds, weapons and objects as Mod Loader folders; handling and weapon data: read, explain, patch | [addon.md](docs/en/addon.md) |
+| `satk col gen`, `fx2d` | collision generated from models, collision checks; 2dEffect lights, particles and entry points as JSON | [colgen.md](docs/en/colgen.md), [fx2d.md](docs/en/fx2d.md) |
+| `satk texture optimize`, `audit`, `budget` | smaller TXDs, a texture audit, the streaming memory budget | [txdopt.md](docs/en/txdopt.md) |
+| `satk script`, `kb mta`, `kb native` | CLEO and SCM scripts: disassemble, assemble, check, templates; MTA Lua and SA-MP Pawn API lookup | [script.md](docs/en/script.md), [scriptapi.md](docs/en/scriptapi.md) |
+| `satk batch`, `recipe` | one operation over many files, saved multi-step checks | [batch.md](docs/en/batch.md) |
+| `satk anim` | IFP animations: list, edit as JSON, write, merge into `ped.ifp`, check against a skeleton, to and from Blender | [anim.md](docs/en/anim.md) |
+| `satk gxt`, `zone`, `water`, `timecyc` | game text, zones, water, the time cycle, population and radar tiles: read, edit, write as Mod Loader folders | [worldfiles.md](docs/en/worldfiles.md) |
+| `satk limits plan` | the engine limits your game and mods need, with limit adjuster settings | [limits.md](docs/en/limits.md) |
+| `satk mta`, `shader` | MTA:SA resources: Lua lint with the server's own messages, starter resources, model packs, logs; shaders for world textures | [mta.md](docs/en/mta.md), [shader.md](docs/en/shader.md) |
 | `satk map convert`, `ipl`, `paths` | SA-MP/MTA/IPL map conversion, binary IPL, vehicle and ped paths | [mapconv.md](docs/en/mapconv.md), [paths.md](docs/en/paths.md) |
 | `satk crash`, `re`, `kb` | crash dumps and logs, `gta_sa.exe` addresses to functions, engine knowledge base | [crash.md](docs/en/crash.md), [re.md](docs/en/re.md), [kb.md](docs/en/kb.md) |
 | `satk view`, `saap` | a viewer with a camera, frames with numbered objects, "what is this object" | [viewer.md](docs/en/viewer.md) |
+| `satk view place`, `vehicle`, `ped` | your own models, vehicles and peds next to the map in the viewer, reloaded when the files change | [viewscene.md](docs/en/viewscene.md) |
+| `satk ingame` | a mod in the real game on the MTA fork: test spots, behaviour checks against vanilla with frames, hot reload | [ingame.md](docs/en/ingame.md) |
+| `satk sp` | `satk_sp.asi`: camera, screenshots and picking in the single-player game | [spbridge.md](docs/en/spbridge.md) |
 | `satk blender`, `engine` | headless Blender import/render/export to MTA; build of the MTA fork | [blender.md](docs/en/blender.md), [engine.md](docs/en/engine.md) |
+| `satk style`, `asset check` | the stock San Andreas style in numbers per class and detail tier; a model or a texture checked against it | [style.md](docs/en/style.md), [sa-style.md](docs/en/sa-style.md) |
+| `satk blender session`, `kit`, `blender preview` | new cars, props, buildings and other assets in a live Blender session: templates, blanks, generators, a game-like preview, export | [authoring.md](docs/en/authoring.md), [studio.md](docs/en/studio.md), [kit.md](docs/en/kit.md), [look.md](docs/en/look.md) |
+| `satk asset convert`, `texlib` | a third-party model brought to San Andreas scale, detail and textures; procedural SA-style textures | [convert.md](docs/en/convert.md), [texlib.md](docs/en/texlib.md) |
 | `satk status`, `doctor`, `help`, `mcp` | overview, diagnostics with fixes, help, the MCP server | [mcp.md](docs/en/mcp.md), [ai.md](docs/en/ai.md) |
 
 Every page, by task: [docs/en/README.md](docs/en/README.md).
+
+Some parts need tools that are not in the release zip: the viewer (an Ariane fork) for `satk view`, Blender 5.1 for
+the Blender and authoring commands, the MTA fork for `satk ingame` and `satk mta server-check` (its client needs a
+one-time administrator setup), and the Visual Studio C++ build tools to build `satk_sp.asi`. Everything else works
+with the zip and your game folder.
 
 ## Documentation
 

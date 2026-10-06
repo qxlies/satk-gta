@@ -55,13 +55,21 @@ data  carcols:testcar    modify   readme.txt:3         colours 1,2,2,1->3,3,0,0
 | `satk mod inspect PATH [--profile vanilla] [--change ...] [--kind ...]` | — (via `satk_op`) | rows `kind, target, change, by, detail`; summary `changes`, `unchanged` (files identical to the game's), `new_ids` |
 | `satk mod conflicts [MODS...] [--profile installed] [--with-installed] [--ml-profile NAME] [--priority name=N ...]` | — | rows `target, kind, winner, losers, rule`; `mods` in install order; `DROPS` warnings |
 | `satk mod effective FILE [KEY] [--profile installed] [--mod PATH ...] [--with-installed] [--save]` | — | `FILE`: `handling`, `carcols`, `ide`, `gta`, `default`, `object`, a data file name or an IDE; `KEY`: handling id or model ID/name, model ID, colour index, path |
-| `satk mod check PATH [--profile vanilla] [--engine satk\|inu] [--exe PATH] [--sev info] [--no-lint]` | — | rows `rule, sev, file, msg, sid`: ID collisions, files Mod Loader skips, dropped game records, IDs over the limit and [`asset lint`](lint.md) findings |
+| `satk mod check PATH [--profile vanilla] [--engine satk\|inu] [--exe PATH] [--sev info] [--no-lint]` | — | rows `rule, sev, file, msg, sid`: ID collisions, files Mod Loader skips, dropped game records, IDs over the limit, engine capacity (`mod.capacity`) and [`asset lint`](lint.md) findings |
 
 `change` values: `replace` (a game file is swapped), `add` (new file or record), `modify` (a record differs),
 `remove` (a game record disappears), `new-id`, `override-id` (the ID belongs to another model in the game),
 `load` (ASI/CLEO), `ignored` (Mod Loader will not use the file; the detail says why).
 
 ## How it works
+
+- **Capacity (`mod.capacity`).** The stock single-player engine has fixed stores: 212 vehicle, 278 ped, 51
+  weapon, 14,070 object, 169 timed-object and 92 clump model slots, 255 COL file slots (slot 0 is the engine's
+  own), 5,000 TXD slots, 100 IDE `2dfx` entries and 400 entry-exits. The vanilla game leaves few of them free
+  (2 ped, 1 weapon, 3 COL, 3 `2dfx`, 24 entry-exits). For every store the mod adds to, `mod check` adds one row:
+  `error` when the total is over the stock size, `warn` when fewer than 10 slots are left, `info` otherwise.
+  Limit adjusters raise these stores. When `satk texture budget` is available, a mod with TXD/DFF files also
+  gets a `mod.streaming` hint about the 50 MiB streaming memory.
 
 - **Files** (`classify.py`): the first Mod Loader plugin that accepts a file handles it: FX names (`hud.txd`,
   `particle.txd`, `vehicle.txd` ...), ASI/CLEO, std.data (data files by name, IDE/IPL by path, `*.txt` readmes),

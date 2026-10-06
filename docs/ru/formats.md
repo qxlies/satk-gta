@@ -35,14 +35,24 @@ satk formats dump models/coll/weapons.col --level full
 | Команда | MCP | Что делает |
 |---|---|---|
 | `satk formats selftest [--root R] [--profile vanilla\|installed\|samp] [--quick] [--bench] [--geometry] [--dxt]` | — | разбирает всю игру и сверяет 99 счётчиков с эталонными числами ванильной игры (около 5 с; `--quick` пропускает TXD и DFF, около 1 с; `--geometry` декодирует всю геометрию gta3/gta_int; `--dxt` сравнивает бэкенды декодера DXT на эталонных текстурах и замеряет их скорость) |
-| `satk formats ls IMG [--name S] [--ext E] [--limit N] [--cursor C] [--profile P]` | — | записи IMG-архива (путь абсолютный или от корня игры профиля, регистр не важен) |
-| `satk formats dump TARGET [--level stats\|full\|tree] [--limit N] [--profile P]` | — | разбор файла или записи `<img>/<entry>`: IMG, TXD, DFF, COL, IFP, IDE, IPL, ZON, DAT; `tree` — сырое дерево RW-чанков (в том числе битого файла). Файл под корнем профиля получает канонический SID в `id` (`file:data/maps/la/lae2.ipl`, как бы ни был написан путь); файл вне корня — `path` (и `entry` для записи IMG) без SID |
+| `satk formats ls IMG [--name S] [--ext E] [--limit N] [--cursor C] [--profile P]` | — | записи IMG-архива (путь абсолютный, от текущей папки или от корня игры профиля, регистр не важен) |
+| `satk formats dump TARGET [--level stats\|full\|tree] [--limit N] [--cursor C] [--profile P]` | — | разбор файла или записи `<img>/<entry>`: IMG, TXD, DFF, COL, IFP, IDE, IPL, ZON, DAT; `tree` — сырое дерево RW-чанков (в том числе битого файла). Файл под корнем профиля получает канонический SID в `id` (`file:data/maps/la/lae2.ipl`, как бы ни был написан путь); файл вне корня — `path` (и `entry` для записи IMG) без SID |
 
 Своего MCP-инструмента нет ни у одной из трёх команд: агент вызывает их через `satk_op` (например,
 `satk_op("formats.dump", {"target": "models/gta3.img/infernus.dff"})`). Из Blender:
 `selftest.main(['--root', r'<папка игры>', '--quick'])` (код выхода 0/1, JSON в stdout).
 
 ## Как это устроено
+
+- **Пути.** Относительный путь сначала ищется в текущей папке, затем под корнем игры профиля; `resolved_from`
+  говорит, где он нашёлся (`cwd`, `profile`, `absolute`). Если файл есть в обоих местах, побеждает текущая папка
+  с предупреждением `PATH_SHADOWS`; SID `file:` всегда означает файл игры. SID `model:`, `dff:`, `inst:` и `txd:`
+  ищутся в индексе профиля (`satk formats dump model:426` разбирает DFF модели premier; `resolved_from`
+  равно `index`).
+- **Постраничный вывод.** `--level full` и `tree` обрезают каждый список (строки, `geom_rows`, `frame_names`,
+  `effects_list`) по `--limit` (20, не больше 500). Обрезанный ответ перечисляет списки в `truncated`
+  (`"frames 20 of 51"`), предупреждает `TRUNCATED` и даёт `next`: повторите с `--cursor <next>`, чтобы получить
+  следующую страницу всех списков.
 
 | Модуль | Что |
 |---|---|

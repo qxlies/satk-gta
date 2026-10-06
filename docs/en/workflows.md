@@ -2,7 +2,7 @@
 
 [Русская версия](../ru/workflows.md)
 
-<!-- The human version of the agent scenarios S1-S16 (the agent version with token costs is
+<!-- The human version of the agent scenarios S1-S29 (the agent version with token costs is
      docs/agent/workflows.md). Chains re-run on 2026-10-05 with schema-v3 indexes; the numbers in the comments are
      real answers. -->
 
@@ -179,6 +179,147 @@ satk kb opcode 0A8C                            # WRITE_MEMORY (CLEO) and its gta
 ```
 
 More in [kb.md](kb.md).
+
+## Add a new car as an add-on (S17)
+
+```powershell
+satk mod add vehicle --dff dff:infernus --txd txd:infernus --like 411 --name infernus2 --game-name "Infernus II" --dry-run
+satk mod add vehicle --dff my_car.dff --txd my_car.txd --like 411 --name mycar --game-name "My Car"
+satk mod check <workspace>\work\out\addon\mycar
+```
+
+`mod add` copies the donor's data lines (IDE, handling, carcols, carmods, the game name) with a free id and new names
+into a Mod Loader folder `work\out\addon\<name>\`; copy that folder into the game's `modloader` folder. Read the
+warnings: a vehicle id over 611 or a new handling name needs the fastman92 Limit Adjuster. Peds, weapons and objects
+work the same way ([addon.md](addon.md)).
+
+## Change handling or weapon data (S18)
+
+```powershell
+satk data get handling infernus --field fMass fTractionMultiplier   # value, unit and meaning of each field
+satk data explain handling fTractionBias                           # unit, range, column, MTA name
+satk data patch handling infernus fMass=1500 fTractionMultiplier=0.8
+satk data patch handling infernus fMass=1500 --target mta          # a setModelHandling Lua snippet instead
+```
+
+The default target writes a Mod Loader folder whose readme holds only the changed line; `--target full` writes a
+patched copy of the whole file. Weapons: `satk data get weapon PISTOL`, `satk data patch weapon ...`.
+
+## Write or fix a CLEO script (S19)
+
+```powershell
+satk script new spawn_car --name mycar --model 522 --cheat BIKE   # a checked .txt and the assembled .cs
+satk script check mycar/mycar.txt                                  # errors with line numbers
+satk script asm mycar/mycar.txt
+satk script disasm mymod.cs                                        # someone else's script as text
+satk script asm mymod/mymod.txt --compare mymod.cs                 # what your edit changed
+```
+
+satk never writes into the game: copy the `.cs` into the game's `cleo` folder (CLEO 4 or 5). Opcode signatures:
+`satk kb opcode <id or words>` ([script.md](script.md)).
+
+## Look up an MTA Lua function or a SA-MP native (S20)
+
+```powershell
+satk kb mta engineRequestModel                 # signature, client/server, enums, the C++ source line
+satk kb mta "vehicle handling"                 # every function whose name has both words
+satk kb mta --event onClientElementStreamIn
+satk kb native SetObjectMaterial
+```
+
+The answers come from the local sources through the knowledge base (`satk kb build` after an update). For the full
+SA-MP/open.mp list set `kb.pawn_include` in `satk.toml` to a pawno or qawno include folder ([scriptapi.md](scriptapi.md)).
+
+## Make a mod's textures smaller (S21)
+
+```powershell
+satk texture audit mymod                                        # issues by bytes saved, the fix for each
+satk texture optimize mymod --max 512 --drop-unused --dedupe    # copies in work\out\txdopt\mymod\, PSNR per texture
+satk texture budget --area 2495 -1666 150                       # streaming memory around a point vs the 50 MiB limit
+```
+
+Look at `psnr_min` and every `LOW_PSNR` warning before you copy the output over the mod ([txdopt.md](txdopt.md)).
+
+## Check a mod before release; many files at once (S22)
+
+```powershell
+satk recipe list
+satk recipe run check-mod-before-release --var mod=mymod --dry-run
+satk recipe run check-mod-before-release --var mod=mymod
+satk batch asset.lint --over "models/gta3.img/infernus.*" --arg fail_on=error --jobs 2
+```
+
+A recipe is a saved chain of operations (inspect, check, texture audit, id conflicts); a batch runs one operation over
+a glob, IMG entries, a list file, a folder or an index query and writes one JSON line per input ([batch.md](batch.md)).
+
+## Add a street light to a model (S23)
+
+```powershell
+satk fx2d dump model:lamppost1                                       # the lamp post's light as JSON
+satk fx2d copy model:lamppost1 my_lamp.dff --filter light --offset 0,0,1
+satk fx2d check my_lamp.dff
+```
+
+The result is a copy of the DFF in `work\out\fx2d\`; `fx2d apply` writes hand-edited JSON back ([fx2d.md](fx2d.md)).
+
+## Collision for a new model (S24)
+
+```powershell
+satk col gen my_model.dff                       # a COL3 file in work\out\colgen\
+satk col gen my_models --archive my_models.col  # one .col for a folder of models
+satk col check my_models.col
+```
+
+The mode is chosen per model (a hull for small objects, spheres for cars, a mesh for big ones); surfaces come from
+texture names, `satk col surface <texture>` explains the choice ([colgen.md](colgen.md)).
+
+## Create a new asset in SA style (S25)
+
+An AI assistant (or you) models the asset in a live Blender session, shows a picture next to two stock models
+of the class after the rough shape and again after the final shape, then exports a Mod Loader folder and checks
+it against the stock model. The whole workflow: [authoring.md](authoring.md); the style rules:
+[sa-style.md](sa-style.md).
+
+## Write and check an MTA resource (S27)
+
+```powershell
+satk mta resource new my-panel                  # a starter resource in work\out\mta\my-panel\
+satk mta lint my-panel                          # what would break on a server, before you upload it
+satk mta pack mods\cars --kind vehicle          # a resource that loads a folder of DFF/TXD/COL files
+satk mta server-check my-panel                  # the built MTA server loads it (127.0.0.1, no game client)
+```
+
+`satk mta logs server.log` turns server and client logs into rows with a hint ([mta.md](mta.md)). Copy the
+resource folder into `<server>\mods\deathmatch\resources` yourself; satk never writes into a server.
+
+## Animations (S28)
+
+```powershell
+satk anim list ifp:ped --name walk              # animations of ped.ifp: bones, keys, duration, root motion
+satk anim extract anim:ped/walk_civi --out walk.json
+satk anim write walk.json --out mywalk.ifp --pack mywalk
+satk anim check mywalk.ifp --loader mta
+satk anim mta mywalk.ifp --replace ped/WALK_civi=WALK_civi
+```
+
+The last command writes a client resource that replaces the game animation. `anim merge` patches a package such
+as `ped.ifp` instead; `anim to-blender` and `anim from-blender` edit animations in Blender ([anim.md](anim.md)).
+
+## See a new model next to the map, then in the game (S29)
+
+```powershell
+satk view vehicle --dff work\out\kit\mycar\files\mycar\mycar.dff --txd work\out\kit\mycar\files\mycar\mycar.txd --pos 2495,-1675,13.4 --watch
+satk view capture --pos 2503,-1666,17 --look 2495,-1674,13.4 --marks 6
+satk ingame start --mod work\out\addon\mycar
+satk ingame check --suite vehicle
+satk ingame reload
+```
+
+The viewer shows the exported files next to the map in a fraction of a second after each re-export (`view place`
+for a prop, `view ped` for a ped); it needs the viewer build with the scene methods ([viewscene.md](viewscene.md)).
+Behaviour (driving, collisions, damage, lights, streaming) is checked in the real game: `ingame start` runs a
+private test server and writes the one-time administrator setup, you start the client with `satk ingame play`, and
+`ingame check` returns a verdict and a mod-versus-vanilla frame per check ([ingame.md](ingame.md)).
 
 ## Build the server of the MTA fork
 

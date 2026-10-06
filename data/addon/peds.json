@@ -1,0 +1,43 @@
+{
+  "about": "Fields of a peds.ide line and of data/pedstats.dat (GTA San Andreas 1.0) for satk.addon. key = satk name (satk.formats.ide extra names), type i int | x hex | s word | f float, unit, desc.",
+  "peds": [
+    {"key": "id", "col": "A", "name": "modelId", "type": "i", "unit": "model id", "desc": "Model id of the ped."},
+    {"key": "model", "col": "B", "name": "modelName", "type": "s", "unit": "name", "desc": "Model (DFF) name."},
+    {"key": "txd", "col": "C", "name": "txdName", "type": "s", "unit": "name", "desc": "Texture dictionary name."},
+    {"key": "pedtype", "col": "D", "name": "defaultPedType", "type": "s", "unit": "name", "desc": "Default ped type (CIVMALE, CIVFEMALE, COP, GANG1-10, DEALER, MEDIC, FIREMAN, CRIMINAL, BUM, PROSTITUTE, SPECIAL ...): decides relationships from data/ped.dat."},
+    {"key": "stat", "col": "E", "name": "pedStats", "type": "s", "unit": "name", "desc": "Behaviour stats line of data/pedstats.dat (STAT_...)."},
+    {"key": "animgroup", "col": "F", "name": "animGroup", "type": "s", "unit": "name", "desc": "Movement animation group (man, woman, fatman, oldman, gang1, ...)."},
+    {"key": "cars_mask", "col": "G", "name": "carsCanDriveMask", "type": "x", "unit": "hex bits", "flags": "car_groups", "desc": "Car classes this ped may drive (hex bits of the vehicles.ide classes)."},
+    {"key": "flags", "col": "H", "name": "flags", "type": "x", "unit": "hex bits", "desc": "Ped flags; 1 = buys drugs."},
+    {"key": "ifp", "col": "I", "name": "animFile", "type": "s", "unit": "name", "desc": "Extra animation file (IFP) loaded with the ped, null = none."},
+    {"key": "radio1", "col": "J", "name": "radio1", "type": "i", "unit": "station", "enum": "radio", "desc": "Favourite radio station."},
+    {"key": "radio2", "col": "K", "name": "radio2", "type": "i", "unit": "station", "enum": "radio", "desc": "Second favourite radio station."},
+    {"key": "voice_type", "col": "L", "name": "voiceType", "type": "s", "unit": "name", "desc": "Voice type (PED_TYPE_GEN, PED_TYPE_EMG, PED_TYPE_PLAYER, PED_TYPE_GANG, PED_TYPE_GFD, PED_TYPE_SPC)."},
+    {"key": "voice1", "col": "M", "name": "voiceMin", "type": "s", "unit": "name", "desc": "First voice of the range the ped speaks with."},
+    {"key": "voice2", "col": "N", "name": "voiceMax", "type": "s", "unit": "name", "desc": "Last voice of the range."}
+  ],
+  "pedstats": [
+    {"key": "name", "col": "A", "type": "s", "unit": "name", "desc": "Stat name (STAT_...). The engine reads the lines in order: the name is only a label."},
+    {"key": "flee_distance", "col": "B", "type": "f", "unit": "m", "desc": "Distance a fleeing ped keeps."},
+    {"key": "heading_change_rate", "col": "C", "type": "f", "unit": "degrees", "desc": "How fast the ped turns."},
+    {"key": "fear", "col": "D", "type": "i", "unit": "0-100", "desc": "Fear; 100 = scared of everything."},
+    {"key": "temper", "col": "E", "type": "i", "unit": "0-100", "desc": "Temper; 100 = very bad tempered."},
+    {"key": "lawfulness", "col": "F", "type": "i", "unit": "0-100", "desc": "Lawfulness; 100 = very law-abiding."},
+    {"key": "sexiness", "col": "G", "type": "i", "unit": "0-100", "desc": "Sexiness."},
+    {"key": "attack_strength", "col": "H", "type": "f", "unit": "x", "desc": "Multiplier of the damage the ped deals."},
+    {"key": "defend_weakness", "col": "I", "type": "f", "unit": "x", "desc": "Multiplier of the damage the ped receives."},
+    {"key": "shooting_rate", "col": "J", "type": "i", "unit": "0-100", "desc": "How the ped fights with guns."},
+    {"key": "decision_maker", "col": "K", "type": "i", "unit": "id", "desc": "Default decision maker: 0 group member, 1 cop, 2 random normal, 3 random tough, 4 random weak."}
+  ],
+  "car_groups": [
+    {"bit": 0, "name": "NORMAL_CAR"}, {"bit": 1, "name": "POOR_FAMILY_CAR"}, {"bit": 2, "name": "RICH_FAMILY_CAR"},
+    {"bit": 3, "name": "EXECUTIVE_CAR"}, {"bit": 4, "name": "WORKER_CAR"}, {"bit": 5, "name": "BIG_CAR"},
+    {"bit": 6, "name": "TAXI_CAR"}, {"bit": 7, "name": "MOPED"}, {"bit": 8, "name": "MOTORBIKE"},
+    {"bit": 9, "name": "LEISURE_BOAT"}, {"bit": 10, "name": "WORKER_BOAT"}, {"bit": 11, "name": "BICYCLE"},
+    {"bit": 12, "name": "ON_FOOT"}
+  ],
+  "enums": {
+    "radio": {"0": "station 0", "1": "station 1", "2": "station 2", "3": "station 3", "4": "station 4", "5": "station 5",
+              "6": "station 6", "7": "station 7", "8": "station 8", "9": "off"}
+  }
+}

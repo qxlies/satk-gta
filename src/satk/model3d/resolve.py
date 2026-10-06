@@ -1,7 +1,9 @@
 """Which files make up a model: SID -> :class:`ModelSource` through ``satk.index.api`` (SPEC §4.3.4).
 
 Accepted ids: ``model:411``, ``model:infernus``, ``411``, ``infernus``, ``dff:infernus`` (the model whose
-name is that DFF, else the bare DFF), ``inst:lae2_stream0#4`` (the placed model).
+name is that DFF, else the bare DFF), ``inst:lae2_stream0#4`` (the placed model), or the path of a ``.dff``
+file of one's own (:func:`resolve_file`: the ``.txd`` of the same name next to it; a vehicle also gets the
+game's ``vehicle.txd`` and default paint).
 
 The index API is used first (``IndexDB.model_files`` ...). An ``IndexDB`` of stage Q1 raises
 ``IndexNotImplemented`` there; then a small read-only SQL fallback over the frozen schema v1 (``model``,
@@ -19,7 +21,8 @@ from ..core.errors import SatkError
 from ..core.ids import Sid
 from ..index.api import BlobRef, ColRef, IndexDB, ModelFiles, open_index
 
-__all__ = ["ModelSource", "resolve", "model_files", "list_models", "read_blob", "blob_ref", "open_db"]
+__all__ = ["ModelSource", "resolve", "resolve_file", "is_dff_path", "model_files", "list_models", "read_blob",
+           "blob_ref", "open_db"]
 
 _QMAX = 500
 
@@ -204,8 +207,52 @@ def _parse(ident: str) -> Sid:
     return s
 
 
+def is_dff_path(ident) -> bool:
+    """True for the path of a ``.dff`` file (instead of a SID or model name)."""
+    s = str(ident).strip().strip('"')
+    return s.lower().endswith(".dff") and ("/" in s or "\\" in s or Path(s).is_file())
+
+
+def _loose(p: Path) -> BlobRef:
+    return BlobRef(f"file:{p.name.lower()}", p, 0, p.stat().st_size, p.name)
+
+
+def resolve_file(path, profile: str = "vanilla", db: IndexDB | None = None) -> ModelSource:
+    """A DFF file of one's own: the TXD of the same name next to it; vehicles (chassis/wheel dummies) also get
+    the game's ``vehicle.txd`` (from the index of ``profile``) and are previewed as ``cars``."""
+    from ..core.paths import open_ro, jpath
+    from ..formats.rw import FormatError
+    from .mesh import build_scene, is_vehicle
+
+    p = Path(str(path).strip().strip('"')).expanduser()
+    if not p.is_file():
+        raise SatkError("NOT_FOUND", f"no DFF file at {jpath(p)}", hint="a .dff file, or model:<id>")
+    notes: list[str] = []
+    want = p.stem.lower() + ".txd"
+    txd = next((q for q in p.parent.iterdir() if q.name.lower() == want and q.is_file()), None)
+    chain = [_loose(txd)] if txd is not None else []
+    if txd is None:
+        notes.append(f"NO_TXD: no {want} next to {p.name}: rendered without its own textures")
+    with open_ro(p) as f:
+        data = f.read()
+    try:
+        scene = build_scene(data, name=p.stem.lower())
+    except FormatError as e:
+        raise SatkError("UNSUPPORTED", f"{p.name}: cannot decode the DFF: {e}") from None
+    sec = "cars" if is_vehicle(None, scene.frames) else None
+    if sec == "cars":
+        try:
+            db = db or open_db(profile)
+            chain.append(blob_ref(db, "txd:vehicle"))
+        except SatkError as e:
+            notes.append(f"NO_VEHICLE_TXD: {e.code}: vehicle.txd textures render missing")
+    return ModelSource(f"file:{p.name.lower()}", None, p.stem.lower(), sec, _loose(p), chain, None, profile, notes)
+
+
 def resolve(ident: str, profile: str = "vanilla", db: IndexDB | None = None) -> ModelSource:
     """Model files for any accepted id (see module docstring)."""
+    if is_dff_path(ident):
+        return resolve_file(ident, profile, db)
     db = db or open_db(profile)
     s = _parse(ident)
     notes: list[str] = []

@@ -6,7 +6,9 @@ list:
 
 * ``satk_ops(query, limit)`` -- search the registry (name, CLI words, summaries, parameters, docs,
   examples); rows ``op | args | summary`` with a compact signature, and the full JSON ``schema``
-  when the query has exactly one hit or names an operation exactly;
+  when the query has exactly one hit or names an operation exactly. Natural task queries ("make txd
+  from png", "create vehicle", "smooth faceted shading") are ranked by :data:`INTENTS` first;
+  filler words (:data:`STOPWORDS`) are ignored and :data:`SYNONYMS` widen single words;
 * ``satk_op(op, args)`` -- resolve ``op`` (dotted name, CLI words, MCP tool name), check the policy
   below, validate ``args`` with the operation's own schema (the CLI path: ``OpSpec.bind``) and run
   it. In the MCP server ordinary operations run in a worker thread under their group lock and
@@ -50,6 +52,10 @@ __all__ = [
     "prepare",
     "args_signature",
     "search",
+    "rank",
+    "INTENTS",
+    "SYNONYMS",
+    "STOPWORDS",
 ]
 
 #: Registry operations behind the two generic MCP tools (``satk mcp ops`` / ``satk mcp op``).
@@ -297,15 +303,157 @@ def _haystack(o: OpSpec) -> list[tuple[str, int]]:
 
 
 def _score(o: OpSpec, words: list[str], hay: list[tuple[str, int]]) -> tuple[int, int]:
-    """(matched words, score)."""
+    """(matched words, score); a word also matches through its singular and synonyms (one point less)."""
     segs = set(re.split(r"[._\s-]+", f"{o.name} {o.cli}".lower()))
     matched = score = 0
     for w in words:
-        best = max((wt for text, wt in hay if w in text), default=0)
+        best = bonus = 0
+        for k, f in enumerate(_forms(w)):
+            b = max((wt for text, wt in hay if f in text), default=0)
+            if b:
+                best = max(best, b - (1 if k else 0))
+                bonus = max(bonus, 6 if f in segs else 0)
         if best:
             matched += 1
-            score += best + (6 if w in segs else 0)
+            score += best + bonus
     return matched, score
+
+
+#: Words that carry no meaning for the search (they would match nearly every summary).
+STOPWORDS = frozenset(
+    "a an the to of for from in into on onto with my me i we want need how do does can could should is are it "
+    "its and or some this that these those please using use by as at via so then".split())
+
+#: Query word -> other spellings that count as a match of that word.
+SYNONYMS: dict[str, tuple[str, ...]] = {
+    "car": ("vehicle",), "cars": ("vehicle",), "auto": ("vehicle",), "sedan": ("vehicle",),
+    "truck": ("vehicle",), "motorbike": ("bike", "vehicle"), "helicopter": ("heli",), "aircraft": ("plane",),
+    "picture": ("image", "png"), "photo": ("image", "png"), "pic": ("image", "png"), "png": ("image",),
+    "skin": ("ped",), "character": ("ped",), "gun": ("weapon",), "prop": ("object",), "props": ("object",),
+    "collision": ("col",), "texture": ("txd",), "textures": ("txd", "texture"), "frames": ("frame",),
+    "nodes": ("node", "frame"), "dummies": ("dummy", "frame"), "addon": ("add",),
+    "modloader": ("mod loader", "mod"), "limits": ("limit",), "capacity": ("limit", "slots", "store"),
+}
+
+_CREATE = frozenset({"make", "create", "new", "build", "author", "model", "modelling", "modeling", "design",
+                     "sculpt", "draw", "start", "begin"})
+_KINDS = frozenset({"vehicle", "vehicles", "car", "cars", "bike", "motorbike", "boat", "plane", "heli",
+                    "helicopter", "truck", "trailer", "bmx", "quad", "train", "prop", "props", "object", "objects",
+                    "building", "buildings", "house", "interior", "weapon", "gun", "ped", "skin", "character",
+                    "pickup", "upgrade", "asset", "assets", "wheel", "wheels", "mod", "dff"})
+
+#: Task intents: every word set must be hit by the query; the operations (those registered) then lead
+#: the answer in this order. An operation named by several fired intents ranks higher.
+INTENTS: tuple[tuple[str, tuple[frozenset[str], ...], tuple[str, ...]], ...] = (
+    ("texture from images", (frozenset({"txd", "texture", "textures"}),
+                             frozenset({"png", "image", "images", "jpg", "picture", "photo", "pack", "make", "create",
+                                        "build", "new", "from"})),
+     ("texture.pack", "texture.finish", "texture.replace")),
+    ("create an asset", (_CREATE, _KINDS),
+     ("kit.template", "blender.session", "asset.init", "mod.add", "kit.kinds", "blender.methods",
+      "blender.import_model", "blender.export", "id.free")),
+    ("live blender modelling", (frozenset({"session", "live", "modelling", "modeling", "sculpt", "step"}),),
+     ("blender.session", "blender.call", "blender.methods")),
+    ("open in blender", (frozenset({"open", "import", "load", "edit", "show"}), frozenset({"blender"})),
+     ("blender.import_model", "blender.import_area", "blender.session")),
+    ("templates", (frozenset({"template", "templates", "kinds", "starter", "blank"}),),
+     ("kit.template", "kit.kinds", "kit.scene_spec")),
+    ("smooth shading", (frozenset({"smooth", "smoothing", "faceted", "facet", "facets", "facetted", "shading",
+                                   "normals", "blocky", "sharp"}),),
+     ("rw.patch", "asset.check", "style.profile", "blender.game_ready")),
+    ("package a mod", (frozenset({"package", "modloader", "install", "addon", "add-on", "ship", "release",
+                                  "distribute"}),),
+     ("mod.add", "kit.export", "mod.check", "blender.export")),
+    ("export to the game", (frozenset({"export", "exporting"}),
+                            frozenset({"dff", "model", "vehicle", "car", "asset", "blender", "game", "txd", "col"})),
+     ("kit.export", "blender.export", "asset.export")),
+    ("test in the game", (frozenset({"test", "try", "drive", "testdrive", "ingame"}),
+                          frozenset({"drive", "testdrive", "ingame", "game", "play"})),
+     ("mta.testdrive", "engine.run", "view.start")),
+    ("preview my asset", (frozenset({"preview", "render", "look", "looks", "screenshot", "lineup", "picture",
+                                     "snapshot"}),),
+     ("blender.preview", "model.image", "blender.render")),
+    ("vanilla style", (frozenset({"style", "styles", "vanilla", "stock", "original"}),
+                       frozenset({"style", "styles", "look", "looks", "like", "profile", "guide", "metrics",
+                                  "band", "bands", "texture", "textures"})),
+     ("style.card", "style.profile", "style.texture", "asset.check")),
+    ("check an asset", (frozenset({"check", "validate", "verify", "lint", "compare", "problems", "problem",
+                                   "wrong", "broken", "quality"}),
+                        frozenset({"asset", "model", "dff", "vehicle", "car", "mod", "prop", "own", "txd"})),
+     ("asset.check", "asset.lint", "mod.check")),
+    ("collision", (frozenset({"collision", "col", "collisions"}),),
+     ("col.gen", "col.check", "col.write", "col.export")),
+    ("free model ids", (frozenset({"id", "ids", "slot", "slots"}),
+                        frozenset({"free", "new", "unused", "pick", "available", "empty"})),
+     ("id.free",)),
+    ("engine capacity", (frozenset({"limit", "limits", "capacity", "pool", "pools", "full", "store", "stores"}),),
+     ("re.limits", "id.free", "mod.check", "texture.budget", "kb.fact")),
+    ("frame names", (frozenset({"frame", "frames", "node", "nodes", "dummy", "dummies", "hierarchy", "bones"}),),
+     ("re.nodes", "asset.anatomy", "formats.dump")),
+    ("reference photos", (frozenset({"reference", "blueprint", "blueprints", "photo", "photos", "refs"}),),
+     ("ref.import",)),
+    ("resume work", (frozenset({"resume", "continue", "progress", "manifest", "checkpoint", "checkpoints"}),),
+     ("asset.status", "asset.init", "blender.session")),
+    ("data lines", (frozenset({"handling", "carcols", "carmods", "cargrp", "line", "lines"}),),
+     ("data.get", "data.explain", "data.patch", "mod.add")),
+    ("2d effects", (frozenset({"2dfx", "effect", "effects", "corona", "coronas", "particle"}),),
+     ("fx2d.dump", "fx2d.check", "fx2d.apply")),
+    ("streaming memory", (frozenset({"streaming", "memory", "budget", "vram"}),),
+     ("texture.budget", "texture.audit")),
+)
+
+
+def _words(query: str) -> list[str]:
+    """Lower-case query words without filler words (all of them when only filler is left)."""
+    raw = re.findall(r"[\w.\-]+", query.lower())
+    kept = [w for w in raw if w not in STOPWORDS]
+    return kept or raw
+
+
+def _forms(word: str) -> tuple[str, ...]:
+    """A word, its singular (``frames`` -> ``frame``) and its synonyms."""
+    out = [word]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        out.append(word[:-1])
+    for w in list(out):
+        out.extend(SYNONYMS.get(w, ()))
+    return tuple(dict.fromkeys(out))
+
+
+def _intents(words: list[str]) -> list[str]:
+    """Operation names of the fired intents, best first (named by more intents, then intent order)."""
+    present = set(words) | {f for w in words for f in _forms(w)}
+    votes: dict[str, list[int]] = {}
+    for i, (_name, needs, ops) in enumerate(INTENTS):
+        if all(present & need for need in needs):
+            for j, name in enumerate(ops):
+                v = votes.setdefault(name, [0, i * 100 + j])
+                v[0] += 1
+    return sorted(votes, key=lambda n: (-votes[n][0], votes[n][1]))
+
+
+def rank(query: str, pool: list[OpSpec]) -> tuple[list[OpSpec], bool]:
+    """Operations of ``pool`` matching ``query``, best first, and whether every word matched.
+
+    Operations of fired intents come first (:data:`INTENTS`), then the operations matching the most
+    words (name and CLI words weigh most, then summaries, parameters, docs).
+    """
+    words = _words(query)
+    if not words:
+        return list(pool), True
+    by_name = {o.name: o for o in pool}
+    intent = [by_name[n] for n in _intents(words) if n in by_name]
+    scored = []
+    for o in pool:
+        matched, score = _score(o, words, _haystack(o))
+        if matched:
+            scored.append((matched, score, o))
+    top = max((m for m, _, _ in scored), default=0)
+    hits = [o for m, _, o in sorted(scored, key=lambda t: (-t[0], -t[1], t[2].name)) if m == top]
+    if intent:
+        seen = {o.name for o in intent}
+        return intent + [o for o in hits if o.name not in seen], True
+    return hits, bool(top) and top == len(words)
 
 
 def _row(o: OpSpec, *, full: bool) -> list:
@@ -332,7 +480,7 @@ def search(query: str | None = None, limit: int = 20, groups: set[str] | None = 
     pool = callable_ops(groups)
     in_pool = {o.name for o in pool}
     q = (query or "").strip()
-    words = re.findall(r"[\w.\-]+", q.lower())
+    words = _words(q)
     warn: list[str] = []
     exact: OpSpec | None = None
     blocked: list[OpSpec] = []
@@ -346,20 +494,14 @@ def search(query: str | None = None, limit: int = 20, groups: set[str] | None = 
                 exact = cand
             else:
                 blocked.append(cand)
-        scored = []
-        for o in pool:
-            matched, score = _score(o, words, _haystack(o))
-            if matched:
-                scored.append((matched, score, o))
-        top = max((m for m, _, _ in scored), default=0)
-        if top and top < len(words):
+        hits, full = rank(q, pool)
+        if hits and not full:
             warn.append(f"NO_FULL_MATCH: no operation matches all of {words}; showing the closest")
-        hits = [o for m, _, o in sorted(scored, key=lambda t: (-t[0], -t[1], t[2].name)) if m == top]
         if exact is not None:
             hits = [exact] + [o for o in hits if o is not exact]
         # Say which refused operations match: by name always, by any text when no callable operation
         # matched every word (never the generic tools themselves).
-        partial = top < len(words)
+        partial = not full
         for o in all_ops():
             if o.name in in_pool or o.name in (FIND_OP, RUN_OP) or any(b is o for b in blocked):
                 continue

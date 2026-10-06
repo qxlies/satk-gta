@@ -1,0 +1,17 @@
+// {{NAME}}: a cheat code. Made by 'satk script new cheat'.
+// Build: satk script asm {{NAME}}/{{NAME}}.txt; install: copy {{NAME}}.cs into the game's cleo folder (CLEO 4 or 5).
+// $2 is the player (PLAYER_CHAR), $3 the player's character (PLAYER_ACTOR).
+{$CLEO .cs}
+03A4: script_name '{{SNAME}}'
+
+:LOOP
+0001: wait 250
+00D6: if 1                              // and: both conditions
+0256: is_player_playing $2
+0ADC: test_cheat "{{CHEAT}}"
+004D: goto_if_false @LOOP
+0109: add_score $2 1000                 // money
+0223: set_char_health $3 100
+035F: add_armour_to_char $3 100
+0ACA: print_help_string "{{TEXT}}"
+0002: goto @LOOP

@@ -3,8 +3,9 @@
 # This program is free software: you can redistribute it and/or modify it under the terms of the
 # GNU General Public License as published by the Free Software Foundation, either version 3 of the
 # License, or (at your option) any later version. See LICENSE in this directory.
-"""Export models of a satk scene with DragonFF: ``<name>.dff`` (RW 3.6.0.3), ``<name>.txd``
-(RGBA8888 for now - DragonFF has no DXT encoder) and ``<name>.col`` (COL3).
+"""Export models of a satk scene with DragonFF: ``<name>.dff`` (RW 3.6.0.3) and ``<name>.col`` (COL3), plus a PNG
+of every own texture (``_tex/<name>/tex``; shared ``vehicle.txd`` textures are referenced, not copied). The TXD is
+packed on the satk side by ``satk.texmod`` (DXT, class formats) - DragonFF's TXD writer has no DXT encoder.
 
 Targets are given as object names, model names or SIDs (``model:``/``inst:``); an instance maps to
 the prototype of its model (the model in its own coordinates). Generated helper objects (cloned
@@ -26,6 +27,12 @@ import bpy
 from mathutils import Matrix
 
 from . import common, shading
+
+def fix_bspheres(path: str) -> dict:
+    """Frame-local geometry bounding spheres in a DragonFF DFF (see :func:`satk.kit.rwfix.fix_bspheres`)."""
+    from satk.kit.rwfix import fix_bspheres as _fix
+
+    return _fix(path)
 
 
 class ExportError(Exception):
@@ -347,22 +354,37 @@ def _export(targets, out_dir: str, de, te, state: SceneState) -> dict:
         shading.set_game_shading(False, mats)
         shading.restore_for_export(mats)
         files = {}
-        # TXD first: DragonFF's DFF exporter wraps materials with PrincipledBSDFWrapper(is_readonly=False),
-        # which adds empty image nodes to untextured materials - and the TXD exporter trips over those.
+        # Textures first: DragonFF's DFF exporter wraps materials with PrincipledBSDFWrapper(is_readonly=False),
+        # which adds empty image nodes to untextured materials. The own textures become PNGs; the satk side packs
+        # them into <stem>.txd with satk.texmod (DXT1/DXT3 by the section's class, never the RGBA8888 of DragonFF).
         _drop_empty_image_nodes(mats)
-        txd_path = os.path.join(out_dir, f"{stem}.txd")
-        te.txd_exporter.version = 0x36003
-        te.txd_exporter.export_textures([o for o in exp_objs if o.type == "MESH"], txd_path)
-        files["txd"] = common.fwd(txd_path)
+        from .kit.export import save_textures
+
+        tex_rows = save_textures([o for o in exp_objs if o.type == "MESH"], os.path.join(out_dir, "_tex", stem), warn)
         dff_path = os.path.join(out_dir, f"{stem}.dff")
         _select_only(exp_objs)
+        # the engine finds a vehicle's embedded COL by name: <model>_col (DragonFF names it after the collection)
+        col_renames = []
+        if vehicle:
+            for c in {u for o in exp_objs if getattr(o.dff, "type", "") in ("COL", "SHA") for u in o.users_collection}:
+                other = bpy.data.collections.get(f"{stem}_col")
+                if other is not None and other is not c:
+                    other.name = f"{stem}_col_satk_tmp"
+                    col_renames.append((other, other.name, f"{stem}_col"))
+                col_renames.append((c, f"{stem}_col", c.name))
+                c.name = f"{stem}_col"
+                break
+        de.dff_exporter.collection = None
         de.export_dff({
             "file_name": dff_path, "directory": out_dir, "selected": True, "mass_export": False,
             "preserve_positions": True, "preserve_rotations": True, "version": 0x36003,
             "export_coll": vehicle, "coll_ext_type": 39056122, "apply_coll_trans": True,
             "export_frame_names": True, "exclude_geo_faces": False, "from_outliner": False,
         })
+        for c, _tmp, orig in reversed(col_renames):
+            c.name = orig
         files["dff"] = common.fwd(dff_path)
+        fix_bspheres(dff_path)
         if sec not in ("cars", "peds"):
             col_path = os.path.join(out_dir, f"{stem}.col")
             cc = _col_collection(name)
@@ -380,11 +402,10 @@ def _export(targets, out_dir: str, de, te, state: SceneState) -> dict:
         if sid and str(sid).startswith("model:") and str(sid)[6:].isdigit():
             model_id = int(str(sid)[6:])
         entry = {"name": stem, "sid": sid, "id": model_id, "sec": sec or "objs", "files": files,
-                 "sizes": {k: os.path.getsize(p) for k, p in files.items()},
+                 "sizes": {k: os.path.getsize(p) for k, p in files.items()}, "textures": tex_rows,
                  "insts": _placements(sid) if sid else []}
         ide = coll.get("satk_ide")
         if ide is not None:  # IDE definition data kept by the import (draw distance, flags, tobj times)
             entry["ide"] = {k: (v if isinstance(v, (str, int, float)) else list(v)) for k, v in ide.items()}
         models.append(entry)
-    warn.append("TXD_RGBA8888: textures are exported uncompressed (the add-on has no DXT encoder yet)")
     return {"models": models, "warnings": warn}

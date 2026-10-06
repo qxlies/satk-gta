@@ -34,7 +34,7 @@ def test_saap_validate_cli(run_cli, repo_root, tmp_path):
                  str(repo_root / "proto" / "SAAP-v1.md")])
     assert r.code == 0, r.out
     d = r.json
-    assert d["valid"] is True and d["schemas"] == 21 and len(d["rows"]) >= 12
+    assert d["valid"] is True and d["schemas"] == 30 and len(d["rows"]) >= 12
     bad = tmp_path / "bad.jsonl"
     bad.write_text('{"id":"x","caps":["camera"],"steps":[{"call":"camera.set","params":{}}]}\n', encoding="utf-8")
     r = run_cli(["saap", "validate", str(bad)])

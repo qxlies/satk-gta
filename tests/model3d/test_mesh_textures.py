@@ -134,11 +134,24 @@ def test_resolve_materials_colours_lights_missing(m):
     out = TX.resolve_materials(mats, ch, {1: (10, 20, 30)})
     paint, light, lost, plain = out[0]
     assert paint.rgba == (10, 20, 30, 255) and paint.slot == 1 and paint.tex is not None
-    assert light.rgba[:3] == TX.LIGHT_KEYS[(255, 175, 0)]
+    assert light.rgba[:3] == (255, 175, 0)          # a lamp key off vehiclelights128 stays (engine rule)
     assert lost.missing and lost.tex is None and lost.tex_name == "lost"
     assert plain.rgba == (128, 128, 128, 128) and not plain.missing
     raw = TX.resolve_materials(mats, ch, None)[0]                      # not a vehicle: colours untouched
     assert raw[0].rgba == (60, 255, 0, 255) and raw[0].slot is None
+
+
+def test_lamp_rule_white_on_vehiclelights128(m):
+    from satk.formats.dff import Material
+
+    mats = [[Material(0, 0, 0xFFAF00FF, "vehiclelights128", None, 0, None),
+             Material(0, 1, 0xB9FF00FF, "vehiclelights128", None, 0, None),
+             Material(0, 2, 0xFF3C00FF, "generic", None, 0, None)]]
+    ch = TX.TxdChain([("v", m.solid_txd({"vehiclelights128": (9, 9, 9, 255), "generic": (9, 9, 9, 255)}))])
+    head, tail, other = TX.resolve_materials(mats, ch, {1: (10, 20, 30)})[0]
+    assert head.rgba[:3] == (255, 255, 255) and tail.rgba[:3] == (255, 255, 255)   # every lamp material white
+    assert other.rgba[:3] == (255, 60, 0)                                          # key colour elsewhere kept
+    assert TX.resolve_materials(mats, ch, None)[0][0].rgba[:3] == (255, 175, 0)   # not a vehicle: untouched
 
 
 def test_parse_carcols_and_vehicle_colours(tmp_path):

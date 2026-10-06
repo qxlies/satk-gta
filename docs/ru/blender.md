@@ -121,10 +121,12 @@ TXD упаковывает `satk texmod`; в рабочей копии без н
 | `satk blender render --blend B (--pos X,Y,Z --look X,Y,Z \| --ypr Y,P,R \| --bm NAME) [--time HH:MM] [--size WxH] [--fov 70] [--engine workbench\|eevee] [--objindex] [--limit N]` | `blender_job` (`render`) | PNG; с `--objindex` — ещё таблица видимых SID с долей пикселей |
 | `satk blender export --blend B --objects NAME… [--target mta-resource\|modloader] [--out DIR] [--name N]` | `blender_job` (`export`) | DFF/TXD/COL + IDE/IPL с исходными данными определения и расстановок (+ `meta.xml`, `client.lua`) |
 | `satk blender game-ready <src> [--name N] [--objects A,B] [--budget N] [--height M \| --scale S] [--origin base\|center\|keep] [--uv auto\|keep\|smart\|box] [--bake auto\|always\|never] [--tex-size N] [--prelight bake\|simple\|none] [--col hull\|box\|mesh\|none] [--surface N] [--lod R] [--draw D] [--out DIR] [--render]` | — | меш → игровая модель: DFF + COL + LOD + TXD в `work\out\blender\<name>\`, с проверками |
+| `satk blender preview <subject>` | — | лист превью в стиле SA для модели, файла DFF, папки мода или сессии: [look.md](look.md) |
 | `satk blender addon-build` | — | zip расширения `satk_blender` в `work\out\blender\` |
 | `satk blender run <cmd> --args '<json>'` | `blender_job` | то же через JSON (`cmd` = `doctor`, `import_model`, `import_area`, `render`, `export`) |
 
-`id` модели — `model:411`, `model:infernus`, `411` или имя. Команды импорта принимают ещё `--profile` и
+`id` модели — `model:411`, `model:infernus`, `411`, имя или путь к своему файлу `.dff` (берётся `.txd`
+с тем же именем рядом; машина получает ещё `vehicle.txd` игры). Команды импорта принимают ещё `--profile` и
 `--source auto|index|direct`. `--objects` у экспорта — имя объекта из сцены, имя модели (`lae2_roads89`) или SID
 (`model:17613`, `inst:lae2_stream0#4`); расстановка экспортируется как её модель.
 
@@ -198,6 +200,29 @@ Blender запускает Python с `ignore_environment`, поэтому `PYTHO
 аддон и `agent_cli.py` выставляют `sys.dont_write_bytecode` сами (аддон — если переменная задана, как её
 задаёт раннер satk), и `__pycache__` не появляется ни в `tools`, ни в `work\blender\dragonff`.
 
+## Заметки о Blender 5.1
+
+- **Нормали.** С Blender 4.1 «автосглаживания» нет: свои нормали сохраняются и на плоских гранях, но каждая
+  плоская грань — отдельный веер, поэтому экспорт DFF пишет по вершине на каждый угол (у машины с плоским
+  затенением вершин примерно вчетверо больше). Сначала сварите вершины, сделайте все грани гладкими, отметьте
+  острые рёбра и только потом примените модификатор Weighted Normal или свои нормали; переключение гладкого
+  затенения после этого сдвигает свои нормали.
+- **Smooth by Angle** с 4.1 — модификатор (ассет геометрических узлов); он работает без окна с
+  `--factory-startup`, а DragonFF экспортирует вычисленный стек модификаторов.
+- **`use_nodes`** у материалов и миров в 5.x устарел (всегда включён); satk ставит его только там, где это
+  нужно старым сборкам.
+- **Миниатюры.** Blender в Windows пишет миниатюры `.blend` в папку пользователя `.thumbnails`, что бы ни было в
+  `XDG_CACHE_HOME`. Каждый входной скрипт satk ставит `file_preview_type = 'NONE'` (и без резервных `.blend1`,
+  без автосохранения) до любого сохранения: холодное задание, сохраняющее `.blend`, не добавляет миниатюр.
+- **Байт-код.** Blender игнорирует `PYTHONDONTWRITEBYTECODE` (Python запускается с `ignore_environment`);
+  входные скрипты ставят `sys.dont_write_bytecode`, поэтому в папке аддона не появляется `__pycache__`.
+- **Потоки.** Задания передают `-t N` из `SATK_BLENDER_THREADS` или `[blender] threads` в `satk.toml`
+  (не задано или 0 — все ядра), чтобы несколько заданий делили одну машину.
+- **Фоновый режим.** `bpy.app.timers` под `-b` не срабатывают, отмены нет; живая сессия
+  ([studio.md](studio.md)) вместо этого использует блокирующий цикл в главном потоке и контрольные точки `.blend`.
+- **EEVEE** (`BLENDER_EEVEE` в 5.x) компилирует шейдеры на первом кадре задания; игровой вид SA из
+  [look.md](look.md) делит одну группу узлов между всеми материалами, чтобы это было быстро.
+
 ## Ограничения и известные проблемы
 
 - `export` пишет TXD в RGBA8888 без мипмапов (у писателя TXD DragonFF нет DXT-энкодера; предупреждение
@@ -209,7 +234,7 @@ Blender запускает Python с `ignore_environment`, поэтому `PYTHO
 - DragonFF теряет несколько вырожденных/дублирующихся треугольников (у `lae2_roads89` 219 из 225).
 - Вся карта в Blender не помещается (50 935 расстановок): лимит задания — 5 000 расстановок (`--limit`,
   по умолчанию 2 000), разумная единица — район.
-- Постоянного Blender-сервера пока нет: каждый вызов платит 1,5 с на старт.
+- Каждое задание платит 1,5 с на старт; пошаговая работа — в живой сессии ([studio.md](studio.md)).
 - `game-ready`: UV — `smart_project` или куб (xatlas и развёртка по частям не ставятся: без новых зависимостей),
   поверхность COL одна на всю модель, prelight — модель освещения, а не `timecyc.dat`; альфа исходных текстур
   при запекании теряется; ориентацию нормалей исходника `game-ready` не чинит.

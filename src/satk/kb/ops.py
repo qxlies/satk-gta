@@ -1,6 +1,6 @@
 """Operations of satk.kb — knowledge base about GTA:SA internals (owner M2-02).
 
-CLI: ``satk kb build|search|sym|struct|opcode|fact``. All operations are ``mcp=False``; MCP
+CLI: ``satk kb build|search|sym|struct|opcode|fact`` (``kb mta|native``: :mod:`.scriptapi_ops`). All operations are ``mcp=False``; MCP
 clients reach them through the generic operation tool. Also registers the ``kb`` status section
 and the ``kb`` doctor check. Module-level imports are stdlib-only.
 """
@@ -12,6 +12,7 @@ from typing import Literal
 from ..core.envelope import clamp_limit, obj
 from ..core.errors import SatkError
 from ..core.registry import doctor_check, op, report_progress, status_provider
+from . import scriptapi_ops as _scriptapi_ops  # noqa: F401 - registers kb.mta and kb.native
 
 __all__ = ["kb_build", "kb_search", "kb_sym", "kb_struct", "kb_opcode", "kb_fact"]
 
@@ -20,7 +21,8 @@ Source = Literal["gta-reversed", "plugin-sdk", "mta-upstream", "mta-neon", "cleo
 
 @op("kb.build", group="re", mcp=False, long_running=True,
     summary="Rebuild the knowledge base work/kb/kb.sqlite from gta-reversed, plugin-sdk, MTA upstream and Neon, the "
-            "cleo-ai opcode reference, research reports and curated facts (read-only git, no network, ~30-60 s).",
+            "cleo-ai opcode reference, research reports, curated facts, the MTA Lua API and Pawn include files "
+            "(read-only git, no network, ~30-60 s).",
     summary_ru="Пересобрать базу знаний work/kb/kb.sqlite из gta-reversed, plugin-sdk, MTA (upstream и Neon), "
                "справочника опкодов cleo-ai, отчётов и проверенных фактов",
     examples=("satk kb build",))
@@ -41,6 +43,7 @@ def kb_build(research: bool = True) -> dict:
               facts={k: v for k, v in (st.get("facts") or {}).items() if k != "facts"},
               layouts={k: f"{v['ok']} ok / {v['mismatch']} mismatch / {v['unverified']} unverified / {v['partial']} partial"
                        for k, v in structs.items() if v},
+              scriptapi=(st.get("scriptapi") or {}).get("counts"),
               skipped=st.get("skipped"))
     if st.get("skipped"):
         env.setdefault("warn", []).extend(f"SKIPPED: {k}: {v}" for k, v in sorted(st["skipped"].items()))

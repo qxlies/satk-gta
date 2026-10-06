@@ -42,6 +42,17 @@ Python с `-X utf8`, поэтому вывод satk корректен в люб
 `satk world near --kinds inst 2495 -1687` → `BAD_PARAMS: kinds must be one of inst, item, zone, water, got '2495'`.
 Пишите позиционные аргументы **первыми**: `satk world near 2495 -1687 --kinds inst`.
 
+Команды поиска принимают слова без кавычек: `satk ops make txd from png` (= `satk mcp ops`), `satk kb search
+CStreaming RequestModel`, `satk help --find crash address`. Длинный ответ можно отправить в файл:
+`--out result.json` пишет весь JSON и печатает одну строку; `--summary` печатает только эту строку. В режиме
+JSON ошибка дополнительно выводится одной строкой в stderr.
+
+## `%` в аргументах пропадает
+
+Обёртка вида `call satk.cmd %*` заставляет `cmd` заново раскрыть `%...%`, и `LIKE '%car%'` приходит
+изменённым. Вызывайте `tools\satk.cmd` (или `satk.sh`, или консольный скрипт `satk`) напрямую либо
+передавайте такие аргументы в JSON-файле: `satk mcp op index.query --args @args.json`.
+
 ## Вьювер: `NOT_READY`, чёрный или пустой кадр
 
 - **Не запущен.** `NOT_READY: target 'ariane' is not running` → `satk view start --target ariane`
@@ -157,6 +168,17 @@ satk работает на CPython 3.12–3.14 (`satk doctor`, проверка 
   Узкий набор инструментов: `SATK_MCP_GROUPS=core,index,media,view`.
 - Сервер не стартует: `satk doctor` (проверки `deps`, `ops_import`, `app_control`), затем
   `<workspace>\work\logs\mcp.log`.
+
+## `WinError 5` в песочнице (песочница Codex для Windows, урезанные токены)
+
+Процесс в песочнице не может создавать именованные каналы, запускать Git Bash и пользоваться временными папками
+с правами только для владельца. satk справляется там, где это возможно: пулы воркеров (сборка индекса, миниатюры,
+экспорт текстур) работают в одном процессе, а ответ содержит `warn: ["UNSUPPORTED: worker processes are not
+available here ..."]`; результат тот же, только медленнее. `SATK_JOBS=1` (или `--jobs 1`) включает такой режим
+намеренно. `satk dev gate` сам находит ограничения, подключает к pytest `tests/sandbox_compat.py` и перечисляет
+найденное в `warn`; немногие тесты, которым нужны Git Bash или каналы asyncio-подпроцессов, пропускаются с причиной,
+которая начинается с `sandbox:`, а gate их считает («N skipped for the sandbox»). Вне такой песочницы ничего не
+меняется.
 
 ## Быстрый пример
 

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/scene.reload.json",
+  "title": "scene.reload",
+  "description": "Re-read the files of one entity (handle) or of all entities.",
+  "x-saap": {
+    "method": "scene.reload",
+    "capability": "view",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "handle": {
+          "type": "string",
+          "pattern": "^@?[A-Za-z0-9_.-]{1,48}$"
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "reloaded": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "handle": {
+                "type": "string"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "load_ms": {
+                "type": "number",
+                "minimum": 0
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "handle",
+              "ok"
+            ]
+          }
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "reloaded"
+      ]
+    }
+  }
+}

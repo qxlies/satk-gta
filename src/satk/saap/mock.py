@@ -295,6 +295,7 @@ class MockWorld:
         self.log_seq = 0
         self.log_max = 1000
         self._owner_cache: dict[tuple, _Frame] = {}
+        self._author = None  # satk.studio.mock.MockStudioWorld, made on first author.* call
         self._log("console", "info", "mock endpoint started")
 
     # -- server hooks ------------------------------------------------------------------------
@@ -325,7 +326,7 @@ class MockWorld:
     def _drawable(self) -> list[MockEntity]:
         mode = self.view["lod_mode"]
         out = []
-        for e in ENTITIES:
+        for e in (*ENTITIES, *self._scene_entities()):
             if e.ref in self.view["hide"]:
                 continue
             if mode == "lod" and not e.lod and e.lod_parent:
@@ -729,8 +730,9 @@ class MockWorld:
             bad = [o for o in p["overlays"] if o not in OVERLAYS]
             if bad:
                 raise SatkError("UNSUPPORTED", f"overlay {bad[0]!r} is not supported", data={"overlay": bad[0]})
+        placed = {e.ref for e in self._scene_entities()}
         for k in ("hide", "highlight"):
-            missing = [r for r in p.get(k) or [] if r not in _ENTITY_BY_REF]
+            missing = [r for r in p.get(k) or [] if r not in _ENTITY_BY_REF and r not in placed]
             if missing:
                 raise SatkError("NOT_FOUND", f"no entity {missing[0]!r}")
         for k in ("overlays", "lod_mode", "draw_dist_mul", "area", "hide", "highlight", "wireframe", "postfx"):
@@ -777,6 +779,41 @@ class MockWorld:
 
     # -- dev ---------------------------------------------------------------------------------
 
+    # -- scene: the agent's own entities (logic in satk.viewscene.mock) ------------------------
+
+    def _scene_ext(self):
+        ext = getattr(self, "_scene", None)
+        if ext is None:
+            from ..viewscene.mock import MockScene
+
+            ext = self._scene = MockScene(self)
+        return ext
+
+    def _scene_entities(self) -> tuple:
+        ext = getattr(self, "_scene", None)
+        return ext.entities() if ext is not None else ()
+
+    def _m_scene_place(self, p: dict) -> dict:
+        return self._scene_ext().call("scene.place", p)
+
+    def _m_scene_vehicle(self, p: dict) -> dict:
+        return self._scene_ext().call("scene.vehicle", p)
+
+    def _m_scene_ped(self, p: dict) -> dict:
+        return self._scene_ext().call("scene.ped", p)
+
+    def _m_scene_reload(self, p: dict) -> dict:
+        return self._scene_ext().call("scene.reload", p)
+
+    def _m_scene_remove(self, p: dict) -> dict:
+        return self._scene_ext().call("scene.remove", p)
+
+    def _m_scene_clear(self, p: dict) -> dict:
+        return self._scene_ext().call("scene.clear", p)
+
+    def _m_scene_list(self, p: dict) -> dict:
+        return self._scene_ext().call("scene.list", p)
+
     def _m_log_poll(self, p: dict) -> dict:
         since = int(p.get("since", 0))
         mx = int(p.get("max", 100))
@@ -818,6 +855,23 @@ class MockWorld:
         if p.get("side", "client") not in ("client", "server"):
             raise SatkError("BAD_PARAMS", "side must be client or server")
         return mini_lua(p["code"])
+
+    # -- author (the studio's fake scene, satk.studio.mock) ------------------------------------
+
+    def _studio(self):
+        if self._author is None:
+            from ..studio.mock import MockStudioWorld
+
+            self._author = MockStudioWorld()
+        return self._author
+
+    def _m_author_methods(self, p: dict) -> dict:
+        return self._studio().dispatch("author.methods", p)
+
+    def _m_author_call(self, p: dict) -> dict:
+        out = self._studio().dispatch("author.call", p)
+        self.scene_rev += 1
+        return out
 
     def _m_mem_read(self, p: dict) -> dict:
         a = p["addr"]

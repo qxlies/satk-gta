@@ -2,7 +2,7 @@
 
 Status: **FROZEN v1** (2026-10-04). Source of truth for the satk mock, the
 `ARIANE_IPC/1` adapter, the native Ariane endpoint, the MTA Lua resource, the native MTA
-client/server endpoints (planned) and, later, Blender. Machine-readable parts: `schema/*.json` (JSON Schema 2020-12, one file
+client/server endpoints (planned) and the Blender studio. Machine-readable parts: `schema/*.json` (JSON Schema 2020-12, one file
 per method with `$defs.params` and `$defs.result`, shared types in `common.json`),
 `conformance/*.jsonl` (request → expectation cases) and `cpp/saap_frame.hpp` (framing,
 limits, token check, descriptor writing; MIT, header-only, C++14).
@@ -12,7 +12,8 @@ extensions are announced through capabilities (`caps`). Anything not stated here
 implementation-defined and must not be relied on by clients.
 
 Contents: 1 Transport · 2 Envelope · 3 Errors · 4 Authentication · 5 Discovery ·
-6 Common types · 7 Capabilities · 8 Methods · 9 Conformance · 10 Implementation notes.
+6 Common types · 7 Capabilities · 8 Methods · 9 Conformance · 10 Implementation notes ·
+11 Scene (extension of `view`).
 
 ---
 
@@ -148,6 +149,9 @@ sends `WM_CLOSE` or terminates a pid it cannot verify.
 
 Roles: `ariane`, `game` (= `client1`), `client2`, `server`, `blender`, `mock`.
 
+Several Blender studio sessions can run at once: each has its own pair of files named
+`blender-<name>.json` (the descriptor keeps `"role":"blender"` and adds `"name"`).
+
 ## 6. Common types
 
 All types are defined in `schema/common.json` (`$defs`).
@@ -223,17 +227,19 @@ answers `UNSUPPORTED`. Sub-capabilities refine a method:
 | `entity.query` | `entity.query` |
 | `entity.inspect` | `entity.inspect` |
 | `env` | `env.get`, `env.set` |
-| `view` | `view.set` |
+| `view` | `view.set`; `scene.*` (§11: the agent's own models, vehicles and peds) |
 | `asset.render` | `asset.render` |
 | `log` | `log.poll` |
 | `console` | `console.exec` |
 | `lua` | `lua.exec` (dev builds only) |
 | `mem.read` | `mem.read` (dev builds only) |
+| `author` | `author.call`, `author.methods` (the Blender studio: step-by-step modelling) |
 
 Implementation matrix: mock — all; Ariane via the `ARIANE_IPC/1` adapter — `core camera
 world.settle capture pick entity.query entity.inspect env asset.render`; native Ariane adds
 `capture.size capture.ids capture.depth pick.visible view`; the MTA Lua resource answers what its
-`hello` lists (`docs/en/mta-agent.md`); the native MTA endpoints are planned.
+`hello` lists (`docs/en/mta-agent.md`); the native MTA endpoints are planned; the Blender studio
+(`satk blender session`) answers `core author`.
 
 ## 8. Methods
 
@@ -639,6 +645,65 @@ Example:
 ← {"saap":1,"id":"x3","ok":true,"result":{"hex":"00000000"}}
 ```
 
+### `author.call`
+
+Capability: `author`
+
+Runs one studio *method* in the scene (plug-ins with a `METHODS` table; `author.methods` lists
+them) and reports what changed. Every call is journaled; requests run one at a time on the
+endpoint's main thread.
+
+Params:
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `method` | string (dotted, ≤ 64) | required | studio method, e.g. `mesh.primitive`, `scene.info`, `python` |
+| `params` | object | `{}` | the method's own parameters |
+| `stats` | `auto` \| `none` \| `scene` | `auto` | `auto`: after a mutating method, rows for the changed objects + scene totals; `scene`: totals also after a read-only one |
+| `snapshot` | `{view, views, size, look, objects, wire, ghost, refs, ref_alpha}` | — | JPEG after the step: `view` `3q`/`front`/`rear`/`left`/`right`/`top` or a camera name, `views` 2–4 views as a 2x2 sheet, `size` 64–1024 (512), `look` `clay`/`raw`/`game`/`wire`, `wire` edge overlay, `ghost` `overlay`/`lineup`/`hide` for reference models, `refs`/`ref_alpha` reference photos behind the model |
+| `checkpoint` | boolean | — | `true`: save a `.blend` checkpoint after the step; `false`: none; absent: the endpoint's rule (every N-th mutating step, `python` steps, a batch with two or more mutating steps) |
+| `timeout` | number (1–7200) | 600 | time budget in seconds: a method that overruns it is stopped and answered `TIMEOUT` (the endpoint stays up); when it cannot be stopped the endpoint answers `TIMEOUT` itself a few seconds later and then `BUSY` until it is free |
+| `open` | Path | — | open this `.blend` before the step |
+| `save` | Path | — | save the scene to this `.blend` after the step (inside the work directory) |
+
+Result: `method`, `n` (journal sequence number), `ms`, optional `result` (the method's own
+answer), `changed` (object names), `stats` (`{scene: {objects, tris, verts, bbox}, objects:
+{name: {tris, verts, dims, ...}}}` of the evaluated meshes), `snapshot`, `checkpoint`, `saved`
+(paths), `warn` (`"CODE: text"`), `truncated` (what was cut to keep the reply ≤ 1.5 KB). An
+exception inside a method is an error (`BAD_PARAMS` for wrong parameters, else `INTERNAL`);
+the endpoint stays up. An unknown method is `NOT_FOUND` with `data.did_you_mean`.
+
+The method `batch` (`params.steps`: 1–200 `{method, params}`) runs the steps in order, journals each
+one, then gives one `stats`, one snapshot and one checkpoint; the result lists `steps`
+(`[{n, method, result?}]`, each result cut to its short values). A failing step stops the batch: its error carries `data.step` and
+`data.done`, and the earlier steps stay applied. Every endpoint also serves `session.checkpoint`
+(`tag`), `session.restore` (`ref`: step, tag or `last`), `session.checkpoints`, `session.prune`
+(`keep`) and `session.journal` (`last`); a world without checkpoints answers them `UNSUPPORTED`.
+
+Example:
+
+```json
+→ {"saap":1,"id":"a1","method":"author.call","params":{"method":"mesh.primitive","params":{"kind":"cylinder","segments":12,"radius":0.3,"depth":1.0,"name":"post"}}}
+← {"saap":1,"id":"a1","ok":true,"result":{"method":"mesh.primitive","n":3,"result":{"object":"post"},"changed":["post"],"stats":{"scene":{"objects":1,"tris":44,"verts":24},"objects":{"post":{"tris":44,"verts":24,"dims":[0.6,0.6,1.0]}}},"ms":2.1}}
+```
+
+### `author.methods`
+
+Capability: `author`
+
+Params: `query` (string ≤ 64: a word to filter names and descriptions), `limit` (1–1000,
+default 500).
+
+Result: `methods` (`[{name, doc, readonly?}]`, sorted by name), `total`, optional `errors`
+(plug-in modules that failed to import).
+
+Example:
+
+```json
+→ {"saap":1,"id":"m1","method":"author.methods","params":{"query":"primitive"}}
+← {"saap":1,"id":"m1","ok":true,"result":{"methods":[{"name":"mesh.primitive","doc":"Add a primitive with explicit density"}],"total":1}}
+```
+
 ## 9. Conformance
 
 `conformance/*.jsonl` holds one test case per line:
@@ -714,3 +779,171 @@ Run: `satk view conformance --target mock|ariane|game` (cases filtered by the en
   `i<instance id>`; `src` is `ipl_bin`/`ipl_text`. `asset.render` ignores `el` and `bg` (fixed preview
   camera); camera roll is ignored. Methods outside its caps (`log.poll`, `console.exec`, `lua.exec`,
   `mem.read`) answer `UNSUPPORTED`.
+
+## 11. Scene: the agent's own entities
+
+Extension of capability `view` (endpoints that implement `view` and not `scene.*` answer
+`UNKNOWN_METHOD`). The agent puts its own work into the live view: a model straight from files
+(DFF + TXDs), a vehicle or a ped. Entities live as long as the endpoint process; they have a
+**handle** (`id` chosen by the client, or `s1`, `s2`, ...) and the entity ref `@<handle>`, which
+works everywhere a ref does (`entity.inspect`, `view.set` `hide`/`highlight`). They are part of
+every layer of `capture` (`ids_legend`), of `pick` (both modes; `collision` tests their bounds),
+`raycast` and `entity.query` (kinds `object`, `vehicle`, `ped`). Their EntityRef has
+`src: {"kind": "runtime", "type": "scene", "id": <handle>}` (satk: `el:scene/<handle>`) and an
+extra object `scene` (`handle`, `dff`, `txd`, `watch`).
+
+Common params of `scene.place`, `scene.vehicle` and `scene.ped`:
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `pos` | Vec3 | required | entity origin (vehicles: their centre; peds: the root, about 1 m above the feet) |
+| `rot` | 3 or 4 numbers | — | `[rx, ry, rz]` degrees (X, then Y, then Z about world axes) or a quaternion `[x, y, z, w]` |
+| `heading` | number | 0 | degrees about Z, counter-clockwise seen from above; not with `rot` |
+| `ground` | boolean | `false` | drop onto the collision below `pos`: the lowest point of the model rests on it |
+| `dff` | absolute path | — | the model file; with `model` the file replaces the game's model |
+| `txd` | path or 1–8 paths | — | texture dictionaries, searched in order before the game's |
+| `model` | integer or string | — | game model (id or name); one of `dff`/`model` is required |
+| `watch` | boolean | `false` | reload when the files (DFF, TXDs, an IFP file) change: polled, applied once stable, about 0.5 s |
+| `id` | string `[A-Za-z0-9_.-]{1,48}` | new `s<N>` | handle; placing again with the same `id` replaces that entity in place |
+
+Result (all three): `handle`, `ref` (`@<handle>`), `entity` (EntityRef), `replaced`, `stats`
+(`atomics`, `tris`, `textures`, `missing_textures` — names the TXDs did not have, `bounds` in
+entity space), `grounded`, `warn` (`"CODE: text"`), `load_ms`. Errors: a missing file →
+`NOT_FOUND` (`data.path`), a file that is not a clump/TXD → `BAD_PARAMS`, an unknown model →
+`NOT_FOUND`, more than 256 entities → `BAD_PARAMS`.
+
+Time and weather are `env.set` (§8); a capture can also take `env` for one frame.
+
+### `scene.place`
+
+Capability: `view`
+
+Params: the common ones plus `scale` (number or Vec3, > 0, default 1). Map objects are drawn
+with the world's own pipelines; atomics named `*_dam` and `*_vlo` are hidden.
+
+Result: the common result.
+
+Example:
+
+```json
+→ {"saap":1,"id":"s1","method":"scene.place","params":{"dff":"<workspace>/work/tmp/bench/bench.dff","txd":"<workspace>/work/tmp/bench/bench.txd","pos":[2493.0,-1671.0,13.4],"heading":30,"ground":true,"watch":true,"id":"bench"}}
+← {"saap":1,"id":"s1","ok":true,"result":{"handle":"bench","ref":"@bench","entity":{"ref":"@bench","kind":"object","model_name":"bench","pos":[2493,-1671,12.75],"rot":{"q_world":[0,0,0.258819,0.965926]},"src":{"kind":"runtime","type":"scene","id":"bench"}},"replaced":false,"stats":{"atomics":1,"tris":164,"textures":2,"bounds":[[-0.32,-1.26,-0.4],[0.34,1.29,0.42]]},"grounded":true,"load_ms":4.9}}
+```
+
+### `scene.vehicle`
+
+Capability: `view`
+
+Params: the common ones (with `model` from `data/vehicles.ide`) plus:
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `colors` | 1–4 items: carcols index or `"#rrggbb"` | the first carcols set | paint slots 1–4 (material keys 60,255,0 / 255,0,175 / 0,255,255 / 255,0,255) |
+| `dirt` | integer 0–15 | 0 | dirt level: `vehiclegrunge256` with RGB = c·i/16 + 255·(16−i)/16 |
+| `lights` | boolean | `false` | lamps on (`vehiclelightson128`, unlit) |
+| `parts` | object part → `ok`\|`dam`\|`off` | all `ok` | per frame (`door_lf`, `bonnet`, `bump_front`, ...): intact, damaged or missing |
+| `wheels` | `{model?, scale?}` | from the IDE | wheel model (veh_mods wheels) and diameter in m (or `[front, rear]`) |
+
+The frame hierarchy is kept (`*_dummy` frames, `*_ok`/`*_dam` atomics, `*_vlo` hidden); wheels
+are copies of the wheel atomic (left ones turned 180°); env maps where the DFF has MatFX
+(strength from the reflection plugin); glass (material alpha < 255) is drawn after everything
+opaque. No specular highlights, no shadows.
+
+Result: the common result plus `vehicle` (`type`, `txd`, `wheels` (`from`, `scale`, `count`),
+`colors` (`[{slot, index?, rgb}]`), `dirt`, `lights`, `parts` (every part and its state),
+`materials` (counts of paint, lamp and dirt materials)). An unknown part → `BAD_PARAMS` with
+`data.parts`.
+
+Example:
+
+```json
+→ {"saap":1,"id":"v1","method":"scene.vehicle","params":{"model":426,"pos":[2495.0,-1675.0,13.4],"heading":90,"dirt":2,"colors":[3,1],"parts":{"door_lf":"dam"},"ground":true,"id":"car"}}
+← {"saap":1,"id":"v1","ok":true,"result":{"handle":"car","ref":"@car","entity":{"ref":"@car","kind":"vehicle","model_id":426,"model_name":"premier","pos":[2495,-1675,13.04],"rot":{"q_world":[0,0,0.707107,0.707107]},"src":{"kind":"runtime","type":"scene","id":"car"}},"replaced":false,"vehicle":{"type":"car","txd":"premier","wheels":{"from":"own","scale":[0.7,0.7],"count":4},"colors":[{"slot":1,"index":3,"rgb":"#840410"},{"slot":2,"index":1,"rgb":"#f5f5f5"}],"dirt":2,"lights":false,"parts":{"door_lf":"dam","bonnet":"ok"}},"stats":{"atomics":15,"tris":2652,"textures":13},"grounded":true,"load_ms":19.8}}
+```
+
+### `scene.ped`
+
+Capability: `view`
+
+Params: the common ones (with `model` from `data/peds.ide`) plus `anim` (`{ifp, name, time}`:
+`ifp` is a game animation file — `ped` or an entry of `anim/anim.img` — or an absolute `.ifp`
+path; `name` the animation, `time` seconds into it; default `ped`, `idle_stance`, 0). The ped is
+skinned (Skin + HAnim) and drawn in that static pose, also in the ID and depth layers. CJ
+(model 0) uses the clothes system and is `NOT_FOUND`; an unknown animation → `NOT_FOUND` with
+`data.animations` (names in the file).
+
+Result: the common result plus `ped` (`anim`: `ifp`, `name`, `time`, `duration`, `bones`
+(tracks matched to the skeleton), `nodes`).
+
+Example:
+
+```json
+→ {"saap":1,"id":"p1","method":"scene.ped","params":{"model":105,"pos":[2497.5,-1673.0,13.4],"heading":180,"ground":true,"id":"fam"}}
+← {"saap":1,"id":"p1","ok":true,"result":{"handle":"fam","ref":"@fam","entity":{"ref":"@fam","kind":"ped","model_id":105,"model_name":"fam1","pos":[2497.5,-1673,13.3],"rot":{"q_world":[0,0,1,0]},"src":{"kind":"runtime","type":"scene","id":"fam"}},"replaced":false,"ped":{"anim":{"ifp":"ped","name":"idle_stance","time":0,"duration":1.5,"bones":32,"nodes":32}},"stats":{"atomics":1,"tris":1113,"textures":1},"grounded":true,"load_ms":21}}
+```
+
+### `scene.reload`
+
+Capability: `view`
+
+Params: `handle` (optional; without it every entity is reloaded).
+
+Re-reads the files of the entity (or all) with the parameters it was placed with. A failed
+reload keeps the previous model (`ok:false` and `error` in the row; for a single `handle` the
+call fails with `BAD_PARAMS`). Watched entities do this by themselves.
+
+Result: `reloaded` (`[{handle, ok, load_ms, error?}]`), `failed`.
+
+Example:
+
+```json
+→ {"saap":1,"id":"r1","method":"scene.reload","params":{"handle":"bench"}}
+← {"saap":1,"id":"r1","ok":true,"result":{"reloaded":[{"handle":"bench","ok":true,"load_ms":5.2}],"failed":0}}
+```
+
+### `scene.remove`
+
+Capability: `view`
+
+Params: `handle` or `handles` (1–256; `@` prefix allowed). An unknown handle → `NOT_FOUND`
+and nothing is removed.
+
+Result: `removed` (handles), `left` (entities still placed).
+
+Example:
+
+```json
+→ {"saap":1,"id":"d1","method":"scene.remove","params":{"handles":["car","fam"]}}
+← {"saap":1,"id":"d1","ok":true,"result":{"removed":["car","fam"],"left":1}}
+```
+
+### `scene.clear`
+
+Capability: `view`
+
+Params: none.
+
+Result: `removed` (count).
+
+Example:
+
+```json
+→ {"saap":1,"id":"d2","method":"scene.clear","params":{}}
+← {"saap":1,"id":"d2","ok":true,"result":{"removed":3}}
+```
+
+### `scene.list`
+
+Capability: `view`
+
+Params: none.
+
+Result: `items` (`[{handle, entity, stats, vehicle?, ped?, grounded?, warn?, reloads, load_ms,
+error?}]` in placement order; `error` is the last failed reload), `total`.
+
+Example:
+
+```json
+→ {"saap":1,"id":"l2","method":"scene.list","params":{}}
+← {"saap":1,"id":"l2","ok":true,"result":{"items":[{"handle":"bench","entity":{"ref":"@bench","kind":"object","model_name":"bench","pos":[2493,-1671,12.75],"src":{"kind":"runtime","type":"scene","id":"bench"},"scene":{"handle":"bench","dff":"<workspace>/work/tmp/bench/bench.dff","watch":true}},"reloads":2,"load_ms":5.2}],"total":1}}
+```

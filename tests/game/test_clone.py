@@ -385,11 +385,36 @@ def test_unknown_exe_variant(fake_game, work):
     assert ei.value.code == "BAD_PARAMS"
 
 
+def _nonstock_count(root: Path, stock) -> int:
+    """Files of ``root`` outside the stock manifest, by a walk independent of ``clone`` (see ``_dry_run_nonstock``)."""
+    base = os.path.abspath(root)
+    return sum(1 for dp, _dns, fns in os.walk(base) for fn in fns
+               if M.key(os.path.relpath(os.path.join(dp, fn), base)) not in stock.entries)
+
+
+def _dry_run_nonstock(root: Path, run, stock) -> dict:
+    """``run()``'s report whose ``skip_nonstock`` matches an independent count of the real folder.
+
+    The game folders collect files that other tools write while the suite runs (logs, SA-MP and MTA leftovers, an
+    agent's temp file), so no number is hard-coded: the count is taken before and after the dry run, and a changing
+    folder gets a few attempts. Stock files and bytes stay exact: the manifest defines them.
+    """
+    for _ in range(4):
+        before = _nonstock_count(root, stock)
+        r = run()
+        after = _nonstock_count(root, stock)
+        if min(before, after) <= r["skip_nonstock"] <= max(before, after):
+            return r
+    raise AssertionError(f"skip_nonstock {r['skip_nonstock']} never matched a walk of {root} ({before}..{after})")
+
+
 @pytest.mark.game
 def test_real_dry_run(installed_root, real_work, tree_snapshot):
     dst = real_work / "wp-01" / "clone"
-    r = clone(installed_root, dst, M.load_stock(), dry_run=True)
-    assert (r["files"], r["bytes"], r["skip_nonstock"]) == (416, 5_029_186_364, 133)
+    stock = M.load_stock()
+    r = _dry_run_nonstock(installed_root, lambda: clone(installed_root, dst, stock, dry_run=True), stock)
+    assert (r["files"], r["bytes"]) == (416, 5_029_186_364)
+    assert r["skip_nonstock"] > 0  # the install carries SA-MP and mods next to the stock files
     assert r["restore"] == ["gta_sa.exe", "vorbisFile.dll"]
     assert not (real_work / "wp-01").exists()
 
@@ -397,8 +422,9 @@ def test_real_dry_run(installed_root, real_work, tree_snapshot):
 @pytest.mark.game
 def test_real_dry_run_from_clean_copy(clean_root, real_work):
     """Verifier finding: --src gta-sa-clean was NOT_FOUND (vorbisHooked.dll); now a valid source."""
-    r = plan(clean_root, real_work / "c2", M.load_stock())
-    assert (r["files"], r["bytes"], r["skip_nonstock"]) == (416, 5_029_186_364, 1)
+    stock = M.load_stock()
+    r = _dry_run_nonstock(clean_root, lambda: plan(clean_root, real_work / "c2", stock), stock)
+    assert (r["files"], r["bytes"]) == (416, 5_029_186_364)
 
 
 @pytest.mark.game

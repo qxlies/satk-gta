@@ -152,3 +152,60 @@ def test_col_export_write_vanilla_file_is_bit_exact(game_work, run_cli, clean_ro
     assert orig[:len(out)] == out and not orig[len(out):].strip(b"\0")
     veh = run_cli(["col", "export", "models/gta3.img/infernus.dff"]).json
     assert veh["rows"][0][0] == "infernus_col"
+
+
+def _premier(clean_root: Path) -> bytes:
+    with ImgArchive.open(clean_root / "models" / "gta3.img") as a:
+        data = a.read(a.find("premier.dff"))
+    return data[:rw_payload_size(data)]
+
+
+def test_smooth_normals_leave_vanilla_shading_alone(clean_root):
+    """Vanilla premier is already smooth (shade.normal_bend 10.64 deg): --smooth-normals changes it by < 0.5."""
+    from satk.formats.dff import decode_geometries
+    from satk.lint.anat import read_frames
+    from satk.lint.metrics import model_shading
+
+    data = _premier(clean_root)
+    names = {f.idx: f.name for f in read_frames(data)}
+    before = model_shading(decode_geometries(data), names)["shade.normal_bend"]
+    doc = DffDoc.parse(data)
+    doc.smooth_normals(angle=45.0)
+    after = model_shading(decode_geometries(doc.to_bytes()), names)["shade.normal_bend"]
+    assert abs(before - 10.64) < 0.2 and abs(after - before) <= 0.5
+
+
+def test_recalc_bsphere_repairs_world_space_spheres(clean_root, tmp_path):
+    """DragonFF writes geometry spheres in world space (centre + frame position, radius 1.732 x half size):
+    lint dff.bsphere fires on the parts away from the origin; --recalc-bsphere brings it to 0."""
+    import struct
+
+    from satk.lint.anat import read_frames
+    from satk.lint.runner import lint
+
+    def bsphere_findings(blob: bytes, name: str) -> int:
+        p = tmp_path / name / "premier.dff"
+        p.parent.mkdir()
+        p.write_bytes(blob)
+        return len(lint(str(p), use_index=False, only=["dff.bsphere"]).findings)
+
+    data = _premier(clean_root)
+    frames = read_frames(data)
+    doc = DffDoc.parse(data)
+    for gr, gi in zip(doc.geometries(), scan_dff(data).geoms):
+        g = gr.data()
+        fx, fy, fz = frames[gi.frame].pos if 0 <= gi.frame < len(frames) else (0.0, 0.0, 0.0)
+        for m in g.morphs:
+            p = struct.unpack(f"<{3 * g.num_verts}f", m.verts)
+            lo = [min(p[i::3]) for i in range(3)]
+            hi = [max(p[i::3]) for i in range(3)]
+            c = [(a + b) / 2 for a, b in zip(lo, hi)]
+            r = 1.732 * max(b - a for a, b in zip(lo, hi)) / 2
+            m.sphere = struct.pack("<4f", c[0] + fx, c[1] + fy, c[2] + fz, r)
+        gr.store(g)
+    broken = doc.to_bytes()
+    n_before = bsphere_findings(broken, "broken")
+    assert n_before >= 6
+    fixed = DffDoc.parse(broken)
+    assert dict(fixed.recalc_bsphere())["bsphere"] >= n_before
+    assert bsphere_findings(fixed.to_bytes(), "fixed") == 0

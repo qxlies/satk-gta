@@ -346,3 +346,16 @@ def make_world(root: Path) -> World:
     _w(trunk, "docs/limits.toml", LIMITS_TOML)
     _w(trunk, "Client/multiplayer_sa/CMultiplayerSA.cpp", MTA_MP.replace("0x401010", "0x401011"))
     return World(root, exe, gr, ps, mta, trunk)
+
+
+def make_sources(world: World):
+    """Build inputs for the synthetic world (all trees are plain directories)."""
+    from satk.re.build import Sources
+    from satk.re.gitsrc import DirTree
+
+    return Sources(exe=world.exe, gtarev=DirTree(world.gtarev), pluginsdk=DirTree(world.psdk),
+                   upstream=DirTree(world.mta), neon=DirTree(world.mta), trunk=DirTree(world.trunk),
+                   limits=DirTree(world.trunk),
+                   repo_names={"gta-reversed": world.gtarev.as_posix(), "plugin-sdk": world.psdk.as_posix(),
+                               "mta-upstream": world.mta.as_posix(), "neon": world.mta.as_posix(),
+                               "mta-trunk": world.trunk.as_posix(), "exe": world.exe.as_posix()})

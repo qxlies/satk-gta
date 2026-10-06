@@ -130,8 +130,10 @@ function satk.execLua(code, chunkname)
     if not fn then
         return {values_json = {}, prints = {}, error = satk.luaError(cerr)}
     end
-    if setfenv and getfenv then
-        pcall(setfenv, fn, getfenv(1))  -- the resource's globals (same table in MTA; matters in the tests)
+    if setfenv then
+        -- the resource's globals (the same table in MTA; matters in the tests). Not getfenv: MTA
+        -- disables it and logs "Unsafe function was called." on every call.
+        pcall(setfenv, fn, _G)
     end
     local prints = {}
     local oldPrint = print

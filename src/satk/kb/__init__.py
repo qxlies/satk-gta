@@ -7,5 +7,6 @@ Code from the sources is only shown, never written into the repository. Stdlib o
 
 Modules: :mod:`.cxx` (C++ scanning), :mod:`.layout` (MSVC x86 struct layouts), :mod:`.opcodes`
 (cleo-ai reference), :mod:`.facts` (curated facts), :mod:`.build` (the builder), :mod:`.query`
-(read side), :mod:`.ops` (CLI operations).
+(read side), :mod:`.ops` (CLI operations); scripting API references: :mod:`.scriptapi` (MTA Lua and Pawn
+parsers), :mod:`.scriptapi_build`, :mod:`.scriptapi_query`, :mod:`.scriptapi_ops` (``kb mta``, ``kb native``).
 """

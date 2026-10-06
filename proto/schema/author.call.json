@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/author.call.json",
+  "title": "author.call",
+  "x-saap": {
+    "method": "author.call",
+    "capability": "author",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$",
+          "maxLength": 64
+        },
+        "params": {
+          "type": "object"
+        },
+        "stats": {
+          "enum": [
+            "auto",
+            "none",
+            "scene"
+          ]
+        },
+        "snapshot": {
+          "type": "object",
+          "properties": {
+            "view": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 64,
+              "maximum": 1024
+            },
+            "look": {
+              "enum": [
+                "clay",
+                "game",
+                "raw",
+                "wire"
+              ]
+            },
+            "objects": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "maxItems": 64
+            },
+            "views": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "minItems": 2,
+              "maxItems": 4
+            },
+            "wire": {
+              "type": "boolean"
+            },
+            "refs": {
+              "type": "boolean"
+            },
+            "ref_alpha": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "ghost": {
+              "enum": [
+                "overlay",
+                "lineup",
+                "hide"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "checkpoint": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 7200
+        },
+        "open": {
+          "$ref": "common.json#/$defs/Path"
+        },
+        "save": {
+          "$ref": "common.json#/$defs/Path"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "additionalProperties": false
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "n": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "result": {
+          "type": "object"
+        },
+        "changed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "stats": {
+          "type": "object",
+          "properties": {
+            "scene": {
+              "type": "object"
+            },
+            "objects": {
+              "type": "object"
+            }
+          }
+        },
+        "snapshot": {
+          "$ref": "common.json#/$defs/Path"
+        },
+        "checkpoint": {
+          "$ref": "common.json#/$defs/Path"
+        },
+        "saved": {
+          "$ref": "common.json#/$defs/Path"
+        },
+        "ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "warn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "truncated": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "n": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "method": {
+                "type": "string"
+              },
+              "result": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "n",
+              "method"
+            ]
+          }
+        }
+      },
+      "required": [
+        "method",
+        "n",
+        "ms"
+      ]
+    }
+  }
+}

@@ -10,12 +10,16 @@ from __future__ import annotations
 import json
 import os
 import sys
+from pathlib import Path
 
 import anyio
 import pytest
 
 from satk.core.config import REPO_ROOT, SRC_ROOT
 from satk.mcp import adapter as A
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))  # tests/: sandbox helper; appended, so it never shadows a conftest
+import sandbox_compat  # noqa: E402
 
 pytestmark = pytest.mark.slow
 pytest.importorskip("mcp")
@@ -26,6 +30,7 @@ def _env(result) -> dict:
 
 
 def test_generic_tools_over_stdio(satk_home, tmp_path):
+    sandbox_compat.skip_unless_async_subprocess()
     from mcp import Client
     from mcp.client.stdio import StdioServerParameters
 

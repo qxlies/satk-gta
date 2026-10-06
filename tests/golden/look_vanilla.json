@@ -1,0 +1,8 @@
+{
+ "_doc": "Golden numbers of the satk game look (numbers only). Measured with Blender 5.1 on gta-sa-clean by tests/look/test_live_look.py (blender/satk_blender/look/golden.py): premier front view 200 px (glass), 3q (dirt), prelit models 3q at 12:00. Bands are uncalibrated and will be recalibrated against in-game captures. Measured 2026-10-05: glass_px 3635, glass_lum 87.7 (opaque 64.2), lamps 8 of 8 white, dirt 2 vs raw +3.82 on 1223 px, prelit 17613 133.1, 3279 112.4, 4000 89.0, 5000 131.1, 6000 136.0 (soft renderer before the game look: 34.7-78.3).",
+ "premier": {"glass_px_min": 3000, "glass_lum": [60, 120], "glass_vs_opaque_min": 10, "lamp_materials_min": 6,
+             "dirt_px_min": 600, "dirt2_lighter_min": 2.0, "normal_bend": [10.44, 10.84]},
+ "prelit": {"model:17613": [79, 145], "model:3279": [79, 145], "model:4000": [79, 145], "model:5000": [79, 145],
+            "model:6000": [79, 145]},
+ "sheet_bytes_max": 300000
+}

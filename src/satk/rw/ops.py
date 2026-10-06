@@ -203,19 +203,21 @@ def _parse_colors(items: list[str] | None) -> list[tuple[int | None, int, tuple[
     return out
 
 
-@op("rw.patch", summary="Patch DFF models without Blender: rename texture references, set RW version (iii/vc/sa), "
-                        "add or remove night colours, rebuild normals, set material colours. Writes changed copies "
-                        "under <work>/out/rw/<out>/; untouched chunks stay byte-identical.",
-    summary_ru="Правка DFF без Blender: переименовать текстуры, версия RW (III/VC/SA), ночные цвета, нормали, "
-               "цвет материала. Копии — в <work>/out/rw/<out>/.",
+@op("rw.patch", summary="Patch DFF models without Blender: rename textures, set RW version (iii/vc/sa), night "
+                        "colours, material colours, seam-aware smooth normals (--smooth-normals), frame-local "
+                        "bounding spheres (--recalc-bsphere). Writes copies under <work>/out/rw/<out>/.",
+    summary_ru="Правка DFF без Blender: текстуры, версия RW, ночные цвета, цвет материала, сглаживание нормалей "
+               "со швами, ограничивающие сферы. Копии — в <work>/out/rw/<out>/.",
     mcp=False, group="formats",
     examples=("satk rw patch models/gta3.img/infernus.dff --rename-tex vehiclelights128=mylights128",
               "satk rw patch models/gta3.img/lae2_roads04.dff --rw-version vc --night-colors remove",
-              "satk rw patch mydir --material-color 0=255,0,0 --recalc-normals --out fixed"))
+              "satk rw patch mycar/premier.dff --smooth-normals --recalc-bsphere --out mycar_fixed",
+              "satk rw patch mydir --material-color 0=255,0,0 --out fixed"))
 def rw_patch(dff: list[str], rename_tex: list[str] | None = None, rw_version: Literal["iii", "vc", "sa"] | None = None,
              night_colors: Literal["add", "remove"] | None = None, recalc_normals: bool = False,
              material_color: list[str] | None = None, out: str = "patch", dry_run: bool = False, limit: int = 20,
-             profile: Profile = "vanilla") -> dict:
+             profile: Profile = "vanilla", smooth_normals: bool = False, angle: float = 45.0, weld: float = 0.001,
+             split_at: list[str] | None = None, recalc_bsphere: bool = False) -> dict:
     """Patch DFF files.
 
     Args:
@@ -223,24 +225,59 @@ def rw_patch(dff: list[str], rename_tex: list[str] | None = None, rw_version: Li
         rename_tex: old=new texture renames (case-insensitive; diffuse, mask, MatFX and specular textures).
         rw_version: re-stamp to GTA III (3.1.0.1), Vice City (3.3.0.2) or San Andreas (3.6.0.3).
         night_colors: add (copy of the prelit day colours where missing) or remove the night vertex colours.
-        recalc_normals: rebuild smooth vertex normals from the triangles (sets the NORMALS flag).
+        recalc_normals: rebuild normals per vertex record from its own triangles; it does NOT weld, so a
+            flat-shaded export (every face with its own vertices) stays flat: use --smooth-normals.
         material_color: N=r,g,b[,a] (N = row of formats dump --level full) or G:I=r,g,b[,a] (geometry G, slot I).
         out: output folder under <work>/out/rw/ (or an absolute path).
         dry_run: only report what would change.
         limit: rows to show (changed files first; max 500).
         profile: profile whose game root resolves relative paths.
+        smooth_normals: seam-aware smooth normals: vertices at one position (--weld) share the normals of faces
+            within --angle of each other, except across the --split-at seams; vertex records, UVs and skin stay
+            as they are; a geometry whose shading would get flatter keeps its normals.
+        angle: largest angle (degrees) between faces that are smoothed together (vanilla rule: 45).
+        weld: position grid (metres) for treating split vertices as one position.
+        split_at: seams that stay hard: material (default) and/or uv; none = only the angle decides.
+        recalc_bsphere: recompute geometry bounding spheres that do not enclose their vertices or are
+            oversized (DragonFF writes world-space spheres; lint dff.bsphere).
     """
     renames = _parse_renames(rename_tex)
     colors = _parse_colors(material_color)
-    if not (renames or rw_version or night_colors or recalc_normals or colors):
+    if not (renames or rw_version or night_colors or recalc_normals or colors or smooth_normals or recalc_bsphere):
         raise SatkError("BAD_PARAMS", "nothing to do: give --rename-tex, --rw-version, --night-colors, "
-                                      "--recalc-normals or --material-color", hint="satk rw patch -h")
+                                      "--recalc-normals, --smooth-normals, --recalc-bsphere or --material-color",
+                        hint="satk rw patch -h")
+    if recalc_normals and smooth_normals:
+        raise SatkError("BAD_PARAMS", "--recalc-normals and --smooth-normals both rebuild the normals; pick one",
+                        hint="--smooth-normals welds split vertices (what a flat-shaded export needs)")
+    if not 0 < angle <= 180 or weld < 0:
+        raise SatkError("BAD_PARAMS", f"--angle must be in (0, 180] and --weld >= 0 (got {angle}, {weld})")
+    bad = [x for x in split_at or [] if x not in ("material", "uv", "none")]
+    if bad:
+        raise SatkError("BAD_PARAMS", f"--split-at takes material, uv or none, got {', '.join(bad)}")
+    seams = tuple(x for x in (split_at or ["material"]) if x != "none")
+    smooth = (angle, weld, seams) if smooth_normals else None
     with contextlib.ExitStack() as stack:
         return _patch(_load_entries(dff, profile, "dff", stack), renames, colors, rw_version, night_colors,
-                      recalc_normals, out, dry_run, limit)
+                      recalc_normals, out, dry_run, limit, smooth, recalc_bsphere)
 
 
-def _patch(items, renames, colors, rw_version, night_colors, recalc_normals, out, dry_run, limit) -> dict:
+def _hd_bend(buf: bytes) -> float | None:
+    """Pooled ``shade.normal_bend`` (degrees) of the HD geometries of a DFF (no ``_dam``/``_vlo``), or None."""
+    from ..formats.dff import decode_geometries
+    from ..formats.rw import FormatError
+    from ..lint.anat import read_frames
+    from ..lint.metrics import model_shading
+
+    try:
+        sh = model_shading(decode_geometries(buf), {f.idx: f.name for f in read_frames(buf)})
+    except (FormatError, ValueError, IndexError, struct.error):
+        return None
+    return None if sh is None else float(sh["shade.normal_bend"])
+
+
+def _patch(items, renames, colors, rw_version, night_colors, recalc_normals, out, dry_run, limit, smooth=None,
+           recalc_bsphere=False) -> dict:
     from .chunk import GAME_VERSIONS
     from .dff import DffDoc, PatchError
 
@@ -271,7 +308,18 @@ def _patch(items, renames, colors, rw_version, night_colors, recalc_normals, out
                 changes += doc.night_colors(night_colors, w)
             if recalc_normals:
                 changes += doc.recalc_normals(w)
+            if smooth is not None:
+                changes += doc.smooth_normals(angle=smooth[0], weld=smooth[1], split_at=smooth[2], warn=w)
+            if recalc_bsphere:
+                changes += doc.recalc_bsphere()
             after = doc.to_bytes()
+            if (smooth is not None or recalc_normals) and after != before:
+                b0, b1 = _hd_bend(before), _hd_bend(after)
+                if b0 is not None and b1 is not None:
+                    changes.append(("bend", f"{b0:.2f}->{b1:.2f}"))
+                    if recalc_normals and b1 < b0 - 0.01:
+                        w.append(f"FLATTER: --recalc-normals lowered the shading bend {b0:.2f}->{b1:.2f} deg "
+                                 "(it does not weld); use --smooth-normals")
         except PatchError as e:
             if len(items) == 1:
                 raise SatkError("UNSUPPORTED", f"{label}: {e}") from None

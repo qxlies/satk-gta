@@ -14,7 +14,15 @@
   "classes": {
     "_comment": "Model class for budgets: IDE section (objs/tobj -> map, or lod when the name contains lod_name or draw > lod_draw), else guessed from the DFF (skin -> peds, embedded COL -> cars).",
     "lod_name": "lod",
-    "lod_draw": 300.0
+    "lod_draw": 300.0,
+    "_comment2": "Classes aligned with satk.style: pickup = the pickup models of the vanilla game (by name); upgrade = definitions in an IDE whose path contains upgrade_ide; interior_shell / interior_prop = definitions in an IDE under interior_ide or DFFs of interior_archives (shell when the model is at least interior_shell_size m across). txd_class fixes the class of shared TXDs, archive_class the class of every entry of an archive (player.img holds the clothes, not the models of the same names).",
+    "pickup_names": ["briefcase", "money", "info", "health", "adrenaline", "bodyarmour", "bribe", "barrelexpos", "killfrenzy", "property_locked", "property_fsale", "bigdollar", "clothesp", "package1", "pickupsave", "craigpackage", "pikupparachute", "killfrenzy2plyr", "twoplayer", "arrow", "cj_money_bag", "drug_white", "drug_orange", "drug_yellow", "drug_green", "drug_blue", "drug_red", "keycard"],
+    "upgrade_ide": ["veh_mods.ide"],
+    "interior_ide": ["maps/interior/"],
+    "interior_archives": ["gta_int.img"],
+    "interior_shell_size": 8.0,
+    "txd_class": {"vehicle": "cars"},
+    "archive_class": {"player.img": "other"}
   },
   "rules": {
     "img.parse": {
@@ -156,7 +164,9 @@
       "msg": "geometry {geom}: a vertex lies {d} m outside the stored bounding sphere (the model pops out of view)",
       "what": "geometry bounding sphere (frustum culling) that does not enclose the vertices",
       "what_ru": "Сфера геометрии (для отсечения по пирамиде видимости) не охватывает вершины",
-      "ref": "RpMorphTarget boundingSphere; RpAtomic frustum test uses it"
+      "ref": "RpMorphTarget boundingSphere; RpAtomic frustum test uses it",
+      "hint": "satk rw patch <dff> --recalc-bsphere (exporters such as DragonFF write world-space spheres)",
+      "prevents": "parts of the model vanishing at the screen edge"
     },
     "dff.tris_budget": {
       "sev": "warn",
@@ -180,6 +190,162 @@
       "what": "RenderWare stream version newer or older than what SA handles",
       "what_ru": "Версия RenderWare, которую SA не читает",
       "ref": "research 14 (RW versions of vanilla files)"
+    },
+
+    "dff.flat_shading": {
+      "sev": "warn", "params": {"min_bend": {"cars": 3.0, "peds": 10.0}, "vanilla_p10": {"cars": 7.2, "peds": 26.0}, "fold_p10": {"cars": 7.9}},
+      "msg": "flat shading: shade.normal_bend {bend} deg, shade.flat_share {flat} (vanilla {cls} p10 {p10} deg): every face is lit on its own, the model looks faceted{why}",
+      "what": "dynamically lit model (car, ped) whose normals are face normals (area-weighted normal bend below the class floor)",
+      "what_ru": "Плоское затенение: нормали совпадают с нормалями граней (машина, пед выглядят гранёными)",
+      "ref": "satk.style metric shade.normal_bend; vanilla cars p10/p50 7.2/10.9 deg (n=212, min 1.65 on two trailers), peds 26/29 deg (min 20.5); geo.median_dihedral of vanilla cars p10/p50/p90 7.9/11.7/21.4 deg",
+      "hint": "satk rw patch <dff> --smooth-normals (seam-aware weld), or in Blender: weld, Smooth by Angle, mark sharp at material borders, export split normals; a low median fold needs more curvature segments, not other normals",
+      "prevents": "the faceted low-poly look next to vanilla cars"
+    },
+    "dff.vert_sharing": {
+      "sev": "warn", "params": {"max": {"cars": 1.45, "peds": 1.3}, "max_bend": {"cars": 3.0, "peds": 10.0}, "min_tris": 200},
+      "msg": "geometry {geom} ({part}): {vpt} vertices per triangle with flat normals (bend {bend} deg): faces do not share vertices (vanilla car chassis 1.09-1.30-1.50)",
+      "what": "high-detail geometry whose triangles do not share vertices (split per face) and whose shading is flat",
+      "what_ru": "Треугольники не делят вершины (разрезаны по граням), затенение плоское: лишние вершины",
+      "ref": "dff.verts_per_tri; vanilla car chassis p10/p50/p90 1.09/1.30/1.50 (n=203); benchmark agents 1.52-1.54 at a bend of 0.6-1.8 deg",
+      "hint": "weld the shell before export (merge by distance) and keep normals split only at material and UV borders; satk rw patch <dff> --smooth-normals fixes the shading of a finished file",
+      "prevents": "wasted vertices and faceted shading"
+    },
+    "veh.frames": {
+      "sev": "warn", "params": {"required": {
+        "bike": ["chassis", "chassis_dummy", "chassis_vlo", "engine", "exhaust", "forks_front", "forks_rear", "handlebars", "headlights", "mudguard", "ped_frontseat", "taillights", "wheel_front", "wheel_rear"],
+        "bmx": ["bargrip", "chainset", "chassis", "chassis_dummy", "chassis_vlo", "forks_front", "handlebars", "headlights", "ped_frontseat", "pedal_l", "pedal_r", "taillights", "wheel_front", "wheel_rear"],
+        "boat": ["ped_frontseat"],
+        "car": ["chassis", "chassis_dummy", "headlights", "ped_frontseat", "wheel_lb_dummy", "wheel_lf_dummy", "wheel_rb_dummy", "wheel_rf_dummy"],
+        "heli": ["chassis", "chassis_dummy", "chassis_vlo", "moving_rotor", "ped_frontseat", "static_rotor", "wheel_lb_dummy", "wheel_lf_dummy", "wheel_rb_dummy", "wheel_rf_dummy"],
+        "mtruck": ["chassis", "chassis_dummy", "chassis_vlo", "door_lf_dummy", "door_lf_ok", "headlights", "ped_frontseat", "taillights", "wheel", "wheel_lb_dummy", "wheel_lf_dummy", "wheel_rb_dummy", "wheel_rf_dummy", "windscreen_dummy"],
+        "plane": ["chassis", "ped_frontseat", "rudder", "wheel_lb_dummy", "wheel_lf_dummy", "wheel_rb_dummy", "wheel_rf_dummy"],
+        "quad": ["chassis", "chassis_dummy", "chassis_vlo", "exhaust", "handlebars", "headlights", "ped_backseat", "ped_frontseat", "quad", "rear_axle", "suspension_lf", "suspension_rf", "taillights", "wheel", "wheel_lb_dummy", "wheel_lf_dummy", "wheel_rb_dummy", "wheel_rf_dummy"],
+        "trailer": ["chassis", "chassis_dummy", "chassis_vlo", "hookup", "wheel_lb_dummy", "wheel_lf_dummy", "wheel_rb_dummy", "wheel_rf_dummy"],
+        "train": ["bogie_front", "bogie_rear", "chassis", "chassis_dummy", "chassis_vlo", "headlights", "taillights", "wheel", "wheel_lb1_dummy", "wheel_lb2_dummy", "wheel_lf1_dummy", "wheel_lf2_dummy", "wheel_rb1_dummy", "wheel_rb2_dummy", "wheel_rf1_dummy", "wheel_rf2_dummy"]
+      }},
+      "msg": "{vtype} without {n} frame(s) every vanilla {vtype} has: {missing}",
+      "what": "vehicle DFF missing frames the game looks up by name for its type (wheels, chassis, seats, lights)",
+      "what_ru": "У машины нет фреймов, которые игра ищет по имени для её типа (колёса, кузов, сиденья, фары)",
+      "ref": "frames present in every vanilla vehicle of the IDE type (212 vehicles); CVehicleModelInfo::ms_vehicleDescs",
+      "hint": "satk formats dump <vanilla model> --level tree lists the vanilla frame tree; copy the names exactly",
+      "prevents": "crash 0x004C7DAD (CrashInfo #120: the game cannot find a wheel of the vehicle)"
+    },
+    "veh.dummy_side": {
+      "sev": "warn", "params": {"types": ["car", "mtruck", "quad", "bike", "bmx", "heli", "trailer", "train"], "min_offset": 0.25},
+      "msg": "{n} frame(s) on the wrong side: {frames} (left = x < 0: _lf, _lb, _lr, ped_arm; right = x > 0)",
+      "what": "side-named frame (wheel_lf_dummy, door_rr_dummy, ped_arm) on the wrong side of the vehicle",
+      "what_ru": "Фрейм с указанием стороны (wheel_lf_dummy, door_rr_dummy, ped_arm) не на той стороне",
+      "ref": "vanilla: 0 of 111 cars with ped_arm at x > 0; side frames of cars, bikes, trucks, helis and trains are all on their side (planes are not checked)",
+      "hint": "mirror the frame position (x -> -x) or swap the l/r names",
+      "prevents": "mirrored doors and wheels, the driver's arm outside the car"
+    },
+    "veh.wheel_scale": {
+      "sev": "warn", "params": {"types": ["car", "mtruck", "quad"], "lo": 0.85, "hi": 1.15},
+      "msg": "wheel mesh is {d} m across but the IDE wheel size is {ws} m (ratio {ratio}): the game rides on the IDE size, so the tyre floats or sinks by {gap} m",
+      "what": "wheel mesh diameter different from the wheel size of the vehicles.ide line",
+      "what_ru": "Диаметр колеса в DFF не совпадает с размером колеса в vehicles.ide",
+      "ref": "gta-reversed Automobile.cpp (wheel spheres and ride height from m_fWheelSizeFront/Rear); vanilla mesh/IDE ratio p10/p50/p90 0.99/1.00/1.03 (n=141 cars)",
+      "hint": "scale the wheel mesh to the IDE size, or change the wheel size of the IDE line",
+      "prevents": "wheels floating above or sunk into the road"
+    },
+    "veh.shadow_mesh": {
+      "sev": "warn", "params": {"types": ["car", "mtruck", "quad", "trailer", "bike", "bmx", "heli", "boat"]},
+      "msg": "{what}",
+      "what": "vehicle DFF without an embedded collision or without the shadow mesh in it",
+      "what_ru": "У машины нет встроенной коллизии или теневого меша в ней",
+      "ref": "vanilla: every road vehicle has a COL3 shadow mesh except rccam (three planes and two trains lack one)",
+      "hint": "satk col gen <dff> (vehicle collision with a shadow mesh), or export the collision with a shadow mesh in Blender",
+      "prevents": "crash 0x0070FB39 (CrashInfo #68: the game could not find the vehicle's shadow model)"
+    },
+    "veh.env_uv2": {
+      "sev": "warn", "params": {"textures": ["xvehicleenv128"]},
+      "msg": "{n} material(s) with the {tex} sheen on geometry with one UV set ({parts}): the sheen reads UV set 2, so it is invisible",
+      "what": "vehicle material with the xvehicleenv128 environment sheen on a geometry without a second UV set",
+      "what_ru": "Материал с отблеском xvehicleenv128 на геометрии без второго UV-набора: отблеска не будет",
+      "ref": "vanilla: all 4,247 xvehicleenv128 materials sit on 2-UV geometry (the vehicleenvmap128 chrome does not need UV2)",
+      "hint": "export the painted parts with a second UV set (DragonFF: a second UV map) or drop the effect",
+      "prevents": "dull paint without the vanilla sheen"
+    },
+    "veh.light_key_tex": {
+      "sev": "warn",
+      "msg": "{n} material(s) with a lamp key colour use {tex}, not vehiclelights128: the lamp never lights up and shows its key colour",
+      "what": "material with a lamp key colour (255,175,0 / 0,255,200 / 185,255,0 / 255,60,0) on a texture other than vehiclelights128",
+      "what_ru": "Материал с цветом-ключом фары не на текстуре vehiclelights128: фара не загорается",
+      "ref": "gta-reversed Models/VehicleModelInfo.cpp SetEditableMaterialsCB (lamp keys only on the lights texture); vanilla: 0 of 598 lamp materials",
+      "hint": "put lamp materials on vehiclelights128 with the key colour of their lamp",
+      "prevents": "lamps that never switch on and glow orange or green"
+    },
+    "veh.paint_dirt": {
+      "sev": "warn", "params": {"types": ["car", "mtruck", "quad", "bike"], "min_share": 0.25, "shared": ["xvehicleenv128", "vehicletyres128", "vehiclesteering128", "vehiclespecdot64", "vehicleshatter128", "vehiclescratch64", "vehiclepoldecals128", "vehiclelightson128", "vehiclelights128", "vehiclegeneric256", "vehicleenvmap128", "vehicledash32"]},
+      "msg": "only {share} of the primary paint triangles use vehiclegrunge256 (paint on {tex}): dirt is drawn by changing vehiclegrunge256, so this body never gets dirty",
+      "what": "vehicle whose primary paint (60,255,0) sits on a shared vehicle texture other than vehiclegrunge256",
+      "what_ru": "Основная краска машины не на vehiclegrunge256: кузов никогда не пачкается",
+      "ref": "the dirt level changes vehiclegrunge256 only (InitialiseDirtTexture 0x5D5BC0); vanilla road vehicles: 1 of 165 (rcbandit); bodies on their own textures (remap, *body*) are not counted",
+      "hint": "map the painted body onto vehiclegrunge256 (in its grime gradient) with the paint key colour",
+      "prevents": "a car that stays showroom-clean in traffic"
+    },
+    "veh.upgrade_frames": {
+      "sev": "warn",
+      "msg": "the vanilla {name} has {n} upgrade frame(s) this DFF lacks: {missing}",
+      "what": "replacement vehicle without the ug_* frames of the model it replaces",
+      "what_ru": "У замены машины нет ug_*-фреймов заменяемой модели",
+      "ref": "carmods.dat installs tuning parts on the ug_* frames of the model id; reference frames from the index (dff_frame)",
+      "hint": "add empty frames with the same names and positions as in the vanilla model (satk formats dump model:<id> --level tree)",
+      "prevents": "crash 0x007F0BF7 (CrashInfo #295: a frame does not find its child when a tuning part is installed)"
+    },
+    "veh.hd_tris": {
+      "sev": "warn", "params": {"budget": {"default": 3200, "bike": 3500, "mtruck": 5200, "plane": 3500, "train": 3300}},
+      "msg": "veh.hd_tris {tris} > {limit} for a {vtype} (chassis + parts + the wheel once; _dam and _vlo not counted)",
+      "what": "high-detail triangles of a vehicle (the canonical veh.hd_tris: chassis, every _ok part and extra, the wheel mesh once)",
+      "what_ru": "Треугольники высокой детализации машины (veh.hd_tris: кузов, все _ok-части, колесо один раз)",
+      "ref": "satk.style veh.hd_tris; vanilla maximum per type: car 3,104, bike 3,453, mtruck 5,125, plane 3,460, train 3,258",
+      "hint": "satk asset lint <dff> --preset sa_plus applies the higher sa_plus tier",
+      "prevents": "streaming and fill cost above the tier"
+    },
+    "veh.part_tris": {
+      "sev": "warn", "params": {"types": ["car", "mtruck", "quad"], "budget": {"chassis": 2600, "chassis_vlo": 340, "wheel": 400, "door": 260, "bump": 340, "bonnet": 180, "boot": 290, "windscreen": 40}},
+      "msg": "{n} part(s) above the part budget: {parts}",
+      "what": "triangles of one vehicle part (chassis, chassis_vlo, wheel, doors, bumpers, bonnet, boot, windscreen)",
+      "what_ru": "Треугольники одной части машины (кузов, chassis_vlo, колесо, двери, бамперы, капот, багажник, стекло)",
+      "ref": "satk.style part.tris; vanilla maximum (cars, monster trucks, quad): chassis 2,495, chassis_vlo 338, wheel 382, door 256, bump 332, bonnet 174, boot 282, windscreen 40",
+      "hint": "move detail to where the silhouette lives; satk asset lint --preset sa_plus applies the higher tier",
+      "prevents": "one part eating the budget of the whole car"
+    },
+    "veh.dam_ratio": {
+      "sev": "warn", "params": {"lo": 0.5, "hi": 1.4, "min_tris": 24},
+      "msg": "the _dam parts have a median {median} of the _ok triangles ({parts}); vanilla medians are 0.51-1.28: the damaged state looks broken",
+      "what": "damaged parts (_dam) systematically much lighter or heavier than their undamaged twins (_ok)",
+      "what_ru": "Повреждённые части (_dam) систематически намного легче или тяжелее целых (_ok)",
+      "ref": "satk.style dam.ok_ratio; vanilla median per vehicle 0.51-0.95-1.28 (n=131); per part 0.66-1.11 (doors, bonnet)",
+      "hint": "build _dam from _ok (same topology, dented), do not decimate it",
+      "prevents": "low-poly damaged doors and bumpers"
+    },
+    "ped.skin": {
+      "sev": "error", "params": {"bones": 32, "max_weights": 4},
+      "msg": "{what}",
+      "what": "ped model whose skin does not match the 32-bone ped skeleton (bone count, weights per vertex, bone indices)",
+      "what_ru": "Скин педа не соответствует 32-костному скелету (число костей, веса, индексы костей)",
+      "ref": "vanilla: 265 of 265 peds have 32 bones and at most 4 weights per vertex",
+      "hint": "rig to the vanilla skeleton (import a vanilla ped and keep its armature), at most 4 weights per vertex",
+      "prevents": "crash 0x007C4781 (CrashInfo #130: processing a skin model)"
+    },
+    "weap.flash": {
+      "sev": "warn",
+      "msg": "{what}",
+      "what": "firearm without a working gunflash atomic (frame, mesh, texture)",
+      "what_ru": "У огнестрельного оружия нет рабочего атомика gunflash",
+      "ref": "vanilla: 14 firearms, each with a 'gunflash' atomic textured muzzle_texture4",
+      "hint": "keep the vanilla 'gunflash' frame and atomic (a textured quad fan at the muzzle)",
+      "prevents": "shots without a muzzle flash"
+    },
+    "mat.alpha_draw_last": {
+      "sev": "info", "enabled": false,
+      "msg": "model {id} '{name}': see-through material colours (alpha < 255) but IDE flags {flags} have neither draw_last (4) nor additive (8): they can hide what is behind them",
+      "what": "map model with semi-transparent material colours (alpha < 255) and neither the draw_last nor the additive IDE flag (off by default: vanilla does it on 42 % of such models; on in strict and sa_plus)",
+      "what_ru": "Модель карты с полупрозрачными материалами без флага draw_last (4) или additive (8)",
+      "ref": "IDE object flags 4 and 8 draw alpha models after the opaque ones (research 22); vanilla: 100 of 236 map models with material alpha < 255 have neither flag",
+      "hint": "set flag 4 in the IDE line, or use 1-bit alpha (DXT1) for cut-outs",
+      "prevents": "see-through holes behind glass, fences and foliage"
     },
 
     "txd.parse": {
@@ -276,11 +442,11 @@
       "ref": "vanilla: 4 722 DXT1 tail levels of 0 bytes"
     },
     "txd.mips_missing": {
-      "sev": "info", "params": {"min_size": 64},
+      "sev": "info", "params": {"min_size": 64}, "class_sev": {"cars": "info", "peds": "info", "weap": "info", "upgrade": "info"},
       "msg": "texture '{tex}': {w}x{h} without mipmaps (shimmers at a distance)",
       "what": "texture of 64 px or more without mipmaps",
       "what_ru": "Текстура от 64 px без мипмапов (рябит вдали)",
-      "ref": "research 22 sec. 3.3 (79 % of vanilla textures have one level)"
+      "ref": "research 22 sec. 3.3 (79 % of vanilla textures have one level; 0 of 593 vehicle, 289 ped and 114 weapon textures have mips)"
     },
     "txd.alpha_off": {
       "sev": "info", "params": {"formats": ["DXT3", "DXT5", "A8R8G8B8", "A4R4G4B4", "A1R5G5B5"]},
@@ -403,6 +569,16 @@
       "ref": "gta-reversed FileLoader.cpp:540-552 (StaticRef<uint8[0x8000]>(0xBC40D8))"
     },
 
+    "col.face_light_zero": {
+      "sev": "warn",
+      "msg": "model '{name}': all {n} mesh faces have lighting 0 (day 0, night 0): peds and cars on it are lit by ambient only and cars switch their headlights on",
+      "what": "collision mesh whose every face has the lighting byte 0",
+      "what_ru": "Все грани коллизии с освещением 0: педы и машины на ней тёмные, у машин включаются фары",
+      "ref": "tColLighting (low nibble day, high nibble night; gta-reversed Collision/ColPoint.cpp); lighting = light x 0.95 + 0.05 (Renderer.cpp:434); headlights on below 0.05 (Vehicle.cpp)",
+      "hint": "satk col gen derives the lighting from the prelight; satk col write takes a light value per face or per model",
+      "prevents": "dark peds and cars with their headlights on in daylight"
+    },
+
     "ide.parse": {
       "sev": "error",
       "msg": "line {line}: {err}",
@@ -451,6 +627,16 @@
       "what": "draw distance below 4 in the 5-field objs/tobj form",
       "what_ru": "Дальность прорисовки < 4 в 5-польной форме objs/tobj",
       "ref": "gta-reversed FileLoader.cpp:931 (LoadObject), 1759 (LoadTimeObject): drawDistance < 4.0f"
+    },
+
+    "ide.draw_bigbuilding": {
+      "sev": "warn", "params": {"max_draw": 300.0},
+      "msg": "line {line}: model {id} '{name}': draw distance {draw} > 300 makes it a big building: the game turns its collision off",
+      "what": "non-LOD map model with collision and a draw distance above 300 (LODDistMultiplier 1.0 x draw > 300)",
+      "what_ru": "Модель карты с коллизией и дальностью прорисовки больше 300: игра выключает ей коллизию",
+      "ref": "gta-reversed FileLoader.cpp:1992 (SetupBigBuilding: SetUsesCollision(false)); vanilla: 1,090 high-detail models at exactly 299",
+      "hint": "use 299 or less for models with collision; a far view needs a LOD model",
+      "prevents": "players and cars falling through the object"
     },
 
     "link.dff_missing": {
@@ -513,17 +699,38 @@
   "presets": {
     "game": {},
     "strict": {
-      "_comment": "New content (research 22 sec. 3): vanilla p90 budgets, textures <= 512, mipmaps, pow2, night colours, collision.",
+      "_comment": "New content (research 22 sec. 3): vanilla p90 budgets, textures <= 512, mipmaps outside vehicles/peds/weapons, pow2, night colours, collision. Vehicles are budgeted on veh.hd_tris (vanilla p90 per type); the whole file only has a cap.",
       "txd.size_max": {"params": {"max": 512}},
       "txd.pow2": {"sev": "error"},
       "txd.mips_missing": {"sev": "warn"},
       "dff.night_missing": {"sev": "warn"},
       "dff.prelight_black": {"sev": "warn"},
-      "dff.tris_budget": {"params": {"budget": {"map": 1040, "lod": 262, "cars": 3343, "peds": 1274, "weap": 600, "other": 1040}}},
+      "dff.tris_budget": {"params": {"budget": {"map": 1040, "lod": 262, "cars": 5300, "peds": 1274, "weap": 600, "other": 1040}}},
       "dff.materials_budget": {"params": {"budget": {"map": 11, "lod": 7, "cars": 110, "peds": 2, "weap": 2, "other": 11}}},
+      "veh.hd_tris": {"params": {"budget": {"default": 2700, "car": 2650, "bike": 3460, "mtruck": 5130, "plane": 3200, "train": 3260, "trailer": 1350}}},
       "link.col_missing": {"sev": "error"},
       "link.texture_missing": {"sev": "error"},
-      "col.empty": {"sev": "warn"}
+      "col.empty": {"sev": "warn"},
+      "mat.alpha_draw_last": {"enabled": true}
+    },
+    "vanilla": {
+      "_comment": "Detail tier 'vanilla' (satk.style): new content that must sit unnoticed next to vanilla. Conventions vanilla follows in at least 95 % of its files are warnings; budgets are the vanilla p98 per model class (whole file), vehicles on veh.hd_tris and veh.part_tris (vanilla maxima). Mipmaps stay info: vanilla vehicle, ped and weapon textures have none, most map textures below 256 px neither.",
+      "txd.size_max": {"params": {"max": 512}},
+      "txd.pow2": {"sev": "error"},
+      "dff.night_missing": {"sev": "warn"},
+      "dff.prelight_black": {"sev": "warn"},
+      "dff.tris_budget": {"params": {"budget": {"map": 1900, "lod": 560, "cars": 5300, "peds": 2100, "weap": 1300, "upgrade": 800, "pickup": 460, "interior_prop": 1600, "interior_shell": 5600, "other": 1900}}},
+      "dff.materials_budget": {"params": {"budget": {"map": 18, "lod": 12, "cars": 125, "peds": 3, "weap": 4, "upgrade": 8, "pickup": 5, "interior_prop": 10, "interior_shell": 34, "other": 30}}},
+      "link.texture_missing": {"sev": "error"}
+    },
+    "sa_plus": {
+      "_base": "vanilla",
+      "_comment": "Detail tier 'sa_plus' (satk.style, default for new assets; the numbers are a PROPOSAL until validated in game): the vanilla visual language with higher budgets where silhouette and curvature live. Vehicles: veh.hd_tris 3,000-4,500 (cap 5,000), chassis 2,000-3,000, wheels 16-24 sides; map models up to 2x the class p90; peds 1,600-2,500; weapons 400-1,200; LODs unchanged.",
+      "dff.tris_budget": {"params": {"budget": {"map": 2000, "lod": 560, "cars": 9000, "peds": 3000, "weap": 1500, "upgrade": 1200, "pickup": 500, "interior_prop": 1600, "interior_shell": 6000, "other": 2200}}},
+      "dff.materials_budget": {"params": {"budget": {"cars": 160}}},
+      "veh.hd_tris": {"params": {"budget": {"default": 5000, "bike": 5600, "mtruck": 8300, "plane": 5600, "train": 5300}}},
+      "veh.part_tris": {"params": {"budget": {"chassis": 3600, "chassis_vlo": 340, "wheel": 480, "door": 300, "bump": 360, "bonnet": 290, "boot": 460, "windscreen": 48}}},
+      "mat.alpha_draw_last": {"enabled": true}
     }
   }
 }

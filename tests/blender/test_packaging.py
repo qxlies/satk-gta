@@ -142,3 +142,14 @@ def test_write_package_refuses_protected(satk_home, tmp_path, monkeypatch):
         assert e.value.code == "PROTECTED_PATH" and "prot" in e.value.msg
     finally:
         config.reset()
+
+
+def test_write_package_vehicles_only_has_no_empty_fragments(satk_home):
+    """A vehicle export needs no IDE/IPL fragment (mod.add writes vehicle data lines)."""
+    from satk.core.paths import work
+
+    d = work("out", "exports", "car")
+    (d / "export.json").write_text(json.dumps({"models": [MODELS[1]]}), encoding="utf-8")
+    r = P.write_package(d, "modloader", "car")
+    assert sorted(p.rsplit("/", 1)[-1] for p in r["files"]) == ["README.txt"]
+    assert not (d / "car.ide").exists() and not (d / "car.ipl").exists()

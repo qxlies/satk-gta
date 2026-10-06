@@ -1,0 +1,5 @@
+<meta>
+    <info name="{{NAME}}" author="satk shader new" type="script" version="1.0.0" description="{{ABOUT}}" />
+    <script src="client.lua" type="client" />
+    <file src="{{FX}}" />
+{{FILES}}</meta>

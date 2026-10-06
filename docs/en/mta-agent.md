@@ -12,7 +12,8 @@ on a private server bound to `127.0.0.1` only. The server exports an HTTP `rpc` 
 MTA client sets the camera (`setCameraMatrix`), takes a frame (`dxCreateScreenSource` → `dxGetTexturePixels` →
 PNG), picks the world (`processLineOfSight` with building information → `model_pos` → an index SID), changes time
 and weather, returns the log and runs Lua on both sides. Ariane gives fast eyes; `game` is the ground truth.
-It writes only to `work\mta\server\` (server copy, logs) and `work\out\captures\` (frames).
+It writes only to `work\mta\server\` (server copy, logs) and `work\out\captures\` (frames). Scripted checks of a mod
+in this game are [ingame.md](ingame.md); checks of an MTA resource's scripts are [mta.md](mta.md).
 
 ## Quick example
 

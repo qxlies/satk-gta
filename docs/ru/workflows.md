@@ -2,7 +2,7 @@
 
 [English version](../en/workflows.md)
 
-<!-- Человеческая версия агентных сценариев S1–S16 (агентная, с ценой в токенах — docs/agent/workflows.md).
+<!-- Человеческая версия агентных сценариев S1–S29 (агентная, с ценой в токенах — docs/agent/workflows.md).
      Цепочки прогнаны заново 2026-10-05 с индексами схемы v3; числа в комментариях — настоящие ответы. -->
 
 Команды — для PowerShell/cmd: `satk` — это шим `tools\satk.cmd` рабочего пространства (или команда `satk`
@@ -178,6 +178,152 @@ satk kb opcode 0A8C                            # WRITE_MEMORY (CLEO) и его �
 ```
 
 Подробнее — в [kb.md](kb.md).
+
+## Добавить новую машину отдельным аддоном (S17)
+
+```powershell
+satk mod add vehicle --dff dff:infernus --txd txd:infernus --like 411 --name infernus2 --game-name "Infernus II" --dry-run
+satk mod add vehicle --dff my_car.dff --txd my_car.txd --like 411 --name mycar --game-name "My Car"
+satk mod check <workspace>\work\out\addon\mycar
+```
+
+`mod add` копирует строки данных донора (IDE, handling, carcols, carmods, игровое название) со свободным id и новыми
+именами в папку для Mod Loader `work\out\addon\<name>\`; эту папку копируют в папку игры `modloader`. Читайте
+предупреждения: id машины больше 611 или новое имя handling требуют fastman92 Limit Adjuster. Педы, оружие и объекты
+добавляются так же ([addon.md](addon.md)).
+
+## Изменить данные handling или оружия (S18)
+
+```powershell
+satk data get handling infernus --field fMass fTractionMultiplier   # значение, единица и смысл каждого поля
+satk data explain handling fTractionBias                           # единица, диапазон, колонка, имя в MTA
+satk data patch handling infernus fMass=1500 fTractionMultiplier=0.8
+satk data patch handling infernus fMass=1500 --target mta          # вместо этого — фрагмент Lua с setModelHandling
+```
+
+По умолчанию пишется папка для Mod Loader, в readme которой только изменённая строка; `--target full` пишет
+исправленную копию всего файла. Оружие: `satk data get weapon PISTOL`, `satk data patch weapon ...`.
+
+## Написать или исправить скрипт CLEO (S19)
+
+```powershell
+satk script new spawn_car --name mycar --model 522 --cheat BIKE   # проверенный .txt и собранный .cs
+satk script check mycar/mycar.txt                                  # ошибки с номерами строк
+satk script asm mycar/mycar.txt
+satk script disasm mymod.cs                                        # чужой скрипт в виде текста
+satk script asm mymod/mymod.txt --compare mymod.cs                 # что изменила ваша правка
+```
+
+satk никогда не пишет в игру: скопируйте `.cs` в папку игры `cleo` (CLEO 4 или 5). Сигнатуры опкодов:
+`satk kb opcode <id или слова>` ([script.md](script.md)).
+
+## Найти функцию MTA Lua или натив SA-MP (S20)
+
+```powershell
+satk kb mta engineRequestModel                 # сигнатура, клиент/сервер, enum, строка исходника C++
+satk kb mta "vehicle handling"                 # все функции, в имени которых есть оба слова
+satk kb mta --event onClientElementStreamIn
+satk kb native SetObjectMaterial
+```
+
+Ответы берутся из локальных исходников через базу знаний (после обновления — `satk kb build`). Для полного списка
+SA-MP/open.mp укажите в `satk.toml` параметр `kb.pawn_include` — папку include от pawno или qawno
+([scriptapi.md](scriptapi.md)).
+
+## Уменьшить текстуры мода (S21)
+
+```powershell
+satk texture audit mymod                                        # проблемы по сэкономленным байтам и способ исправить
+satk texture optimize mymod --max 512 --drop-unused --dedupe    # копии в work\out\txdopt\mymod\, PSNR для каждой текстуры
+satk texture budget --area 2495 -1666 150                       # память стриминга вокруг точки против лимита 50 МиБ
+```
+
+Перед тем как копировать результат поверх мода, посмотрите `psnr_min` и каждое предупреждение `LOW_PSNR`
+([txdopt.md](txdopt.md)).
+
+## Проверить мод перед релизом; много файлов сразу (S22)
+
+```powershell
+satk recipe list
+satk recipe run check-mod-before-release --var mod=mymod --dry-run
+satk recipe run check-mod-before-release --var mod=mymod
+satk batch asset.lint --over "models/gta3.img/infernus.*" --arg fail_on=error --jobs 2
+```
+
+Рецепт — сохранённая цепочка операций (что меняет мод, проверка, аудит текстур, конфликты id); пакетный режим
+выполняет одну операцию для маски, записей IMG, файла-списка, папки или запроса к индексу и пишет по строке JSON на
+каждый вход ([batch.md](batch.md)).
+
+## Добавить модели уличный фонарь (S23)
+
+```powershell
+satk fx2d dump model:lamppost1                                       # свет фонарного столба в виде JSON
+satk fx2d copy model:lamppost1 my_lamp.dff --filter light --offset 0,0,1
+satk fx2d check my_lamp.dff
+```
+
+Результат — копия DFF в `work\out\fx2d\`; `fx2d apply` записывает обратно JSON, исправленный руками
+([fx2d.md](fx2d.md)).
+
+## Коллизия для новой модели (S24)
+
+```powershell
+satk col gen my_model.dff                       # файл COL3 в work\out\colgen\
+satk col gen my_models --archive my_models.col  # один .col на папку моделей
+satk col check my_models.col
+```
+
+Способ выбирается для каждой модели (оболочка для мелких объектов, сферы для машин, сетка для больших); поверхности
+берутся из имён текстур, `satk col surface <текстура>` объясняет выбор ([colgen.md](colgen.md)).
+
+## Создать новый ассет в стиле SA (S25)
+
+ИИ-ассистент (или вы) моделирует ассет в живой сессии Blender, показывает картинку рядом с двумя стоковыми
+моделями класса после грубой формы и ещё раз после окончательной, затем выгружает папку Mod Loader и проверяет
+её против стоковой модели. Весь процесс: [authoring.md](authoring.md); правила стиля:
+[sa-style.md](sa-style.md).
+
+## Написать и проверить ресурс MTA (S27)
+
+```powershell
+satk mta resource new my-panel                  # заготовка ресурса в work\out\mta\my-panel\
+satk mta lint my-panel                          # что сломается на сервере, до загрузки
+satk mta pack mods\cars --kind vehicle          # ресурс, который загружает папку файлов DFF/TXD/COL
+satk mta server-check my-panel                  # собранный сервер MTA загружает ресурс (127.0.0.1, без клиента игры)
+```
+
+`satk mta logs server.log` превращает логи сервера и клиента в строки с подсказкой ([mta.md](mta.md)). Папку
+ресурса в `<server>\mods\deathmatch\resources` копируете вы сами: satk никогда не пишет в сервер.
+
+## Анимации (S28)
+
+```powershell
+satk anim list ifp:ped --name walk              # анимации ped.ifp: кости, ключи, длительность, движение корня
+satk anim extract anim:ped/walk_civi --out walk.json
+satk anim write walk.json --out mywalk.ifp --pack mywalk
+satk anim check mywalk.ifp --loader mta
+satk anim mta mywalk.ifp --replace ped/WALK_civi=WALK_civi
+```
+
+Последняя команда пишет клиентский ресурс, который заменяет анимацию игры. Вместо него `anim merge` правит пакет
+вроде `ped.ifp`, а `anim to-blender` и `anim from-blender` позволяют править анимации в Blender ([anim.md](anim.md)).
+
+## Увидеть новую модель рядом с картой, а потом в игре (S29)
+
+```powershell
+satk view vehicle --dff work\out\kit\mycar\files\mycar\mycar.dff --txd work\out\kit\mycar\files\mycar\mycar.txd --pos 2495,-1675,13.4 --watch
+satk view capture --pos 2503,-1666,17 --look 2495,-1674,13.4 --marks 6
+satk ingame start --mod work\out\addon\mycar
+satk ingame check --suite vehicle
+satk ingame reload
+```
+
+Вьювер показывает выгруженные файлы рядом с картой через доли секунды после каждой повторной выгрузки (`view place` —
+для объекта, `view ped` — для педа); нужна сборка вьювера с методами сцены ([viewscene.md](viewscene.md)). Поведение
+(езда, столкновения, повреждения, свет, стриминг) проверяется в настоящей игре: `ingame start` запускает закрытый
+тестовый сервер и пишет одноразовую настройку от имени администратора, клиент вы запускаете сами командой
+`satk ingame play`, а `ingame check` возвращает вердикт и кадр «мод против ванили» для каждой проверки
+([ingame.md](ingame.md)).
 
 ## Собрать сервер форка MTA
 

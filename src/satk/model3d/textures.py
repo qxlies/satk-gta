@@ -30,17 +30,21 @@ from ..formats.rw import FormatError
 from ..formats.txd import TexInfo, Txd, mip0_bytes, palette_bytes, parse_txd, texture_hash
 
 __all__ = ["TexHandle", "Decoded", "TxdChain", "MatInfo", "resolve_materials", "decode", "cache_clear",
-           "cache_stats", "vehicle_colours", "parse_carcols", "DEFAULT_CAR_COLOURS", "LIGHT_KEYS", "ADDRESS_MODES"]
+           "cache_stats", "vehicle_colours", "parse_carcols", "DEFAULT_CAR_COLOURS", "LIGHT_KEYS", "LIGHTS_TEXTURE",
+           "ADDRESS_MODES"]
 
 #: RW texture addressing -> name (1 wrap, 2 mirror, 3 clamp, 4 border).
 ADDRESS_MODES = {1: "wrap", 2: "mirror", 3: "clamp", 4: "border"}
 #: Material colours of the recolourable slots when carcols.dat has no entry (RGB).
 DEFAULT_CAR_COLOURS: dict[int, tuple[int, int, int]] = {1: (42, 119, 161), 2: (245, 245, 245),
                                                        3: (88, 89, 90), 4: (88, 89, 90)}
-#: Vehicle light key colours (RGB) -> what a preview shows: head lights white, tail lights red.
+#: Vehicle light key colours (RGB) -> head lights white, tail lights red (kept for callers; previews follow the
+#: engine rule of :func:`resolve_materials` instead: every material on ``vehiclelights128`` is drawn white).
 LIGHT_KEYS: dict[tuple[int, int, int], tuple[int, int, int]] = {
     (255, 175, 0): (235, 235, 225), (0, 255, 200): (235, 235, 225),
     (185, 255, 0): (170, 24, 24), (255, 60, 0): (170, 24, 24)}
+#: The lamp texture of vehicles (``CVehicleModelInfo::SetEditableMaterialsCB``).
+LIGHTS_TEXTURE = "vehiclelights128"
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,7 +142,9 @@ def resolve_materials(materials: list[list], chain: TxdChain | None,
     """Per geometry, per material slot: texture lookup in ``chain`` + vehicle colour slots.
 
     ``colours`` (slot -> RGB) recolours materials whose colour is a vehicle key colour
-    (``Material.color_slot``); pass ``None`` for non-vehicles.
+    (``Material.color_slot``); pass ``None`` for non-vehicles. For vehicles every material on
+    ``vehiclelights128`` is drawn white (the engine's lamp rule, lights off); a lamp key colour on any
+    other texture stays as it is (that lamp never lights up in the game either).
     """
     out: list[list[MatInfo]] = []
     for ms in materials:
@@ -146,10 +152,10 @@ def resolve_materials(materials: list[list], chain: TxdChain | None,
         for m in ms:
             r, g, b, a = (m.rgba >> 24) & 255, (m.rgba >> 16) & 255, (m.rgba >> 8) & 255, m.rgba & 255
             slot = m.color_slot if colours else None
-            if slot is not None and slot in colours:
+            if colours and m.texture and m.texture.lower() == LIGHTS_TEXTURE:
+                r, g, b = 255, 255, 255
+            elif slot is not None and slot in colours:
                 r, g, b = colours[slot]
-            elif colours and (r, g, b) in LIGHT_KEYS:
-                r, g, b = LIGHT_KEYS[(r, g, b)]
             tex = chain.find(m.texture) if chain is not None else None
             name = m.texture.lower() if m.texture else None
             row.append(MatInfo((r, g, b, a), tex, name, bool(name) and tex is None, slot, m.rgba))

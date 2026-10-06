@@ -74,7 +74,8 @@ output folder.
   clothes and hand models). Sources: the ModelInfo.h and eModelID.h headers of gta-reversed.
 - **Store limits.** The stock engine has 212 vehicle, 278 ped, 51 weapon and 14,000 + 70 object model slots;
   the vanilla game already uses 212, 276, 50 and 14,045 of them. `STORE_FULL` warns when the ids asked for do
-  not fit; then a limit adjuster is needed (Open Limit Adjuster, fastman92 LA). SA-MP's own definitions are not
+  not fit; `STORE_LOW` warns when fewer than 10 slots are left (vanilla: 2 ped and 1 weapon slot); then a limit
+  adjuster is needed (Open Limit Adjuster, fastman92 LA). SA-MP's own definitions are not
   counted (SA-MP raises its limits itself).
 - **Remapping keeps bytes.** Only the id tokens change: the first field of `objs tobj anim cars peds weap
   hier` and `2dfx` lines, the model of text IPL `inst` and `cars` lines, the model fields of binary IPL

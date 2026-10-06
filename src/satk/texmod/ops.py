@@ -2,7 +2,9 @@
 
 * ``texture.extract`` -> ``satk texture extract <txd>``: PNGs + ``texmod.json`` in ``work/out/texmod/<txd>/``;
 * ``texture.pack``    -> ``satk texture pack <folder>``: images -> ``work/out/mods/<name>/<file>.txd``;
-* ``texture.replace`` -> ``satk texture replace <txd> <tex>=<image>...``: a TXD copy with swapped textures.
+* ``texture.replace`` -> ``satk texture replace <txd> <tex>=<image>...``: a TXD copy with swapped textures;
+* ``texture.finish``  -> ``satk texture finish <image> --preset interior``: the SA look without photographs;
+* ``texture.new``     -> ``satk texture new <name> --size 256 128 --color #7a7c7c``: a flat, gradient or banded base image.
 
 Module-level imports stay stdlib/satk only (SPEC §2.3).
 """
@@ -14,6 +16,7 @@ from typing import Literal
 from ..core.errors import SatkError
 from ..core.registry import op
 
+AssetClass = Literal["vehicle", "ped", "weapon", "map", "lod"]
 Format = Literal["auto", "dxt1", "dxt3", "dxt5", "a8r8g8b8", "x8r8g8b8", "r5g6b5", "a1r5g5b5", "a4r4g4b4"]
 Quality = Literal["fast", "normal", "high"]
 Profile = Literal["vanilla", "installed", "samp"]
@@ -27,29 +30,97 @@ def _limits(mips: int | None, max_size: int) -> None:
 
 
 @op("texture.pack", mcp=False,
-    summary="Pack a folder of images into a TXD (DXT1/3/5 or raw, mipmaps) at work/out/mods/<name>/<file>.txd "
-            "with a README; round-trip checked, rows carry PSNR.",
-    summary_ru="Собрать TXD из папки картинок (DXT1/3/5 или без сжатия, мип-уровни) в work/out/mods/<name>/ "
-               "с README; результат перечитывается, в строках PSNR.",
-    examples=("satk texture pack bistro --name bistro_hd", "satk texture pack signs --name signs --format dxt5 --max-size 512"))
+    summary="Pack a folder of images into a TXD at work/out/mods/<name>/<file>.txd (or --out <mod folder>); "
+            "--asset-class vehicle|ped|weapon|map|lod picks formats and mip levels like the vanilla game "
+            "(vehicles: DXT1/DXT3, 1 level, never DXT5). Round-trip checked, rows carry PSNR.",
+    summary_ru="Собрать TXD из папки картинок в work/out/mods/<name>/ (или --out <папка мода>); --asset-class "
+               "задаёт форматы и мипы как в игре (машины: DXT1/DXT3, 1 уровень). Результат перечитывается.",
+    examples=("satk texture pack bistro --name bistro_hd", "satk texture pack signs --name signs --format dxt5 --max-size 512",
+              "satk texture pack mycar_tex --asset-class vehicle --file premier.txd --out mymod/premier"))
 def texture_pack(folder: str, name: str | None = None, file: str | None = None, format: Format = "auto",  # noqa: A002
-                 mips: int | None = None, quality: Quality = "normal", pot: bool = True, max_size: int = 0) -> dict:
+                 mips: int | None = None, quality: Quality = "normal", pot: bool = True, max_size: int = 0,
+                 asset_class: AssetClass | None = None, out: str | None = None) -> dict:
     """Images (one texture each, named by the file) -> TXD in the modloader layout.
 
     Args:
         folder: image folder: absolute, relative to the current folder or to work/out/texmod (texture extract).
         name: mod folder under work/out/mods (default: the folder name).
         file: TXD file name (default: <name>.txd).
-        format: auto = DXT1 opaque, DXT1+1-bit alpha, DXT5 smooth alpha (or as in texmod.json).
-        mips: levels; omit = full chain (or as extracted), 0 = none.
+        format: auto = DXT1 opaque, DXT1+1-bit alpha, DXT5 smooth alpha (or as in texmod.json); with
+            --asset-class: the class formats (DXT3, never DXT5, for smooth alpha; X8R8G8B8/A8R8G8B8 for peds).
+        mips: levels; omit = full chain (or as extracted, or as the class), 0 = none.
         quality: DXT endpoint search: fast | normal | high.
         pot: resize sides to powers of two.
         max_size: shrink the longest side to this (0 = keep).
+        asset_class: vehicle|ped|weapon|map|lod: formats and mip levels as in the vanilla game (vehicle, ped,
+            weapon, lod: one level; map: a full chain from 256 px).
+        out: write <out>/<file> into this folder (absolute or relative to the current folder; a mod folder),
+            without a README, instead of work/out/mods/<name>/.
     """
     from .api import pack
 
     _limits(mips, max_size)
-    return pack(folder, name=name, file=file, choice=format, mips=mips, quality=quality, pot=pot, max_size=max_size)
+    return pack(folder, name=name, file=file, choice=format, mips=mips, quality=quality, pot=pot, max_size=max_size,
+                asset_class=asset_class, out=out)
+
+
+@op("texture.new", mcp=False,
+    summary="Make a flat, gradient or banded base image of any size (a multiple of 4) for an own texture: a base "
+            "colour, an optional two-colour gradient and UV rectangles (u0:v0:u1:v1=#hex, v up like uv.fit); "
+            "writes work/out/texmod/new/<name>.png. No Pillow script needed.",
+    summary_ru="Плоская, градиентная или поясная базовая картинка любого размера (кратного 4) для своей текстуры: "
+               "цвет, градиент и прямоугольники в UV (u0:v0:u1:v1=#hex); work/out/texmod/new/<имя>.png.",
+    examples=("satk texture new bin_base --size 256 128 --color #7a7c7c --rect 0:0:1:0.6=#5c7a68",
+              "satk texture new wall --size 128 --color #6a6c6c --color2 #8a8c8c --gradient v"))
+def texture_new(name: str, size: list[int] | None = None, color: str = "#808080", color2: str | None = None,
+                gradient: Literal["none", "u", "v"] = "none", rect: list[str] | None = None, alpha: int = 255,
+                out: str | None = None) -> dict:
+    """Paint a base image: colour, gradient, rectangles (deterministic).
+
+    Args:
+        name: texture name = file stem (a-z 0-9 _ -, at most 31 characters).
+        size: W H in pixels, or one number for a square (each side a multiple of 4; default 256).
+        color: base colour: #rrggbb, #rgb, #rrggbbaa or r,g,b[,a].
+        color2: far-end colour of a gradient.
+        gradient: none, v (colour at the bottom v=0 to color2 at the top v=1) or u (left to right).
+        rect: rectangles painted over it in order, each u0:v0:u1:v1=#rrggbb in UV space (0..1, v up: the
+            rectangles uv.fit and kit.uv_region use).
+        alpha: base alpha 0-255 (255 = opaque).
+        out: output folder (default work/out/texmod/new).
+    """
+    from .newimg import new_image
+
+    return new_image(name, size=size, color=color, color2=color2, gradient=gradient, rects=rect, alpha=alpha, out=out)
+
+
+@op("texture.finish", mcp=False,
+    summary="Give a flat or drawn image the San Andreas texture look without photos: two-scale noise, AO from a "
+            "mask, worn edges from an edge mask, desaturation, grime; then pulls value, saturation, detail and "
+            "colour count into the inner vanilla band of its role. Writes the PNG and its DXT1 preview.",
+    summary_ru="Придать плоской или нарисованной картинке вид текстур SA без фото: шум двух масштабов, AO по "
+               "маске, потёртые края по маске краёв, обесцвечивание, грязь; значения подгоняются под полосу "
+               "ванили для роли. PNG и превью DXT1.",
+    examples=("satk texture finish interior.png --preset interior",
+              "satk texture finish wall.png --preset wall --mask wall_ao.png",
+              "satk texture finish bin.png --mask bin_ao.png --edge bin_edge.png --role prop"))
+def texture_finish(image: str, preset: Literal["photo_like", "interior", "wheel", "wall"] = "photo_like",
+                   mask: str | None = None, out: str | None = None, edge: str | None = None, role: str = "auto",
+                   profile: Profile = "vanilla") -> dict:
+    """Finish one image for the SA look (deterministic: the same image and preset give the same file).
+
+    Args:
+        image: PNG (or any image Pillow reads): absolute, relative to the current folder or to work/out/texmod.
+        preset: photo_like (keep the value) | interior (dark: vanilla value 0.09-0.12-0.26) | wheel | wall (tiles).
+        mask: grey image for ambient occlusion (white = open, black = occluded); another size is resized.
+        out: output folder (default work/out/texmod/finish).
+        edge: grey image of worn edges (white = edge; kit.bake writes <object>_edge.png): edges turn lighter.
+        role: style role whose vanilla band the result lands in (interior wheel decal body ped weapon wall ground
+            prop generic); auto = the preset's, else guessed from the name, else prop.
+        profile: profile whose vanilla textures give the role bands.
+    """
+    from .finish import finish
+
+    return finish(image, preset=preset, mask=mask, out=out, edge=edge, role=role, profile=profile)
 
 
 @op("texture.replace", mcp=False,

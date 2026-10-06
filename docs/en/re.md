@@ -17,6 +17,7 @@ gta-reversed" and "which MTA patches (upstream, our trunk, Neon) sit inside it".
 satk re build
 satk re addr 0x53BF09
 satk re find CPed::Update --limit 3
+satk re nodes --type bike
 ```
 
 What `re addr` returns (abridged):
@@ -35,10 +36,11 @@ What `re addr` returns (abridged):
 |---|---|---|
 | `satk re build [--exe PATH] [--no-trunk] [--ghidra-functions FILE]` | — | rebuild the DB from all sources |
 | `satk re addr 0x53BF09 gta_sa.exe+0x13E4FA` · `--text-file crash.txt` · `-` (stdin) | `re_addr` | address or crash log → function+offset, `file:line`, thunk, patches; one address gives an object, several a table |
-| `satk re find NAME [--kind func\|global\|vtable\|struct]` | `re_find` | exact name, then `::member`, prefix, substring |
-| `satk re src FN [--context 30]` | `re_src` | gta-reversed lines around the hook install and the definition (show only, never copy into files) |
+| `satk re find NAME [--kind func\|global\|vtable\|struct]` | `re_find` | exact name, then `::member`, prefix, substring; with no match a function the knowledge base knows (not hooked: `kb: not reversed at file:line`) or a member of a base class (`inherited: ...`), else names sharing its words in `did_you_mean` |
+| `satk re src FN [--context 30]` | `re_src` | gta-reversed lines around the hook install and the definition (show only, never copy into files); `--context` 0..400; a function the DB has no line for comes from the knowledge base (`via: kb`, `status: not reversed ...` at `file:line`; also before `satk re build`); `CVehicle::X` declared in a base class answers `CPhysical::X` with `inherited`; an unknown name suggests similar ones in `did_you_mean` |
 | `satk re patches [--fn FN \| --range 0xA-0xB] [--origin upstream\|trunk\|neon\|satk\|all] [--kind K]` | `re_patches` | MTA patches with `file:line` |
-| `satk re limits [--kind pool\|array\|store\|id_range\|streaming\|world] [--match S]` | — | engine limits: vanilla / trunk / Neon |
+| `satk re limits [--kind pool\|array\|store\|id_range\|streaming\|world] [--match S] [--summary]` | — | engine limits: vanilla / trunk / Neon; 20 rows per page, `--summary` only the counts per kind |
+| `satk re nodes [--type automobile\|mtruck\|quad\|heli\|plane\|boat\|train\|fheli\|fplane\|bike\|bmx\|trailer\|ped]` | — | the frame names the engine looks up per vehicle type and for peds, read from `gta_sa.exe`: name, id, role (part, dummy, extra), flags |
 | `satk re export ghidra\|x32dbg\|json [--out DIR]` | — | `ApplySaSymbols.py` + `symbols.json`, `gta_sa.exe.dd32`, `symbols.json` |
 
 The SIDs `fn:`, `g:`, `vt:`, `patch:` also work through the common `asset_get` / `asset_find` / `asset_refs`:
@@ -75,6 +77,12 @@ An honest `medium` example: `0x41B1D0` → `sub_41b1d0`, `alt: CCollision::Camer
 from a Ghidra analysis export (Ghidra itself is not needed at build time; an adjacent `summary.json`, when present,
 must name the same exe hash). Names still come from the source scanners. With the export, `0x53BF09` is
 `CGame::Process` with `confidence: exact` and two ranges, and `0x41B1D0` becomes an exact `sub_41b1d0`.
+
+**Frame tables.** `satk re nodes` reads `CVehicleModelInfo::ms_vehicleDescs` (12 pointers at 0x8A7740, one per
+vehicle type) and the ped list at 0x8A6268 straight from the clean `gta_sa.exe` (no symbol DB needed). A part
+row's `id` is the node number, a dummy row's `id` the position slot (`ped_frontseat` = 4), extras have 0;
+`flag_words` spell the flag bits. With the knowledge base the numbers are named after the gta-reversed enums
+(`CAR_WHEEL_LF`, `DUMMY_SEAT_FRONT`). A model that misses a name loses that part in the game.
 
 **Patches in the answer:** first those covering the address (`hit: true`), then by address; upstream rows that trunk
 repeats are hidden (trunk = upstream + our commits). The full list: `satk re patches`. The origin `satk` is

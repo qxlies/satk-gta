@@ -66,6 +66,10 @@ What comes back (shortened, the second command):
 | `satk asset refs <sid> [--rel R]` | `asset_refs` | without `--rel`: how many relations of each kind; with `--rel`: a table |
 | `satk world near X Y [Z] [--r R \| --box x0,y0,x1,y1] [--match aabb\|center] [--area N\|any] [--lod hd\|lod\|all] [--kinds inst,item,zone,water]` | `world_near` | placements nearby, nearest first; `water` = `water.dat` polygons (v3) |
 
+The scan runs in worker processes (`--jobs N`, or the environment variable `SATK_JOBS=N`; `1` scans in-process).
+When the machine forbids worker processes (a restricted sandbox, `WinError 5`) the build scans in-process by
+itself and says so in `warn`; the index and its content hash are identical.
+
 Every query takes `--profile` (default `vanilla`; without a clean copy that is an alias of the `game` profile,
 your game folder, see [install.md](install.md)). When DAT/IDE/IPL/IMG files changed after the build, the answer
 carries `warn: ["INDEX_STALE: … (satk index build)"]`.

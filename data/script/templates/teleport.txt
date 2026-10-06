@@ -1,0 +1,18 @@
+// {{NAME}}: teleport to {{X}} {{Y}} {{Z}} with a cheat code. Made by 'satk script new teleport'.
+// Build: satk script asm {{NAME}}/{{NAME}}.txt; install: copy {{NAME}}.cs into the game's cleo folder (CLEO 4 or 5).
+// Coordinates of a place: satk world near, or the viewer (satk view pick).
+{$CLEO .cs}
+03A4: script_name '{{SNAME}}'
+
+:LOOP
+0001: wait 250
+00D6: if 1                              // and: both conditions
+0256: is_player_playing $2
+0ADC: test_cheat "{{CHEAT}}"
+004D: goto_if_false @LOOP
+04BB: set_area_visible 0                // leave interiors
+0860: set_char_area_visible $3 0
+03CB: load_scene {{X}} {{Y}} {{Z}}
+00A1: set_char_coordinates $3 {{X}} {{Y}} {{Z}}
+0ACA: print_help_string "{{TEXT}}"
+0002: goto @LOOP

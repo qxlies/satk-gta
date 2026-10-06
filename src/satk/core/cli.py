@@ -6,6 +6,13 @@
   tables in a terminal), ``--timing`` (elapsed time on stderr), ``-q`` (no output on
   success), ``-h`` (help). ``--fields a,b`` reduces the result of any operation that does
   not declare its own ``fields`` parameter.
+* ``--out FILE`` writes the whole envelope (JSON) to ``FILE`` and prints a one-line summary instead;
+  ``--json-out FILE`` is the same for operations with an ``--out`` parameter of their own.
+  ``--summary`` prints only the one-line summary. Both keep the exit code. Neither applies to an
+  operation that declares a parameter of that name (``re limits --summary`` is its own).
+* In JSON mode an error envelope is printed on stdout and also echoed as one line on stderr.
+* Aliases: ``satk ops <words>`` = ``satk mcp ops <words>`` (search operations), ``satk op <name>`` =
+  ``satk mcp op <name>``; ``satk help --find <words>`` searches help topics and operations.
 * Exit codes: 0 ok, 1 error, 2 bad arguments (``BAD_PARAMS``), 3 not ready
   (``NOT_READY``/``INDEX_MISSING``/``DEPENDENCY``).
 * Negative numbers and lists work as values: ``--pos 2495,-1720,60``, ``world near 2495 -1687``.
@@ -30,13 +37,16 @@ from . import envelope
 from .errors import EXIT_OK, SatkError, exit_code_for
 from .registry import OpSpec, all_ops, invoke
 
-__all__ = ["main", "build_parser", "parse_args", "render", "CommandTree", "surface"]
+__all__ = ["main", "build_parser", "parse_args", "render", "summarize", "CommandTree", "surface", "ALIASES"]
 
 GLOBAL_FLAGS = {"--json": "json", "--table": "table", "--timing": "timing",
                 "-q": "quiet", "--quiet": "quiet", "-h": "help", "--help": "help"}
 _CELL_MAX = 60
 #: Flags of the people's guide (``satk --all``, ``satk --ru``); not global flags.
 _GUIDE_FLAGS = ("--all", "--ru")
+#: First words that stand for longer commands when no command of that name exists.
+ALIASES: dict[str, tuple[str, ...]] = {"ops": ("mcp", "ops"), "op": ("mcp", "op")}
+_SUMMARY_MAX = 400
 
 _SURFACE: contextvars.ContextVar[str] = contextvars.ContextVar("satk_surface", default="api")
 
@@ -156,11 +166,47 @@ def _free_required_positionals(spec: OpSpec, parser: argparse.ArgumentParser, ar
     return [argv[k] for k in pos] + [t for k, t in enumerate(argv) if k not in taken]
 
 
+def _join_query(spec: OpSpec, parser: argparse.ArgumentParser, argv: list[str]) -> list[str]:
+    """``satk kb search CStreaming RequestModel`` = ``satk kb search "CStreaming RequestModel"``.
+
+    Only for operations whose single positional parameter is a ``query`` string: their free words
+    (tokens that are neither options nor option values) are joined with spaces into that one value.
+    """
+    pos = [p for p in spec.params if p.positional]
+    if len(pos) != 1 or pos[0].name != "query" or pos[0].kind not in ("str", "path") or "--" in argv:
+        return argv
+    arity: dict[str, str] = {}
+    for a in parser._actions:  # noqa: SLF001 - our own parser
+        for s in a.option_strings:
+            arity[s] = "many" if a.nargs == "+" else ("flag" if a.nargs == 0 else "one")
+    free: list[int] = []
+    i = 0
+    while i < len(argv):
+        t = argv[i]
+        if not _is_option_token(parser, t):
+            free.append(i)
+            i += 1
+            continue
+        kind = arity.get(t.split("=", 1)[0])
+        i += 1
+        if "=" in t or kind in (None, "flag"):
+            continue
+        if kind == "one":
+            i += 1
+            continue
+        while i < len(argv) and not _is_option_token(parser, argv[i]):  # a list option takes the run
+            i += 1
+    if len(free) < 2:
+        return argv
+    taken = set(free)
+    return [" ".join(argv[k] for k in free)] + [t for k, t in enumerate(argv) if k not in taken]
+
+
 def parse_args(spec: OpSpec, argv: Sequence[str]) -> dict:
     """CLI tokens -> JSON-style argument dict (only given parameters); ``BAD_PARAMS`` on errors."""
     parser = build_parser(spec)
     try:
-        ns = parser.parse_args(_free_required_positionals(spec, parser, list(argv)))
+        ns = parser.parse_args(_free_required_positionals(spec, parser, _join_query(spec, parser, list(argv))))
     except _UsageError as e:
         raise SatkError("BAD_PARAMS", f"satk {spec.cli}: {e}", hint=f"satk {spec.cli} -h") from None
     out: dict = {}
@@ -317,6 +363,57 @@ def render(env: dict) -> str:
     return "\n".join(lines)
 
 
+def _short(v: Any, n: int = 48) -> str:
+    s = _value(v).replace("\n", " ")
+    return s if len(s) <= n else s[: n - 3] + "..."
+
+
+def summarize(env: dict) -> str:
+    """One line about an envelope: rows/total/next of a table, scalar fields and sizes of the rest.
+
+    ``ok: 20 of 51 rows (cols idx, name); next 20`` or ``ok: kind=dff; frames=51; rows[20]; warn 1: X``.
+    """
+    if not env.get("ok", True):
+        err = env.get("error") or {}
+        return f"error {err.get('code', '?')}: {err.get('msg', '')}"
+    parts: list[str] = []
+    if envelope.is_table(env) and isinstance(env.get("rows"), list):
+        rows = env["rows"]
+        count = f"{env.get('n', len(rows))} of {env['total']}" if "total" in env else str(len(rows))
+        parts.append(f"{count} rows (cols {', '.join(map(str, env.get('cols') or []))})")
+        if env.get("next"):
+            parts.append(f"next {env['next']}")
+    skip = {"ok", "warn", "cols", "rows", "n", "total", "next"} if parts else {"ok", "warn"}
+    for k, v in env.items():
+        if k in skip or v is None:
+            continue
+        if isinstance(v, dict):
+            parts.append(f"{k}{{{len(v)}}}")
+        elif isinstance(v, (list, tuple)):
+            parts.append(f"{k}[{len(v)}]")
+        else:
+            parts.append(f"{k}={_short(v)}")
+    warns = env.get("warn") or []
+    if warns:
+        parts.append(f"warn {len(warns)}: " + str(warns[0]).split(":", 1)[0])
+    text = "ok: " + "; ".join(parts) if parts else "ok"
+    return text if len(text) <= _SUMMARY_MAX else text[: _SUMMARY_MAX - 3] + "..."
+
+
+def _summary_env(env: dict, out_path: str | None = None, size: int | None = None) -> dict:
+    """The small envelope printed by ``--summary`` / ``--out`` (an error envelope stays whole)."""
+    if not env.get("ok", True):
+        res = dict(env)
+    else:
+        res = {"ok": True, "summary": summarize(env)}
+        if env.get("warn"):
+            res["warn"] = list(env["warn"])[:3]
+    if out_path:
+        res["out"] = out_path
+        res["bytes"] = size
+    return res
+
+
 def _is_utf(stream: TextIO) -> bool:
     enc = (getattr(stream, "encoding", None) or "").lower().replace("-", "").replace("_", "")
     return enc in ("utf8", "utf8sig")
@@ -336,6 +433,13 @@ def _encodable(text: str, stream: TextIO) -> str:
 def _emit(env: dict, mode: str, out: TextIO, err: TextIO) -> None:
     if mode == "json":
         out.write(envelope.dumps(env, ascii=not _is_utf(out)) + "\n")
+        if not env.get("ok", True):  # visible even when stdout is parsed or redirected
+            e = env.get("error") or {}
+            line = f"error {e.get('code', '?')}: {e.get('msg', '')}"
+            if e.get("hint"):
+                line += f" (hint: {e['hint']})"
+            err.write(_encodable(line.replace("\n", " "), err) + "\n")
+            err.flush()
     else:
         stream = out if env.get("ok", True) else err
         stream.write(_encodable(render(env), stream) + "\n")
@@ -377,6 +481,84 @@ def _take_fields(tokens: list[str]) -> tuple[list[str], list[str] | None]:
         out.append(t)
         i += 1
     return out, fields
+
+
+def _take_output(tokens: list[str], *, out: bool, summary: bool) -> tuple[list[str], str | None, bool]:
+    """Remove the global ``--json-out FILE`` (always), ``--out FILE`` (when ``out``) and ``--summary``
+    (when ``summary``) from ``tokens``: ``(rest, file or None, summary wanted)``."""
+    rest: list[str] = []
+    path: str | None = None
+    want = False
+    names = ("--json-out",) + (("--out",) if out else ())
+    i = 0
+    while i < len(tokens):
+        t = tokens[i]
+        if t == "--":
+            rest.extend(tokens[i:])
+            break
+        key, eq, val = t.partition("=")
+        if key in names:
+            if eq:
+                path = val
+                i += 1
+                continue
+            if i + 1 >= len(tokens):
+                raise SatkError("BAD_PARAMS", f"{key} needs a file name", hint=f"{key} result.json")
+            path = tokens[i + 1]
+            i += 2
+            continue
+        if summary and t == "--summary":
+            want = True
+            i += 1
+            continue
+        rest.append(t)
+        i += 1
+    return rest, path, want
+
+
+def _write_out(path: str, env: dict) -> tuple[str, int]:
+    """Write the envelope as indented JSON (a relative path is taken from the current folder)."""
+    import os
+    from pathlib import Path
+
+    from .paths import atomic_write, jpath
+
+    p = Path(os.path.abspath(Path(path).expanduser()))
+    data = (envelope.dumps(env, pretty=True) + "\n").encode("utf-8")
+    atomic_write(p, data)
+    return jpath(p), len(data)
+
+
+def _help_find(remaining: list[str]) -> dict:
+    """``satk help --find <words> [--limit N]``: help topics and operations matching the words."""
+    from satk.runtime.help import find as _find
+
+    words: list[str] = []
+    limit = 20
+    i = 0
+    while i < len(remaining):
+        t = remaining[i]
+        key, eq, val = t.partition("=")
+        if t == "--find":
+            i += 1
+            continue
+        if key == "--limit":
+            raw = val if eq else (remaining[i + 1] if i + 1 < len(remaining) else "")
+            try:
+                limit = int(raw)
+            except ValueError:
+                raise SatkError("BAD_PARAMS", f"--limit: not a number: {raw!r}",
+                                hint="satk help --find <words> --limit 50") from None
+            i += 1 if eq else 2
+            continue
+        if t.startswith("-"):
+            raise SatkError("BAD_PARAMS", f"satk help --find: unknown option {t}",
+                            hint="satk help --find <words> [--limit N]")
+        words.append(t)
+        i += 1
+    if not words:
+        raise SatkError("BAD_PARAMS", "satk help --find needs words", hint="satk help --find make txd from png")
+    return _find(" ".join(words), limit=limit)
 
 
 def _setup_streams() -> None:
@@ -431,9 +613,13 @@ def main(argv: Sequence[str] | None = None, *, stdout: TextIO | None = None, std
     setup()
     t0 = time.perf_counter()
     code = EXIT_OK
+    out_file: str | None = None
+    want_summary = False
     token = _SURFACE.set("cli")
     try:
         tree = CommandTree.build(all_ops())
+        if rest and rest[0] in ALIASES and rest[0] not in tree.children:
+            rest = [*ALIASES[rest[0]], *rest[1:]]
         node, used, remaining = tree.walk(rest)
         guide = _guide_request(node, used, remaining, flags, mode)
         if guide is not None:  # satk / satk -h / satk --all / satk --ru -> the help operation
@@ -465,12 +651,18 @@ def main(argv: Sequence[str] | None = None, *, stdout: TextIO | None = None, std
             out.flush()
             return EXIT_OK
         post_fields: list[str] | None = None
-        if not any(p.name == "fields" for p in spec.params):
+        own = {p.name for p in spec.params}
+        if "fields" not in own:
             remaining, post_fields = _take_fields(remaining)
-        if spec.name == "help" and "--all" in remaining:  # satk help --all = topic "all"
-            remaining = ["all"] + [t for t in remaining if t != "--all"]
-        args = parse_args(spec, remaining)
-        env = invoke(spec, args)
+        remaining, out_file, want_summary = _take_output(remaining, out="out" not in own,
+                                                         summary="summary" not in own)
+        if spec.name == "help" and "--find" in remaining:  # satk help --find <words>
+            env = _help_find(remaining)
+        else:
+            if spec.name == "help" and "--all" in remaining:  # satk help --all = topic "all"
+                remaining = ["all"] + [t for t in remaining if t != "--all"]
+            args = parse_args(spec, remaining)
+            env = invoke(spec, args)
         if post_fields and env.get("ok", True):
             env = envelope.select_fields(env, post_fields)
     except SatkError as e:
@@ -480,6 +672,14 @@ def main(argv: Sequence[str] | None = None, *, stdout: TextIO | None = None, std
         return 130
     finally:
         _SURFACE.reset(token)
+    if out_file:
+        try:
+            where, size = _write_out(out_file, env)
+            env = _summary_env(env, where, size)
+        except SatkError as e:
+            env = e.to_dict()
+    elif want_summary:
+        env = _summary_env(env)
     if not env.get("ok", True):
         code = exit_code_for((env.get("error") or {}).get("code", "INTERNAL"))
     if not ("quiet" in flags and code == EXIT_OK):

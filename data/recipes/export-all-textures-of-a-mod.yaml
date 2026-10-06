@@ -1,0 +1,27 @@
+# satk recipe (shipped). Run: satk recipe run export-all-textures-of-a-mod --var mod=<mod folder or .txd>
+name: export-all-textures-of-a-mod
+summary: Extract every texture of a mod - loose TXDs and TXDs inside its IMG archives - as PNG plus texmod.json, one folder per TXD under work/out/texmod/<mod>/ (ready for texture pack).
+description: |
+  Edited PNGs are kept unless force is true. A .zip mod must be extracted first.
+  Each folder can be packed back with 'satk texture pack <folder>'.
+vars:
+  mod: {required: true, help: "mod folder, or one .txd file"}
+  force: {default: false, help: "overwrite PNGs edited since the last extract"}
+steps:
+  - id: single
+    op: texture.extract
+    input: ${mod}
+    args: {out: "${work}/out/texmod/${mod|stem}", force: "${force}"}
+    when: "${mod|ext|eq:txd}"
+  - id: loose
+    op: batch
+    args: {op: texture.extract, over: "${mod}/**/*.txd", arg: ["out=${work}/out/texmod/${mod|name}/{stem}", "force=${force}"],
+           keep: brief, allow_empty: true}
+    unless: "${mod|ext|eq:txd}"
+    on_error: continue
+  - id: in_img
+    op: batch
+    args: {op: texture.extract, over: "${mod}/**/*.img/*.txd", arg: ["out=${work}/out/texmod/${mod|name}/{stem}", "force=${force}"],
+           keep: brief, allow_empty: true}
+    unless: "${mod|ext|eq:txd}"
+    on_error: continue

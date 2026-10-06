@@ -42,6 +42,17 @@ including positional arguments. Required positionals are given back automaticall
 → `BAD_PARAMS: kinds must be one of inst, item, zone, water, got '2495'`. Write positional arguments **first**:
 `satk world near 2495 -1687 --kinds inst`.
 
+Search commands take free words: `satk ops make txd from png` (= `satk mcp ops`), `satk kb search CStreaming
+RequestModel`, `satk help --find crash address`. A long answer can go to a file: `--out result.json` writes the
+whole JSON and prints one line; `--summary` prints only that line. In JSON mode an error is also echoed as one
+line on stderr.
+
+## `%` in arguments is lost
+
+A wrapper script of the form `call satk.cmd %*` makes `cmd` expand `%...%` again, so `LIKE '%car%'` arrives
+changed. Call `tools\satk.cmd` (or `satk.sh`, or the `satk` console script) directly, or pass such arguments
+in a JSON file: `satk mcp op index.query --args @args.json`.
+
 ## Viewer: `NOT_READY`, a black or empty frame
 
 - **Not running.** `NOT_READY: target 'ariane' is not running` → `satk view start --target ariane`
@@ -157,6 +168,16 @@ No venv: run `bootstrap.ps1` (without `-Deps` it works without the network).
   A narrower set: `SATK_MCP_GROUPS=core,index,media,view`.
 - The server does not start: `satk doctor` (checks `deps`, `ops_import`, `app_control`), then
   `<workspace>\work\logs\mcp.log`.
+
+## `WinError 5` in a sandbox (the Codex Windows sandbox, restricted tokens)
+
+A sandboxed process may not create named pipes, start Git Bash or use owner-only temp folders. satk copes where
+it can: worker pools (the index build, thumbnails, texture export) run in-process and the answer carries
+`warn: ["UNSUPPORTED: worker processes are not available here ..."]`; the result is the same, only slower.
+`SATK_JOBS=1` (or `--jobs 1`) asks for that on purpose. `satk dev gate` detects the restrictions, loads
+`tests/sandbox_compat.py` into pytest and lists what it found under `warn`; the few tests that need Git Bash or
+asyncio subprocess pipes skip with a reason that starts with `sandbox:`, and the gate counts them
+("N skipped for the sandbox"). Outside such a sandbox nothing changes.
 
 ## Quick example
 

@@ -53,3 +53,41 @@ def test_older_differing_copy_is_updated(satk_home: Path, run_cli):
     os.utime(dst, (past, past))
     r = run_cli(["dev", "sync-agent-docs"])
     assert r.code == 0 and len(r.json["written"]) == 1
+
+
+def test_skill_companion_folders_are_published_with_the_skill():
+    srcs = [s for s, _ in PAIRS]
+    assert srcs[0] == "docs/agent/SKILL.md"
+    style = [(s, d) for s, d in PAIRS if s.startswith("docs/agent/style/")]
+    assert ("docs/agent/style/README.md", ".claude/skills/satk/style/README.md") in style
+    assert ("docs/agent/briefs/asset-brief.md", ".claude/skills/satk/briefs/asset-brief.md") in PAIRS
+    for s, d in PAIRS:
+        assert (REPO_ROOT / s).is_file(), s
+
+
+def _fake_worktree(root: Path) -> tuple[Path, Path, Path]:
+    """<root>/ws/tools (main checkout) and its linked worktree <root>/ws/work/wt/x."""
+    ws = root / "ws"
+    main = ws / "tools"
+    wtgit = main / ".git" / "worktrees" / "x"
+    wtgit.mkdir(parents=True)
+    (wtgit / "commondir").write_text("../..\n", encoding="utf-8")
+    wt = ws / "work" / "wt" / "x"
+    wt.mkdir(parents=True)
+    (wt / ".git").write_text(f"gitdir: {wtgit}\n", encoding="utf-8")
+    return ws, main, wt
+
+
+def test_a_task_worktree_publishes_nothing(tmp_path: Path):
+    from satk.docs.sync import plan, task_worktree
+
+    ws, main, wt = _fake_worktree(tmp_path)
+    (wt / "docs" / "agent").mkdir(parents=True)
+    (wt / "docs" / "agent" / "SKILL.md").write_text("unmerged\n", encoding="utf-8")
+    assert task_worktree(wt, ws) is True
+    assert plan(wt, ws) == []
+    assert task_worktree(main, ws) is False  # the main checkout publishes
+    other = tmp_path / "other-ws"
+    other.mkdir()
+    assert task_worktree(wt, other) is False  # a worktree of a checkout outside that workspace
+    assert [p.state for p in plan(wt, other)] == ["missing"]

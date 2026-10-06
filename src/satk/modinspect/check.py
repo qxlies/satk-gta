@@ -171,7 +171,135 @@ def satk_issues(rows: list[list], summary: dict, world) -> list[list]:
         out.append(["mod.drops_records", "warn", by,
                     f"{n} game record(s) are missing from this file; with Mod Loader they disappear from the game",
                     None])
+    if world is not None:
+        try:
+            out += capacity_issues(rows, world)
+        except (SatkError, OSError) as e:  # a capacity estimate must never break the check
+            out.append(["mod.capacity", "info", "", f"capacity not estimated: {e}", None])
     out.sort(key=lambda r: (-SEV_ORDER[r[1]], r[2].lower(), r[0]))
+    return out
+
+
+# --------------------------------------------------------------------------- engine capacity
+
+#: Stock stores of gta_sa.exe 1.0 US (single player) a mod competes for: name -> (slots, what).
+#: Limit adjusters (Open Limit Adjuster, fastman92 LA) raise them; MTA raises some engine pools, not these.
+STORES: dict[str, tuple[int, str]] = {
+    "vehicle": (212, "vehicle model slots"), "ped": (278, "ped model slots"), "weapon": (51, "weapon model slots"),
+    "object": (14070, "object model slots (14 000 + 70 damageable)"), "timed": (169, "timed object model slots"),
+    "clump": (92, "clump model slots (anim + hier)"), "col": (255, "COL file slots"),
+    "txd": (5000, "TXD slots"), "2dfx": (100, "IDE 2dfx entries"), "enex": (400, "entry-exits (IPL enex)"),
+}
+#: IDE section -> store.
+SEC_STORE = {"cars": "vehicle", "peds": "ped", "weap": "weapon", "objs": "object", "tobj": "timed",
+             "anim": "clump", "hier": "clump"}
+#: Fewer free slots than this after the mod -> warn.
+LOW_SLOTS = 10
+
+
+def _ide_fx(text: str) -> int:
+    from ..formats.ide import parse_ide
+
+    return len(parse_ide(text)[2])
+
+
+def _ipl_enex(text: str) -> int:
+    from ..formats.ipl import parse_ipl_text
+
+    return len(parse_ipl_text(text)[1].get("enex", []))
+
+
+def _base_count(world, kind: str) -> int:
+    """How many slots of ``kind`` the profile's game already uses."""
+    base = world.base
+    if kind in ("col", "txd"):
+        n = sum(1 for name in base.img_names if name.endswith("." + kind))
+        return n + 1 if kind == "col" else n          # COL slot 0 is the engine's generic slot
+    if kind in ("2dfx", "enex"):
+        from ..formats.dat import read_text, resolve_ci
+
+        total = 0
+        for rel in (base.ide_paths if kind == "2dfx" else base.ipl_paths):
+            p = resolve_ci(base.root, rel)
+            if p is None or not p.is_file():
+                continue
+            text = read_text(p)
+            if kind == "enex" and text[:4] == "bnry":
+                continue
+            total += _ide_fx(text) if kind == "2dfx" else _ipl_enex(text)
+        return total
+    secs = [s for s, k in SEC_STORE.items() if k == kind]
+    return sum(1 for m in base.models.values() if m.sec in secs)
+
+
+def _mod_text(x) -> str:
+    from .world import decode_readme
+
+    return decode_readme(x.file.read())
+
+
+def _base_text(world, rel: str | None) -> str:
+    if not rel:
+        return ""
+    from ..formats.dat import read_text, resolve_ci
+
+    p = resolve_ci(world.base.root, rel)
+    return read_text(p) if p is not None and p.is_file() else ""
+
+
+def capacity_issues(rows: list[list], world) -> list[list]:
+    """``mod.capacity`` rows for the stock stores this mod adds to (only those).
+
+    New IDE ids count per section (``new-id`` rows), new ``.col``/``.txd`` files one slot each,
+    IDE ``2dfx`` and IPL ``enex`` entries by the difference to the game file the mod's file replaces.
+    Severity: ``error`` over the stock size, ``warn`` with fewer than :data:`LOW_SLOTS` left, else ``info``.
+    """
+    added: dict[str, int] = {}
+    first: dict[str, str] = {}
+
+    def add(kind: str, n: int, by: str) -> None:
+        if n > 0:
+            added[kind] = added.get(kind, 0) + n
+            first.setdefault(kind, by)
+
+    for kind, _target, change, by, detail in rows:
+        if change == "new-id" and kind == "ide":
+            store = SEC_STORE.get(str(detail).split(" ", 1)[0])
+            if store:
+                add(store, 1, by)
+        elif change == "add" and kind in ("col", "txd"):
+            add(kind, 1, by)
+    for x in world.used():
+        if x.beh.kind not in ("ide", "ipl"):
+            continue
+        try:
+            text = _mod_text(x)
+        except (SatkError, OSError):
+            continue
+        if x.beh.kind == "ide":
+            add("2dfx", _ide_fx(text) - _ide_fx(_base_text(world, world.ide_target(x))), x.file.rel)
+        elif text[:4] != "bnry":
+            add("enex", _ipl_enex(text) - _ipl_enex(_base_text(world, world.ide_target(x))), x.file.rel)
+    out: list[list] = []
+    for kind in STORES:
+        n = added.get(kind)
+        if not n:
+            continue
+        size, what = STORES[kind]
+        used = _base_count(world, kind)
+        free = size - used - n
+        sev = "error" if free < 0 else "warn" if free < LOW_SLOTS else "info"
+        msg = (f"{what}: the game uses {used}, this mod adds {n} = {used + n} of {size} in the stock "
+               f"single-player engine ({free} left)")
+        if sev != "info":
+            msg += "; more need a limit adjuster (Open Limit Adjuster or fastman92 LA) or fewer new entries"
+        out.append(["mod.capacity", sev, first.get(kind, ""), msg, None])
+    if added.get("txd") or any(r[0] in ("txd", "dff") and r[2] in ("add", "replace") for r in rows):
+        from ..core.registry import all_ops
+
+        if any(o.name == "texture.budget" for o in all_ops()):
+            out.append(["mod.streaming", "info", "", "streamed TXD/DFF bytes count against the 50 MiB stock "
+                        "streaming memory: satk texture budget <mod> estimates the load", None])
     return out
 
 

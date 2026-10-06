@@ -4,4 +4,4 @@ Run via the shims ``<checkout>\satk.cmd`` / ``satk.sh`` (``python -X utf8 -m sat
 Subpackages declare operations in ``satk.<pkg>.ops`` (see ``satk.core.registry``).
 """
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"

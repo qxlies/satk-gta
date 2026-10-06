@@ -1,0 +1,27 @@
+// {{NAME}}: hello world with a key press. Made by 'satk script new hello'.
+// Build: satk script asm {{NAME}}/{{NAME}}.txt; install: copy {{NAME}}.cs into the game's cleo folder (CLEO 4 or 5).
+// $2 is the player (PLAYER_CHAR); is_key_pressed takes a Windows virtual key code (116 = F5).
+{$CLEO .cs}
+03A4: script_name '{{SNAME}}'
+
+:WAIT_GAME
+0001: wait 1000
+00D6: if 0
+0256: is_player_playing $2
+004D: goto_if_false @WAIT_GAME
+0ACA: print_help_string "{{TEXT}}"
+
+:LOOP
+0001: wait 0
+00D6: if 1                              // and: both conditions
+0256: is_player_playing $2
+0AB0: is_key_pressed {{KEY}}
+004D: goto_if_false @LOOP
+0ACD: print_string_now "~y~{{SNAME}}: ~w~key pressed" 1500
+
+:RELEASE                                // wait until the key is released
+0001: wait 0
+00D6: if 0
+0AB0: is_key_pressed {{KEY}}
+004D: goto_if_false @LOOP
+0002: goto @RELEASE

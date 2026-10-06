@@ -1,0 +1,50 @@
+{
+ "version": 1,
+ "source": "vanilla numbers measured on GTA SA PC 1.0 US (vehicle peers of each kind, map size buckets); every sa_plus number is a PROPOSAL until validated next to vanilla peers",
+ "default_tier": "sa_plus",
+ "tiers": {
+  "vanilla": {"meaning": "every metric inside the class p10..p90 band: replacements that must blend into traffic or a district"},
+  "sa_plus": {"meaning": "the same visual language with higher budgets only where silhouette and curvature live (default for new assets)", "status": "proposal"}
+ },
+ "round": {
+  "wheel": {"vanilla": 12, "sa_plus": 20, "sa_plus_range": [16, 24], "measured": "vanilla wheel meshes have 12 sides (16 on some)"},
+  "wheel_arch_half": {"vanilla": 8, "sa_plus": 14, "sa_plus_range": [12, 16]},
+  "exhaust": {"vanilla": 8, "sa_plus": 12},
+  "lamp_round": {"vanilla": 8, "sa_plus": 12},
+  "round_prop": {"vanilla": 8, "sa_plus": 14, "sa_plus_range": [12, 16]},
+  "pole": {"vanilla": 6, "sa_plus": 8, "vanilla_range": [4, 6]},
+  "barrel_weapon": {"vanilla": 6, "sa_plus": 10},
+  "limb_ped": {"vanilla": 6, "sa_plus": 8}
+ },
+ "profile": {
+  "bumper_nose": {"vanilla": 3, "sa_plus": 5, "vanilla_range": [2, 4], "sa_plus_range": [4, 6]}
+ },
+ "tris": {
+  "automobile.hd": {"vanilla": [1677, 2168, 2473], "sa_plus": [3000, 4500], "cap": 5000},
+  "automobile.chassis": {"vanilla": [1152, 1399, 1819], "sa_plus": [2000, 3000]},
+  "automobile.interior": {"vanilla": [130, 130, 183], "sa_plus": [250, 450]},
+  "automobile.door_ok": {"vanilla": [58, 104, 148], "sa_plus": [120, 220]},
+  "automobile.bumper_ok": {"vanilla": [57, 104, 176], "sa_plus": [150, 300]},
+  "automobile.windscreen_ok": {"vanilla": [6, 12, 20], "sa_plus": [12, 30]},
+  "wheel": {"vanilla": [134, 158, 235], "sa_plus": [240, 400]},
+  "vlo": {"vanilla": [55, 72, 92], "sa_plus": [55, 130], "cap": 130},
+  "ped": {"vanilla": [944, 1079, 1274], "sa_plus": [1600, 2500]},
+  "weapon": {"vanilla": [60, 193, 578], "sa_plus": [400, 1200]},
+  "map_lod": {"vanilla": [12, 60, 262], "sa_plus": [12, 60, 262], "note": "LOD budgets do not grow with the tier"}
+ },
+ "damage": {"dam_over_ok_tris": [0.8, 1.1], "displacement_p90_m_min": 0.12},
+ "texel_px_m": {
+  "vehicle.vehiclegrunge256": [20.9, 49.6, 100.8],
+  "vehicle.vehiclegeneric256": [3.6, 56.1, 146.1],
+  "vehicle.vehiclelights128": [89.2, 159.9, 261.2],
+  "vehicle.vehicletyres128": [139.8, 183.6, 204.6],
+  "vehicle.own_interior": {"vanilla": 110, "sa_plus": 160},
+  "ped": {"vanilla": 110, "sa_plus": 160},
+  "map": "see data/kit/classes.json (per size bucket); sa_plus = 1.5-2x the bucket p50"
+ },
+ "txd": {
+  "vehicle": {"vanilla": {"textures": 3, "interior": 128, "wheel": 64}, "sa_plus": {"textures": 4, "interior": 256, "wheel": 128, "detail": 128}},
+  "ped": {"vanilla": {"size": [128, 256]}, "sa_plus": {"size": [256, 512]}},
+  "weapon": {"vanilla": {"size": 64}, "sa_plus": {"size": 128}}
+ }
+}

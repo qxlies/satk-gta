@@ -18,7 +18,9 @@ to the target's parent directory, with forward slashes (``models/gta3.img/infern
 
 from __future__ import annotations
 
+import json
 import os
+from collections import Counter
 from contextlib import ExitStack
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -32,7 +34,7 @@ from ..formats.dff import find_embedded_col
 from ..formats.img import ImgArchive
 from ..formats.rw import FormatError
 from .col import check_col
-from .dff import ModelDef, check_dff
+from .dff import ModelDef, check_dff, model_class
 from .ide import check_ide, check_ide_set
 from .link import Catalog, IndexView, check_links
 from .rules import SEV_RANK, SEVERITIES, Collector, Finding, Rules
@@ -43,7 +45,7 @@ __all__ = ["Item", "Report", "lint", "collect", "KINDS"]
 #: File kinds the linter reads.
 KINDS: tuple[str, ...] = ("dff", "txd", "col", "ide")
 _INDEX_SID_KINDS = ("model", "dff", "txd", "col")
-_ORDER = {"ide": 0, "txd": 1, "dff": 2, "col": 3}
+_ORDER = {"ide": 0, "dff": 1, "txd": 2, "col": 3}   # DFFs before TXDs: a TXD's class comes from its models
 #: Above this many DFF/COL items the index model names are loaded in bulk instead of one query per name.
 _PRELOAD_AT = 200
 
@@ -90,6 +92,12 @@ class Report:
     rules_source: str
     skipped: int = 0
     warn: list[str] = field(default_factory=list)
+    #: subjects each rule examined (files, geometries, models; the denominator of a rule's rate)
+    checked: dict[str, int] = field(default_factory=dict)
+    #: distinct labels (files) each rule fired on
+    fired_files: dict[str, int] = field(default_factory=dict)
+    #: kind -> number of linted items (dff, txd, col, ide)
+    kinds: dict[str, int] = field(default_factory=dict)
 
     def at_least(self, sev: str) -> list[Finding]:
         r = SEV_RANK[sev]
@@ -377,7 +385,8 @@ def lint(target: str, *, profile: str = "vanilla", preset: str = "game", config:
             ix.preload()
         nmax = int(rules.param("file.name_len", "max", 23))
         by_name: dict[str, ModelDef] | None = None
-        for it in sorted(tg.items, key=lambda x: _ORDER[x.kind]):  # stable: IDE first, then TXD, DFF, COL
+        txd_cls: _TxdClasses | None = None
+        for it in sorted(tg.items, key=lambda x: _ORDER[x.kind]):  # stable: IDE first, then DFF, TXD, COL
             if it.name and len(it.name) > nmax and not it.embedded:
                 c.add("file.name_len", it.label, name=it.name, n=len(it.name))
             try:
@@ -392,7 +401,10 @@ def lint(target: str, *, profile: str = "vanilla", preset: str = "game", config:
                     if child.lower() != parent.lower():
                         cat.txdp[child.lower()] = parent.lower()
             elif it.kind == "txd":
-                f = check_txd(c, it.label, data, archive=it.archive, loose=it.loose)
+                if txd_cls is None:                 # every IDE and DFF is read by now
+                    txd_cls = _TxdClasses(rules.classes, cat, ix)
+                f = check_txd(c, it.label, data, archive=it.archive, loose=it.loose,
+                              cls=txd_cls.of(it.stem, it.archive))
                 if f is not None:
                     cat.add_txd(f)
             elif it.kind == "dff":
@@ -404,7 +416,7 @@ def lint(target: str, *, profile: str = "vanilla", preset: str = "game", config:
                     if d is not None and all(x.name.lower() != d.name.lower() for x in cat.index_defs):
                         cat.index_defs.append(d)
                 f = check_dff(c, it.label, data, d, archive=it.archive, loose=it.loose,
-                              guess=not (by_name or ix.available))
+                              guess=not (by_name or ix.available), ix=ix)
                 if f is not None:
                     cat.add_dff(f)
             else:
@@ -417,17 +429,82 @@ def lint(target: str, *, profile: str = "vanilla", preset: str = "game", config:
     for f in findings:
         summary[f.sev] += 1
     by_rule = dict(sorted(c.fired.items(), key=lambda kv: (-SEV_RANK[rules[kv[0]].sev], -kv[1], kv[0])))
+    kinds = Counter(it.kind for it in tg.items)
     return Report(findings, summary, by_rule, len(tg.items), jpath(tg.root) if tg.root else None, preset,
-                  rules.source, tg.skipped, warn)
+                  rules.source, tg.skipped, warn, dict(c.checked), {k: len(v) for k, v in c.fired_on.items()},
+                  dict(kinds))
 
 
 def _index_def(ix: IndexView, stem: str) -> ModelDef | None:
     """The definition of model ``stem`` in the index (``None`` without an index or such a model)."""
-    env = ix.model(stem)
+    return _env_def(ix.model(stem), stem)
+
+
+def _env_def(env: dict | None, stem: str = "") -> ModelDef | None:
+    """A :class:`ModelDef` from an index model answer (``asset get model:...`` or a preloaded row)."""
     if not env or not str(env.get("id", "")).startswith("model:"):
         return None
     try:
         mid = int(str(env["id"]).split(":", 1)[1].split("@", 1)[0])
     except ValueError:
         return None
-    return ModelDef(mid, env.get("name") or stem, env.get("txd"), env.get("sec") or "objs", env.get("draw"), "index")
+    extra = env.get("extra")
+    if isinstance(extra, str):
+        try:
+            extra = json.loads(extra)
+        except ValueError:
+            extra = None
+    ide = str((env.get("links") or {}).get("ide") or "")
+    ide = ide.split(":", 1)[1] if ide.startswith("ide:") else ide
+    return ModelDef(mid, env.get("name") or stem, env.get("txd"), env.get("sec") or "objs", env.get("draw"), "index",
+                    flags=env.get("flags"), extra=extra if isinstance(extra, dict) else None, ide=ide.lower())
+
+
+class _TxdClasses:
+    """Model class of a TXD: the majority class of the models (and ``txdp`` children) that use it, from the
+    linted definitions, the DFFs of the same name, the index, or the ``txd_class`` / ``archive_class`` tables
+    of the rules file (``vehicle`` -> ``cars``, ``player.img`` -> ``peds``)."""
+
+    def __init__(self, classes: dict, cat, ix: IndexView):
+        self.classes = classes
+        self.ix = ix
+        self.votes: dict[str, Counter] = {}
+        for d in [*cat.defs, *cat.index_defs]:
+            if d.txd:
+                self.votes.setdefault(d.txd.lower(), Counter())[model_class(classes, d, None)] += 1
+        for f in cat.dff_list:
+            self.votes.setdefault(f.stem, Counter())[f.cls] += 0.5
+        for child, parent in cat.txdp.items():
+            if child in self.votes:
+                self.votes.setdefault(parent, Counter()).update(self.votes[child])
+        if getattr(ix, "_loaded_all", False):       # a large target: the index models are in memory already
+            self.bulk: dict[str, Counter] = {}
+            for env in ix._models.values():
+                if env and env.get("txd"):
+                    d = _env_def(env)
+                    if d is not None:
+                        self.bulk.setdefault(str(env["txd"]).lower(), Counter())[model_class(classes, d, None)] += 1
+        else:
+            self.bulk = None
+        self.fixed = {str(k).lower(): str(v) for k, v in (classes.get("txd_class") or {}).items()}
+        self.arch = {str(k).lower(): str(v) for k, v in (classes.get("archive_class") or {}).items()}
+
+    def of(self, stem: str, archive: str | None) -> str | None:
+        k = stem.lower()
+        if k in self.fixed:
+            return self.fixed[k]
+        if (archive or "") in self.arch:
+            return self.arch[archive or ""]
+        v = self.votes.get(k)
+        if not v and self.bulk is not None:
+            v = self.bulk.get(k)
+        elif not v and self.ix.available:
+            v = Counter()
+            for d in self.ix.txd_users(k):
+                v[model_class(self.classes, d, None)] += 1
+            self.votes[k] = v
+        if not v:
+            return None
+        if v.get("cars"):                           # a car TXD shared with its tuning parts is a car TXD
+            return "cars"
+        return max(sorted(v), key=lambda x: v[x])

@@ -17,13 +17,14 @@ from __future__ import annotations
 import math
 import os
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import as_completed
 from pathlib import Path
 from typing import Iterable, Sequence
 
 from ..core.errors import SatkError
 from ..core.ids import Sid
 from ..core.paths import jpath, open_ro, work
+from ..core.procpool import pool
 from ..core.registry import report_progress
 from ..formats.rw import FormatError
 from ..formats.txd import TexInfo
@@ -140,6 +141,8 @@ def decode_ref(ref, reader: Reader | None = None, backend: str | None = None) ->
 
     if backend is None:
         backend = dxt_backend()
+    if ref.d3dfmt == "PNG":  # a loose PNG file (refs_from_path)
+        return _png.load_rgba(ref.path)
 
     t = tex_info(ref)
     if t.unsupported:
@@ -197,9 +200,48 @@ def describe(ref) -> str:
     return f"{ref.w}x{ref.h} {ref.d3dfmt}"
 
 
+FILE_EXTS = (".txd", ".png")
+
+
+def is_texture_path(raw: str) -> bool:
+    """True for the path of a ``.txd`` or ``.png`` file (a texture file of one's own, not a SID)."""
+    s = str(raw).strip().strip('"')
+    return s.lower().endswith(FILE_EXTS) and ("/" in s or "\\" in s or Path(s).is_file())
+
+
+def refs_from_path(raw: str) -> list:
+    """Texture refs of a loose ``.txd`` (its PC textures, TXD order) or ``.png`` file (read with ``open_ro``)."""
+    import hashlib
+
+    from ..formats.txd import parse_txd, texture_hash
+    from ..index.api import TexRef
+
+    p = Path(str(raw).strip().strip('"')).expanduser()
+    if not p.is_file():
+        raise SatkError("NOT_FOUND", f"no texture file at {jpath(p)}", hint="a .txd or .png file, or a tex:/txd: SID")
+    with open_ro(p) as f:
+        data = f.read()
+    if p.suffix.lower() == ".png":
+        w, h, rgba = _png.load_rgba(p)
+        pix = "pix:" + hashlib.blake2b(rgba + f"{w}x{h}".encode(), digest_size=12).hexdigest()
+        return [TexRef(f"file:{p.name.lower()}", pix, p, 0, len(data), None, "PNG", 0, 0, w, h, 1,
+                       not _png.is_opaque(rgba))]
+    try:
+        txd = parse_txd(data)
+    except FormatError as e:
+        raise SatkError("UNSUPPORTED", f"{p.name}: not a readable TXD: {e}", hint=f"satk formats dump {jpath(p)}") from None
+    out = []
+    for t in txd.textures:
+        out.append(TexRef(f"file:{p.name.lower()}/{t.name.lower()}", "pix:" + texture_hash(data, t).hex(), p,
+                          t.mip0_off, t.mip0_size, t.pal_off, t.d3dfmt, t.raster_fmt, t.platform, t.w, t.h,
+                          t.levels, bool(t.alpha)))
+    return out
+
+
 def resolve_refs(db, ids: Iterable[str]) -> tuple[list, list[str]]:
     """Expand SIDs to texture refs: ``tex:``/``pix:`` -> 1, ``txd:`` -> its textures (TXD order),
-    ``model:`` -> its resolved material textures. Duplicates are dropped (first occurrence wins).
+    ``model:`` -> its resolved material textures; a ``.txd``/``.png`` file path -> its textures.
+    Duplicates are dropped (first occurrence wins).
 
     Returns ``(refs, warnings)``; raises ``BAD_ID`` for other kinds and ``NOT_FOUND`` from the index.
     """
@@ -207,6 +249,12 @@ def resolve_refs(db, ids: Iterable[str]) -> tuple[list, list[str]]:
     seen: set[str] = set()
     warn: list[str] = []
     for raw in ids:
+        if is_texture_path(raw):
+            for r in refs_from_path(raw):
+                if r.sid not in seen:
+                    seen.add(r.sid)
+                    refs.append(r)
+            continue
         s = Sid.parse(str(raw).strip())
         if s.kind not in TEXTURE_KINDS:
             raise SatkError("BAD_ID", f"expected a tex:/pix:/txd:/model: SID, got {str(s)!r}",
@@ -326,7 +374,7 @@ def export_all(jobs: int = 12, profile: str = "vanilla") -> dict:
     elif total:
         size = max(16, math.ceil(total / (n_jobs * 8)))
         done = 0
-        with ProcessPoolExecutor(max_workers=n_jobs) as ex:
+        with pool(n_jobs) as ex:
             futs = {ex.submit(_export_chunk, c, os.fspath(base), dxt): len(c) for c in _chunks(todo, size)}
             for f in as_completed(futs):
                 w_, s_, e_ = f.result()

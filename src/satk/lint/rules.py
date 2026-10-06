@@ -26,13 +26,15 @@ from typing import Any, Iterable
 
 from ..core.errors import SatkError
 
-__all__ = ["SEVERITIES", "SEV_RANK", "PRESETS", "Rule", "Rules", "Finding", "Collector", "rules_path"]
+__all__ = ["SEVERITIES", "SEV_RANK", "PRESETS", "OFF", "Rule", "Rules", "Finding", "Collector", "rules_path"]
 
 SEVERITIES: tuple[str, ...] = ("info", "warn", "error", "fatal")
 SEV_RANK: dict[str, int] = {s: i for i, s in enumerate(SEVERITIES)}
-PRESETS: tuple[str, ...] = ("game", "strict")
-_RULE_KEYS = frozenset({"sev", "msg", "what", "what_ru", "ref", "params", "enabled"})
-_OVERRIDE_KEYS = frozenset({"sev", "params", "enabled", "msg"})
+PRESETS: tuple[str, ...] = ("game", "strict", "vanilla", "sa_plus")
+_RULE_KEYS = frozenset({"sev", "msg", "what", "what_ru", "ref", "params", "enabled", "hint", "prevents", "class_sev"})
+_OVERRIDE_KEYS = frozenset({"sev", "params", "enabled", "msg", "class_sev"})
+#: ``class_sev`` value that switches a rule off for one model class.
+OFF = "off"
 
 _cache: dict[str, dict] = {}
 
@@ -62,7 +64,12 @@ def _read_json(path: Path, what: str) -> dict:
 
 @dataclass(frozen=True)
 class Rule:
-    """One rule after preset/override merging."""
+    """One rule after preset/override merging.
+
+    ``class_sev`` maps a model class (``cars``, ``peds``, ``map`` ...) to the severity the rule has for that
+    class (``off`` = not reported); the check passes the class as the ``cls`` field. ``hint`` is the fix
+    (an operation to run), ``prevents`` the game crash or visible defect the rule guards against.
+    """
 
     id: str
     sev: str
@@ -72,6 +79,15 @@ class Rule:
     ref: str
     params: dict = field(default_factory=dict)
     enabled: bool = True
+    hint: str = ""
+    prevents: str = ""
+    class_sev: dict = field(default_factory=dict)
+
+    def sev_for(self, cls: str | None) -> str:
+        """Severity for a finding of model class ``cls`` (``off`` = drop it)."""
+        if cls is not None and cls in self.class_sev:
+            return self.class_sev[cls]
+        return self.sev
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +141,12 @@ def _apply(rules: dict[str, dict], overrides: dict, where: str) -> None:
             r["enabled"] = bool(ov["enabled"])
         if "msg" in ov:
             r["msg"] = str(ov["msg"])
+        if "class_sev" in ov:
+            cs = ov["class_sev"]
+            if not isinstance(cs, dict) or any(v not in SEV_RANK and v != OFF for v in cs.values()):
+                raise SatkError("BAD_PARAMS", f"{where}: rule {rid!r}: class_sev maps a class to one of "
+                                f"{list(SEVERITIES) + [OFF]}")
+            r["class_sev"] = {**(r.get("class_sev") or {}), **{str(k): str(v) for k, v in cs.items()}}
         if "params" in ov:
             if not isinstance(ov["params"], dict):
                 raise SatkError("BAD_PARAMS", f"{where}: rule {rid!r}: params must be an object")
@@ -173,12 +195,17 @@ class Rules:
         for rid, r in raw.items():
             if set(r) - _RULE_KEYS or r.get("sev") not in SEV_RANK or not r.get("msg"):
                 raise SatkError("INTERNAL", f"{p.as_posix()}: rule {rid!r} is malformed")
-            rules[rid] = {"params": {}, "enabled": True, "what": "", "what_ru": "", "ref": "", **r}
+            cs = r.get("class_sev") or {}
+            if not isinstance(cs, dict) or any(v not in SEV_RANK and v != OFF for v in cs.values()):
+                raise SatkError("INTERNAL", f"{p.as_posix()}: rule {rid!r}: bad class_sev")
+            rules[rid] = {"params": {}, "enabled": True, "what": "", "what_ru": "", "ref": "", "hint": "",
+                          "prevents": "", **r, "class_sev": dict(cs)}
         presets = data.get("presets") or {}
         if preset not in presets:
             raise SatkError("BAD_PARAMS", f"unknown lint preset {preset!r}",
                             did_you_mean=difflib.get_close_matches(preset, list(presets), n=3, cutoff=0.5))
-        _apply(rules, presets[preset], f"preset {preset}")
+        for base in _preset_chain(presets, preset):
+            _apply(rules, presets[base], f"preset {base}")
         source = p.as_posix()
         if config:
             cp = Path(config)
@@ -195,7 +222,8 @@ class Rules:
             for rid in rules:
                 if rid not in hit:
                     rules[rid]["enabled"] = False
-        out = {rid: Rule(rid, r["sev"], r["msg"], r["what"], r["what_ru"], r["ref"], r["params"], r["enabled"])
+        out = {rid: Rule(rid, r["sev"], r["msg"], r["what"], r["what_ru"], r["ref"], r["params"], r["enabled"],
+                         r["hint"], r["prevents"], r["class_sev"])
                for rid, r in rules.items()}
         classes = {k: v for k, v in (data.get("classes") or {}).items() if not k.startswith("_")}
         return cls(out, preset=preset, classes=classes, source=source)
@@ -211,6 +239,19 @@ class Rules:
     def param(self, rid: str, key: str, default: Any = None) -> Any:
         r = self.rules.get(rid)
         return default if r is None else r.params.get(key, default)
+
+
+def _preset_chain(presets: dict, name: str) -> list[str]:
+    """``name`` and the presets it builds on (``"_base": "vanilla"``), base first."""
+    chain: list[str] = []
+    cur: str | None = name
+    while cur is not None:
+        if cur in chain or cur not in presets:
+            raise SatkError("INTERNAL", f"lint preset {name!r}: broken _base chain at {cur!r}")
+        chain.insert(0, cur)
+        base = (presets[cur] or {}).get("_base")
+        cur = str(base) if base else None
+    return chain
 
 
 class _Fields(dict):
@@ -233,16 +274,29 @@ class Collector:
         self.rules = rules
         self.findings: list[Finding] = []
         self.fired: Counter = Counter()
+        #: subjects each rule examined (files, geometries, models): the denominator of a rule's rate.
+        self.checked: Counter = Counter()
+        #: rule -> labels it fired on (for per-subject rates).
+        self.fired_on: dict[str, set] = {}
 
     def on(self, rid: str) -> bool:
         return self.rules.on(rid)
 
+    def seen(self, rid: str, n: int = 1) -> None:
+        """Count ``n`` subjects examined by rule ``rid`` (the denominator of ``vanilla_rate``)."""
+        self.checked[rid] += n
+
     def add(self, rid: str, file: str, **fields: Any) -> None:
-        """Record rule ``rid`` for ``file``; ``fields`` fill the message template (with the rule params)."""
+        """Record rule ``rid`` for ``file``; ``fields`` fill the message template (with the rule params).
+
+        A ``cls`` field (model class) selects the severity from the rule's ``class_sev``."""
         r = self.rules.rules.get(rid)
         if r is None:
             raise KeyError(f"lint rule {rid!r} is not in the rules file")
         if not r.enabled:
+            return
+        sev = r.sev_for(fields.get("cls"))
+        if sev == OFF:
             return
         vals = _Fields({k: _fmt_value(v) for k, v in r.params.items() if not isinstance(v, dict)})
         vals.update({k: _fmt_value(v) for k, v in fields.items()})
@@ -250,5 +304,6 @@ class Collector:
             msg = r.msg.format_map(vals)
         except (ValueError, IndexError, AttributeError, KeyError):  # a broken template in a user override
             msg = r.msg + " " + ", ".join(f"{k}={v}" for k, v in sorted(fields.items()))
-        self.findings.append(Finding(rid, r.sev, file, msg))
+        self.findings.append(Finding(rid, sev, file, msg))
         self.fired[rid] += 1
+        self.fired_on.setdefault(rid, set()).add(file)

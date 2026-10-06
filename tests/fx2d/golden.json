@@ -1,0 +1,13 @@
+{
+  "_what": "satk fx2d on the stock 1.0 US copy (gta-sa-clean): round trip and check baseline (numbers only)",
+  "roundtrip": {
+    "files": 15356, "with_2dfx": 1851, "exact": 1851, "differ": 0, "failed": 0, "total_entries": 18795,
+    "with_keep": 2642, "raw": 0,
+    "entries": {"attractor": 916, "cover_point": 15007, "enex": 78, "escalator": 5, "light": 2203, "particle": 64,
+                "roadsign": 489, "trigger_point": 33}
+  },
+  "roundtrip_no_keep_exact": 1279,
+  "check": {"errors": 0,
+            "warnings": {"EMPTY_NAME": 1, "FAR_FROM_MODEL": 68, "NEVER_SHOWN": 1, "SCRIPT_NONE": 1,
+                         "TEXT_IGNORED": 7, "TEXT_TOO_LONG": 9}}
+}

@@ -118,3 +118,16 @@ def test_skipped_profile_warnings_ignore_duplicates(monkeypatch):
     monkeypatch.setattr(O, "cfg", lambda: fake)
     w = O._skipped_warnings([("game", "INDEX_MISSING: x"), ("samp", "INDEX_MISSING: old schema")], ["installed"])
     assert len(w) == 1 and w[0].startswith("PROFILE_SKIPPED: samp")
+
+
+def test_cli_free_warns_when_a_store_is_nearly_full(world, run_cli, monkeypatch):
+    from satk.idmgr import free as F
+
+    monkeypatch.setitem(F.STORES, "ped", (8, ("peds",)))      # 1 ped defined -> 7 left (< 10)
+    r = run_cli(["id", "free", "--kind", "ped", "--profile", "vanilla"]).json
+    assert r["capacity"] == {"store": 8, "used": 1}
+    assert [w for w in r["warn"] if w.startswith("STORE_LOW")] == [
+        "STORE_LOW: only 7 of 8 stock ped model slots are free (a profile defines 1); more need a limit adjuster "
+        "(Open Limit Adjuster or fastman92 LA)"]
+    monkeypatch.setitem(F.STORES, "ped", (11, ("peds",)))     # 10 left: no warning
+    assert "warn" not in run_cli(["id", "free", "--kind", "ped", "--profile", "vanilla"]).json

@@ -1,4 +1,4 @@
-"""Step 3 of ``index build``: scan blobs (``ProcessPoolExecutor`` workers). Owner: WP-03.
+"""Step 3 of ``index build``: scan blobs (worker processes). Owner: WP-03.
 
 A job is a slice of one source file (an IMG archive or a loose asset) as a list of
 :class:`BlobJob`; :func:`scan_job` reads the bytes READ-ONLY (``open_ro``), computes
@@ -150,4 +150,7 @@ def scan_job(jobs: list[BlobJob]) -> list[BlobResult]:
 
 
 def default_jobs() -> int:
-    return max(1, min(12, (os.cpu_count() or 2)))
+    """Scan workers: ``SATK_JOBS`` when set (``1`` = in-process), else min(12, CPUs)."""
+    from ..core.procpool import jobs_from_env
+
+    return jobs_from_env() or max(1, min(12, (os.cpu_count() or 2)))

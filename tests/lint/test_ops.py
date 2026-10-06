@@ -39,7 +39,8 @@ def test_rules_file_and_code_agree():
     data = json.loads(rules_path().read_text(encoding="utf-8"))
     ids = set(data["rules"])
     src = "\n".join(p.read_text(encoding="utf-8") for p in LINT_SRC.glob("*.py"))
-    used = set(re.findall(r'\b(?:add|on|param)\(\s*(?:\w+,\s*)?"((?:img|file|dff|txd|col|ide|link)\.[a-z_0-9]+)"', src))
+    used = set(re.findall(r'\b(?:add|on|param|seen)\(\s*(?:\w+,\s*)?"((?:img|file|dff|txd|col|ide|link|veh|ped|weap|mat)'
+                          r'\.[a-z_0-9]+)"', src))
     used |= {f"{k}.parse" for k in ("dff", "txd", "col", "ide")}   # c.add(f"{it.kind}.parse", ...)
     assert used - ids == set(), "rules used by the code but missing in data/lint_rules.json"
     assert ids - used == set(), "rules in data/lint_rules.json that no check implements"
@@ -47,7 +48,8 @@ def test_rules_file_and_code_agree():
         assert r["sev"] in ("info", "warn", "error", "fatal"), rid
         assert r["what"] and r["what_ru"] and r["ref"] and r["msg"], rid
     for name, preset in data["presets"].items():
-        assert set(preset) - {"_comment"} <= ids, name
+        assert {k for k in preset if not k.startswith("_")} <= ids, name
+        assert preset.get("_base", "game") in data["presets"], name
 
 
 def test_rules_load_presets_overrides_and_filters(config_file):
@@ -139,7 +141,7 @@ def test_lint_rules_listing(run_cli):
     n = len(json.loads(rules_path().read_text(encoding="utf-8"))["rules"])
     assert env["total"] == n and env["cols"] == ["rule", "sev", "params", "what"]
     col = run_cli(["asset", "lint-rules", "--rule", "col", "--ru", "--ref", "--json"]).json
-    assert col["cols"][-1] == "ref" and all(r[0].startswith("col.") for r in col["rows"])
+    assert col["cols"][-3:] == ["ref", "hint", "prevents"] and all(r[0].startswith("col.") for r in col["rows"])
     assert any(re.search("[а-я]", r[3]) for r in col["rows"])
     strict = {r[0]: r for r in run_cli(["asset", "lint-rules", "--preset", "strict", "--json"]).json["rows"]}
     assert strict["txd.pow2"][1] == "error" and '"max":512' in strict["txd.size_max"][2]

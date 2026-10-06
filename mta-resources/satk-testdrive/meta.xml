@@ -1,0 +1,16 @@
+<meta>
+    <!-- satk-testdrive (MIT): the in-game test loop of satk (`satk ingame ...`). It loads the models of the
+         generated content resource satk-testdrive-mod (COL -> TXD -> DFF, engineRequestModel for new ids),
+         spawns test vehicles, objects, peds and weapons at test spots and runs scripted behaviour checks.
+         satk talks to it through the satk-agent bridge (lua.exec -> exports td / tdc). Loopback servers only. -->
+    <info author="satk" name="satk-testdrive" version="1.0.0" type="script"
+          description="satk in-game test drive: model loading, test spots, behaviour checks"/>
+
+    <script src="shared.lua" type="shared"/>
+    <script src="server.lua" type="server"/>
+    <script src="client.lua" type="client"/>
+    <script src="checks.lua" type="client"/>
+
+    <export function="td" type="server"/>
+    <export function="tdc" type="client"/>
+</meta>

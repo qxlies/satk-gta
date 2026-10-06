@@ -46,8 +46,8 @@ from .rw import FormatError, rw_version
 
 __all__ = [
     "Material", "Frame", "GeomInfo", "Effect2D", "DffInfo", "Mesh", "scan_dff", "decode_geometry",
-    "decode_geometries", "find_embedded_col", "strip_to_triangles", "count_strip_triangles",
-    "FLAG_NAMES", "FX_NAMES", "EFFECT_TYPES",
+    "decode_geometries", "find_embedded_col", "strip_to_triangles", "count_strip_triangles", "model_matrices",
+    "FLAG_NAMES", "FX_NAMES", "EFFECT_TYPES", "IDENTITY",
 ]
 
 # ----------------------------------------------------------------------------- chunk ids
@@ -136,6 +136,16 @@ class Material:
     ``rgba`` = ``0xRRGGBBAA``; ``texture``/``mask`` ``None`` when absent or empty (6 vanilla materials
     have a Texture chunk with an empty name); ``fx`` = :data:`FX_NAMES` bits; ``color_slot`` 1..4 when the
     RGB is a vehicle recolour key (60,255,0 / 255,0,175 / 0,255,255 / 255,0,255; meaningful for ``cars``).
+
+    ``effects`` holds the decoded values (keys only when present; not part of equality/hash):
+
+    * ``surface``: ``[ambient, specular, diffuse]`` of the Material struct (RW >= 3.4);
+    * ``env``: MatFX env map ``{"coef", "fb_alpha", "tex"}``; ``bump``: ``{"coef", "tex", "bumped_tex"}``;
+      ``dual``: ``{"src_blend", "dst_blend", "tex"}``; ``uv_transform``: ``True``;
+    * ``reflection``: the 24-byte Rockstar env material 0x253F2FC (``CCustomCarEnvMapPipeline``)
+      ``{"scale": [x, y], "offset": [x, y], "intensity"}`` (engine names Scale, TranslationScale,
+      Shininess; the car sheen needs ``intensity`` > 0 and the MatFX env texture);
+    * ``specular``: the 28-byte specular material 0x253F2F6 ``{"level", "tex"}``.
     """
 
     geom: int
@@ -145,16 +155,23 @@ class Material:
     mask: str | None
     fx: int
     color_slot: int | None
+    effects: dict = field(default_factory=dict, compare=False)
 
 
 @dataclass(frozen=True, slots=True)
 class Frame:
-    """A frame (global index across clumps). ``parent`` -1 for a root; ``atomic``: an atomic uses it."""
+    """A frame (global index across clumps). ``parent`` -1 for a root; ``atomic``: an atomic uses it.
+
+    ``matrix`` = the local transform relative to the parent as 12 floats ``(rx, ry, rz, ux, uy, uz, ax, ay,
+    az, px, py, pz)`` (RW columns right, up, at and the position: a point maps to ``x*right + y*up + z*at +
+    pos``). :func:`model_matrices` gives the model-space matrices of all frames.
+    """
 
     idx: int
     parent: int
     name: str | None
     atomic: bool
+    matrix: tuple = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,7 +182,10 @@ class GeomInfo:
     4 textured, 8 prelit, 16 normals, 32 light, 64 modulate, 128 textured2; bits 16-23 UV set count;
     0x01000000 native). ``tris`` = triangles after strip expansion (degenerates dropped; lists as-is).
     ``frame`` = frame of the first atomic using it (-1 if none). ``geom_off`` = offset of the Geometry
-    chunk header in the buffer given to :func:`scan_dff` (pass it to :func:`decode_geometry`).
+    chunk header in the buffer given to :func:`scan_dff` (pass it to :func:`decode_geometry`). ``bbox`` =
+    ``(minx, miny, minz, maxx, maxy, maxz)`` of the vertex positions in the geometry's own (frame) space,
+    ``None`` without positions. ``uv_sets`` counts the UV sets (2 on vehicle parts: set 1 is read by the
+    ``x*`` env texture).
     """
 
     idx: int
@@ -177,6 +197,7 @@ class GeomInfo:
     frame: int
     bsphere: tuple[float, float, float, float]
     geom_off: int
+    bbox: tuple[float, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -356,7 +377,7 @@ class _Geo:
     bsphere: tuple = (0.0, 0.0, 0.0, 0.0)
     pos_off: int = -1
     nrm_off: int = -1
-    mats: list = field(default_factory=list)       # (rgba, tex, mask, fx)
+    mats: list = field(default_factory=list)       # (rgba, tex, mask, fx, effects)
     mesh_strip: bool | None = None                 # BinMesh mode, None = no BinMesh
     meshes: list = field(default_factory=list)     # (mat, idx_off, n)
     night_off: int = -1
@@ -364,6 +385,8 @@ class _Geo:
     effects: list = field(default_factory=list)    # (type, pos, data)
     skin: bool = False
     breakable: bool = False
+    pbox: tuple | None = None                      # cached position bbox (see _pos_bbox)
+    pbox_done: bool = False
 
 
 @dataclass(slots=True)
@@ -458,28 +481,103 @@ def _parse_texture(buf, ch, plugins: set) -> tuple[str | None, str | None]:
     return tex, mask
 
 
+def _f6(v: float) -> float:
+    """A stored f32 as a short decimal (``0.09000000357`` -> ``0.09``); non-finite values stay as they are."""
+    return round(v, 6) if math.isfinite(v) else v
+
+
+def _tex_at(buf, p: int, end: int, plugins: set) -> tuple[str | None, int]:
+    """The Texture chunk at ``p`` inside a MatFX stream -> ``(name, offset after it)``."""
+    _need(p + 12 <= end, p, "MatFX texture header overruns the chunk")
+    t, s, v = _unpack_hdr(buf, p)
+    e = p + 12 + s
+    _need(t == _TEXTURE and e <= end, p, f"MatFX expects a Texture chunk, got 0x{t:X}")
+    tex, _mask = _parse_texture(buf, _tnew(_C, (t, s, v, p + 12, e)), plugins)
+    return tex, e
+
+
+def _matfx_values(buf, e, plugins: set, out: dict) -> None:
+    """Decode the RpMatFX material stream (``u32 type`` + up to two effects) into ``out``.
+
+    Effect records (librw ``readMaterialMatFX`` layout): 1 bump ``f32 coef, i32 has, [Texture], i32 has,
+    [Texture]``; 2 env ``f32 coef, i32 fb_alpha, i32 has, [Texture]``; 4 dual ``i32 src, i32 dst, i32 has,
+    [Texture]``; 5 UV transform (no data); 0 nothing. Malformed data keeps what was read so far.
+    """
+    p, end = e.data_off + 4, e.end
+    u = struct.unpack_from
+    try:
+        for _ in range(2):
+            if p + 4 > end:
+                return
+            (kind,) = u("<I", buf, p)
+            p += 4
+            if kind == 1:
+                coef, has = u("<fi", buf, p)
+                p += 8
+                bumped = tex = None
+                if has:
+                    bumped, p = _tex_at(buf, p, end, plugins)
+                (has2,) = u("<i", buf, p)
+                p += 4
+                if has2:
+                    tex, p = _tex_at(buf, p, end, plugins)
+                out["bump"] = {"coef": _f6(coef), "tex": tex, "bumped_tex": bumped}
+            elif kind == 2:
+                coef, fb, has = u("<fii", buf, p)
+                p += 12
+                tex = None
+                if has:
+                    tex, p = _tex_at(buf, p, end, plugins)
+                out["env"] = {"coef": _f6(coef), "fb_alpha": bool(fb), "tex": tex}
+            elif kind == 4:
+                src, dst, has = u("<iii", buf, p)
+                p += 12
+                tex = None
+                if has:
+                    tex, p = _tex_at(buf, p, end, plugins)
+                out["dual"] = {"src_blend": src, "dst_blend": dst, "tex": tex}
+            elif kind == 5:
+                out["uv_transform"] = True
+            elif kind != 0:
+                return
+    except (struct.error, IndexError, FormatError):
+        return
+
+
 def _parse_material(buf, ch, plugins: set) -> tuple:
     rgba = 0xFFFFFFFF
     tex = mask = None
     fx = 0
+    vals: dict = {}
     for k in _kids(buf, ch.data_off, ch.end):
         if k.type == _STRUCT:
             _need(k.size >= 16, k.data_off, "Material struct shorter than 16 bytes")
             r, g, b, a = buf[k.data_off + 4:k.data_off + 8]
             rgba = (r << 24) | (g << 16) | (b << 8) | a
+            if k.size >= 28:                       # ambient, specular, diffuse (RW >= 3.4)
+                vals["surface"] = [_f6(x) for x in struct.unpack_from("<3f", buf, k.data_off + 16)]
         elif k.type == _TEXTURE:
             tex, mask = _parse_texture(buf, k, plugins)
         elif k.type == _EXT:
             for e in _ext_ids(buf, k, plugins):
                 if e.type == _MATFX and e.size >= 4:
                     fx |= _MATFX_BITS.get(struct.unpack_from("<I", buf, e.data_off)[0], 0)
+                    _matfx_values(buf, e, plugins, vals)
                 elif e.type == _UVANIM:
                     fx |= FX_UVANIM
                 elif e.type == _REFLECTION:
                     fx |= FX_REFLECTION
+                    if e.size >= 20:
+                        sx, sy, ox, oy, inten = struct.unpack_from("<5f", buf, e.data_off)
+                        vals["reflection"] = {"scale": [_f6(sx), _f6(sy)], "offset": [_f6(ox), _f6(oy)],
+                                              "intensity": _f6(inten)}
                 elif e.type == _SPECULAR:
                     fx |= FX_SPECULAR
-    return rgba, tex, mask, fx
+                    if e.size >= 4:
+                        (lvl,) = struct.unpack_from("<f", buf, e.data_off)
+                        name = _cstr(buf, e.data_off + 4, min(24, e.size - 4)) if e.size > 4 else ""
+                        vals["specular"] = {"level": _f6(lvl), "tex": name or None}
+    return rgba, tex, mask, fx, vals
 
 
 def _parse_matlist(buf, ch, plugins: set) -> list:
@@ -744,14 +842,53 @@ def _xform(m, x: float, y: float, z: float) -> tuple[float, float, float]:
             x * r[2] + y * r[5] + z * r[8] + t[2])
 
 
+#: Identity as a 12-float frame matrix (``Frame.matrix`` layout).
+IDENTITY: tuple = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+
+
+def model_matrices(frames: list) -> list[tuple]:
+    """Model-space 12-float matrices of :attr:`DffInfo.frames` (same layout as :attr:`Frame.matrix`).
+
+    A root frame (and a frame whose parent comes later, which the engine does not support) is the model
+    origin: identity, like the engine's model info, which ignores the root transform. Children are
+    ``parent * local``. Example: ``mm = model_matrices(info.frames); x, y, z = mm[i][9:12]``.
+    """
+    out: list[tuple] = []
+    for i, f in enumerate(frames):
+        m = f.matrix if len(f.matrix) == 12 else IDENTITY
+        if f.parent < 0 or f.parent >= i:
+            out.append(IDENTITY)
+            continue
+        a = out[f.parent]
+        r = []
+        for c in range(3):
+            x, y, z = m[3 * c], m[3 * c + 1], m[3 * c + 2]
+            r += [x * a[0] + y * a[3] + z * a[6], x * a[1] + y * a[4] + z * a[7], x * a[2] + y * a[5] + z * a[8]]
+        x, y, z = m[9], m[10], m[11]
+        r += [x * a[0] + y * a[3] + z * a[6] + a[9], x * a[1] + y * a[4] + z * a[7] + a[10],
+              x * a[2] + y * a[5] + z * a[8] + a[11]]
+        out.append(tuple(r))
+    return out
+
+
+def _pos_bbox(buf, g: _Geo) -> tuple | None:
+    """Bounding box of the vertex positions in the geometry's own space (cached on ``g``)."""
+    if not g.pbox_done:
+        g.pbox_done = True
+        if g.pos_off >= 0 and g.nv:
+            p = array("f")
+            p.frombytes(bytes(buf[g.pos_off:g.pos_off + 12 * g.nv]))
+            if _BIG:
+                p.byteswap()
+            xs, ys, zs = p[0::3], p[1::3], p[2::3]
+            g.pbox = (min(xs), min(ys), min(zs), max(xs), max(ys), max(zs))
+    return g.pbox
+
+
 def _local_bbox(buf, g: _Geo) -> tuple | None:
-    if g.pos_off >= 0 and g.nv:
-        p = array("f")
-        p.frombytes(bytes(buf[g.pos_off:g.pos_off + 12 * g.nv]))
-        if _BIG:
-            p.byteswap()
-        xs, ys, zs = p[0::3], p[1::3], p[2::3]
-        return (min(xs), min(ys), min(zs), max(xs), max(ys), max(zs))
+    pb = _pos_bbox(buf, g)
+    if pb is not None:
+        return pb
     x, y, z, r = g.bsphere
     if r > 0:
         return (x - r, y - r, z - r, x + r, y + r, z + r)
@@ -856,8 +993,9 @@ def _scan(buf, walked) -> DffInfo:
             geo_frame.setdefault(gi, fi)
             if matfx:
                 flags |= F_MATFX
-        for i, (_r, _p, parent, name, hanim) in enumerate(cl.frames):
-            frames.append(Frame(fbase + i, fbase + parent if parent >= 0 else -1, name, i in with_atomic))
+        for i, (rot, pos, parent, name, hanim) in enumerate(cl.frames):
+            frames.append(Frame(fbase + i, fbase + parent if parent >= 0 else -1, name, i in with_atomic,
+                                tuple(rot) + tuple(pos)))
             if hanim:
                 flags |= F_HANIM
         for gi, g in enumerate(cl.geos):
@@ -867,10 +1005,11 @@ def _scan(buf, walked) -> DffInfo:
             fr = geo_frame.get(gi)
             strip = g.mesh_strip if g.mesh_strip is not None else bool(g.fmt & GEO_TRISTRIP)
             geoms.append(GeomInfo(gbase + gi, g.fmt, g.nv, nt, g.nts, strip,
-                                  fbase + fr if fr is not None else -1, tuple(g.bsphere), g.off))
-            for mi, (rgba, tex, mask, fx) in enumerate(g.mats):
+                                  fbase + fr if fr is not None else -1, tuple(g.bsphere), g.off,
+                                  _pos_bbox(buf, g)))
+            for mi, (rgba, tex, mask, fx, vals) in enumerate(g.mats):
                 slot = _COLOR_SLOTS.get((rgba >> 24, (rgba >> 16) & 0xFF, (rgba >> 8) & 0xFF))
-                materials.append(Material(gbase + gi, mi, rgba, tex, mask, fx, slot))
+                materials.append(Material(gbase + gi, mi, rgba, tex, mask, fx, slot, dict(vals)))
                 if fx & (FX_ENV | FX_BUMP | FX_DUAL):
                     flags |= F_MATFX
                 if fx & FX_UVANIM:

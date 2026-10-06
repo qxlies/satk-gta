@@ -31,7 +31,9 @@ WORKSPACE_CLAUDE = REPO_ROOT / "docs" / "agent" / "workspace-CLAUDE.md"
 #: Component pages (each written by its package owner, in both languages).
 COMPONENT_PAGES = ("game", "formats", "index", "media", "texmod", "rw", "models", "catalog", "lint", "modinspect",
                    "idmgr", "mapconv", "paths", "crash", "re", "kb", "describe", "viewer", "saap", "mta-agent",
-                   "blender", "engine", "mcp", "ai", "bugreport", "release", "workspace-gta", "install")
+                   "blender", "engine", "mcp", "ai", "bugreport", "release", "workspace-gta", "install",
+                   "addon", "script", "scriptapi", "txdopt", "batch", "fx2d", "colgen", "studio", "style", "kit",
+                   "look", "shader", "spbridge", "worldfiles")
 #: Required headings of a component page, by language (docs/<lang>/_template.md).
 REQUIRED = {"en": ("## Commands",), "ru": ("## Команды",)}
 #: Pages whose quick example is skipped as a whole (docs-smoke skip): a release build takes a minute and

@@ -1,0 +1,75 @@
+{
+ "_comment": "Triangles per piece of every blank at the default dimensions (numbers only): half meshes count their half.",
+ "tris": {
+  "automobile/vanilla": {
+   "body": 726,
+   "interior": 264,
+   "exhaust": 20
+  },
+  "automobile/sa_plus": {
+   "body": 1024,
+   "interior": 484,
+   "exhaust": 20
+  },
+  "bike/vanilla": {
+   "body": 96,
+   "wheel_front": 192,
+   "wheel_rear": 192,
+   "forks_front": 28,
+   "handlebars": 28
+  },
+  "bike/sa_plus": {
+   "body": 128,
+   "wheel_front": 256,
+   "wheel_rear": 256,
+   "forks_front": 28,
+   "handlebars": 28
+  },
+  "boat/vanilla": {
+   "hull": 144
+  },
+  "boat/sa_plus": {
+   "hull": 172
+  },
+  "heli/vanilla": {
+   "fuselage": 84,
+   "skids": 104,
+   "tail": 60,
+   "rotor": 156
+  },
+  "heli/sa_plus": {
+   "fuselage": 112,
+   "skids": 104,
+   "tail": 60,
+   "rotor": 156
+  },
+  "plane/vanilla": {
+   "fuselage": 84,
+   "wing": 40,
+   "tail": 72
+  },
+  "plane/sa_plus": {
+   "fuselage": 112,
+   "wing": 40,
+   "tail": 72
+  },
+  "prop_box/vanilla": {
+   "prop": 44
+  },
+  "prop_box/sa_plus": {
+   "prop": 104
+  },
+  "prop_cyl/vanilla": {
+   "prop": 60
+  },
+  "prop_cyl/sa_plus": {
+   "prop": 136
+  },
+  "building_box/vanilla": {
+   "building": 226
+  },
+  "building_box/sa_plus": {
+   "building": 302
+  }
+ }
+}

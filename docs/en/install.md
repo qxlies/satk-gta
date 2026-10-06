@@ -27,6 +27,10 @@ Three ways to get it:
   installed) or the wheel `satk_gta-<version>-py3-none-any.whl` from the Releases page (PyPI name `satk-gta`,
   not on PyPI yet; the command stays `satk`).
 
+Run satk through the shims (`tools\satk.cmd`, `tools/satk.sh`) or the `satk` console script of a pip install.
+A home-made `.cmd` wrapper of the form `call ... %*` re-expands `%` in the arguments (a SQL `LIKE '%car%'`
+arrives mangled); use the shims or put the arguments in a file (`--args @args.json`).
+
 ## Install in five commands
 
 <!-- docs-smoke: skip needs a clone and the network -->

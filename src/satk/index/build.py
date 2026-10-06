@@ -2,8 +2,8 @@
 
 1. **discover/attribute** (:mod:`.layers`): sources, IMG registration order, DAT directives,
    loose assets, layer of every file;
-2. **scan** (:mod:`.scan`, ``ProcessPoolExecutor``): IMG directories -> blobs; TXD/DFF/COL/IFP/bnry
-   payloads parsed in parallel, in chunks per archive;
+2. **scan** (:mod:`.scan`, worker processes via :func:`satk.core.procpool.pool`, in-process when processes
+   cannot start): IMG directories -> blobs; TXD/DFF/COL/IFP/bnry payloads parsed in parallel, in chunks per archive;
 3. **resolve** (:mod:`.resolve`): blob winners, active IDE definitions, active COL, TXD parents;
 4. **link** (:mod:`.link`): ``model_link``/``model_tex``, IPL parents, LOD, world AABB + R-tree;
    **data files** (:mod:`.gamedata`, schema v3): ``water.dat``, ``timecyc.dat``, ``carcols.dat``,
@@ -28,7 +28,6 @@ import json
 import os
 import sqlite3
 import time
-from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -36,6 +35,7 @@ from typing import Any
 from .. import __version__ as SATK_VERSION
 from ..core.errors import SatkError
 from ..core.paths import cfg, ensure_writable, jpath
+from ..core.procpool import fallback_reason, pool
 from ..core.registry import report_progress
 from ..formats.dat import read_text
 from ..formats.ide import parse_ide
@@ -216,7 +216,7 @@ class _Build:
                     self.by_id[r.key].res = r
                 report_progress(i + 1, total, "scan")
         else:
-            with ProcessPoolExecutor(max_workers=min(self.jobs, total)) as ex:
+            with pool(min(self.jobs, total)) as ex:
                 for i, rs in enumerate(ex.map(scan_job, work)):
                     for r in rs:
                         self.by_id[r.key].res = r
@@ -841,6 +841,10 @@ def build(profile: str = "vanilla", *, jobs: int | None = None, out: Path | None
         out_env["n_errors"] = len(b.errors)
     if b.notes:
         out_env["notes"] = len(b.notes)
+    fb = fallback_reason()
+    if fb:
+        b.warn.append(f"UNSUPPORTED: worker processes are not available here ({fb}); the scan ran in-process "
+                      "(same result, slower)")
     if b.warn:
         out_env["warn"] = b.warn[:20]
     return out_env

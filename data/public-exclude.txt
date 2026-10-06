@@ -18,6 +18,11 @@
 # Review notes of the development process (internal task ids, not needed by any test).
 /tests/re/DEFECT_REVIEW.md
 
+# Private authoring benchmarks (code, task briefs, recipes and tests).
+/src/satk/evals/**
+/data/evals/**
+/tests/evals/**
+
 # Compares the index schema with the maintainers' design notes, which exist only in the development workspace.
 /tests/index/test_ddl_spec.py
 

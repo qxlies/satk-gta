@@ -520,7 +520,7 @@ def _classes(text: str, bp: str, li: LineIndex, path: str) -> list[ClassDef]:
         if tail[:1] not in (";", "") and not re.match(r"^[A-Za-z_*&]", tail):
             pass  # still a definition; trailing declarators are ignored at file scope
         pre_t = bp[max(0, m.start() - 300):m.start()]
-        tm = re.search(r"template\s*<([^;{}]*)>\s*(?:requires[^;{}]*)?$", pre_t)
+        tm = re.search(r"template\s*<([^;{}]*)>\s*(?:requires\b[^;{}]*)?$", pre_t)
         template = tm is not None
         q = _ns_qual(nss, m.start())
         name = f"{q}::{m.group(3)}" if q else m.group(3)

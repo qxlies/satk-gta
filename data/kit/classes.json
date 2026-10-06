@@ -1,0 +1,56 @@
+{
+ "version": 1,
+ "source": "vanilla GTA SA PC 1.0 US map models (objs/tobj/anim, HD, overlays and LODs excluded for the buckets): texel density = sqrt(uv area x texture pixels / world area), area-weighted per model, p50 per size bucket; prelight means of all night-coloured map vertices; face-light mapping of data/colgen/tex_surface.json",
+ "texel_px_m_by_size": [
+  {"max_m": 0.5, "px_m": 359},
+  {"max_m": 1, "px_m": 228},
+  {"max_m": 2, "px_m": 138},
+  {"max_m": 4, "px_m": 94},
+  {"max_m": 8, "px_m": 72},
+  {"max_m": 16, "px_m": 64},
+  {"max_m": 32, "px_m": 53},
+  {"max_m": 64, "px_m": 35},
+  {"max_m": 128, "px_m": 37},
+  {"max_m": 256, "px_m": 33},
+  {"max_m": 100000, "px_m": 16}
+ ],
+ "tier_texel_factor": {"vanilla": 1.0, "sa_plus": 1.5},
+ "prelight": {
+  "day_mean_rgb": [79, 78, 75],
+  "night_unlit_rgb": [30, 27, 23],
+  "night_lit_rgb": [97, 93, 76],
+  "night_over_day": [0.344, 0.319, 0.279],
+  "note": "night colours are darker and warm (R > B), never blue: 50 % of night-coloured models are warm, 10 % cool"
+ },
+ "big_building_draw": 300,
+ "classes": {
+  "prop": {"summary": "street prop or small static object", "texel": "size", "draw": 100, "col": "hull", "lod": 0,
+           "night": "unlit", "budget": 324, "flags": 0},
+  "building": {"summary": "building or large static piece (gets a LOD model)", "texel": "size", "draw": 160, "col": "mesh",
+               "lod": 0.21, "night": "unlit", "budget": 1163, "flags": 0},
+  "terrain": {"summary": "ground, road or landscape piece", "texel_px_m": 41.5, "draw": 200, "col": "mesh", "lod": 0.21,
+              "night": "unlit", "budget": 745, "flags": 0},
+  "vegetation": {"summary": "tree, bush or plant (alpha cut-outs)", "texel_px_m": 49.4, "draw": 99, "col": "hull",
+                 "lod": 0, "night": "unlit", "budget": 336, "flags": 2097156},
+  "interior_prop": {"summary": "furniture or clutter inside an interior", "texel_px_m": 166.0, "draw": 30, "col": "box",
+                    "lod": 0, "night": "unlit", "budget": 570, "flags": 0},
+  "interior_shell": {"summary": "interior room shell", "texel_px_m": 69.8, "draw": 100, "col": "mesh", "lod": 0,
+                     "night": "unlit", "budget": 2918, "flags": 0},
+  "pickup": {"summary": "pickup icon (tiny, one sphere COL, no night colours)", "texel": "size", "draw": 100,
+             "col": "box", "lod": 0, "night": "none", "budget": 170, "flags": 128},
+  "overlay": {"summary": "decal or overlay plane (alpha, draw last, no collision)", "texel_px_m": 17.4, "draw": 150,
+              "col": "none", "lod": 0, "night": "unlit", "budget": 320, "flags": 132}
+ },
+ "face_light": {"day": [0.0809, 2.385], "night": [0.0889, 0.8793],
+                "note": "COL face light nibbles from the prelit brightness (0..255): low nibble day, high nibble night; 0 means ambient only (about 3x darker by day)"},
+ "col_rule": {
+  "note": "vanilla map models up to 8 m carry no collision faces (col.mesh_faces p50 = 0 below 8 m): a box, a few boxes or one sphere; faces only for bigger or shaped models. kit.export applies this rule to the classes listed here; an explicit --col mode wins",
+  "classes": ["prop", "interior_prop", "pickup"],
+  "primitive_max_m": 8.0,
+  "pickup": {"mode": "spheres", "max_prims": 1},
+  "sphere": {"aspect_max": 1.25, "fill": [0.4, 0.65], "max_prims": 1},
+  "box": {"fill_min": 0.55},
+  "boxes": {"max_prims_by_size": [[2.0, 3], [4.0, 4], [8.0, 6]]},
+  "otherwise": "hull"
+ }
+}

@@ -324,7 +324,37 @@ def find(db: SymDb, name: str, kind: str | None = None, limit: int = 10, offset:
     page = hits[offset:offset + limit]
     rows_out = [_row_from_hit(db, kd, sid, nm) for _t, kd, sid, nm in page]
     nxt = f"o:{offset + limit}" if len(hits) > offset + limit else None
-    return table(["id", "kind", "name", "info"], rows_out, total=len(hits), next=nxt)
+    if not hits and kinds[0] == "fn":
+        extra = _kb_find_rows(db, q)
+        if extra:
+            env = table(["id", "kind", "name", "info"], extra, total=len(extra))
+            env["note"] = "no symbol DB match; answered from the knowledge base (re src works for these)"
+            return env
+    env = table(["id", "kind", "name", "info"], rows_out, total=len(hits), next=nxt)
+    if not hits and kinds[0] == "fn" and offset == 0:
+        similar = _similar_funcs(db, q if "::" in q else "::" + q)
+        if similar:
+            env["did_you_mean"] = similar
+            env["hint"] = f"satk re src {similar[0]}"
+    return env
+
+
+def _kb_find_rows(db: SymDb, q: str) -> list[list]:
+    """``re find`` rows from the knowledge base for a function the symbol DB does not know (not hooked by
+    gta-reversed), or for a member declared in a base class."""
+    hit = _kb_location(q)
+    if hit is not None:
+        a = hit.get("addr")
+        rel = str(hit.get("path") or "")
+        rel = rel[len("source/"):] if rel.startswith("source/") else rel
+        why = "not reversed" if hit.get("hook") is False else "not in the symbol DB"
+        return [[f"fn:0x{a:x}" if a is not None else None, "func", hit["name"],
+                 f"kb: {why} at {rel}:{hit.get('line') or 1}"]]
+    base = inherited_name(q, lambda n: bool(db.funcs_by_name(n)))
+    if base is not None:
+        rows = db.funcs_by_name(base)
+        return [[f"fn:0x{rows[0]['addr']:x}", "func", rows[0]["qual"], f"inherited: {q} is served by {base}"]]
+    return []
 
 
 def _lookup(db: SymDb, kd: str, op: str, arg: str) -> list[tuple[str | None, str]]:
@@ -372,12 +402,57 @@ def resolve_fn(db: SymDb, fn: str) -> tuple[int, sqlite3.Row | None, list[str]]:
         return loc.start, db.func(loc.start), []
     rows = db.funcs_by_name(s)
     if not rows:
-        cands = find(db, s, "func", limit=5)["rows"]
-        raise SatkError("NOT_FOUND", f"no function {s!r}", hint=f"satk re find {s}",
-                        did_you_mean=[r[2] for r in cands])
+        cands = [r[2] for r in find(db, s, "func", limit=5)["rows"]]
+        member = s.rpartition("::")[2]
+        if member != s and len(cands) < 5:     # Class::Member unknown: the member in other classes
+            cands += [r[2] for r in find(db, member, "func", limit=5)["rows"] if r[2] not in cands][:5 - len(cands)]
+        if len(cands) < 5:                     # a guessed name: functions sharing most of its words
+            cands += [n for n in _similar_funcs(db, s) if n not in cands][:5 - len(cands)]
+        raise SatkError("NOT_FOUND", f"no function {s!r}",
+                        hint=f"satk re src {cands[0]}" if cands else f"satk kb search {member}",
+                        did_you_mean=cands)
     exact = [r for r in rows if r["qual"] == s] or rows
     others = [f"{r['qual']}@0x{r['addr']:x}" for r in rows if r is not exact[0]]
     return exact[0]["addr"], exact[0], others
+
+
+_WORD = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+")
+
+
+def _words(name: str) -> set[str]:
+    """Lower-case CamelCase words of a name, plural ``s`` dropped (``SetEditableMaterials`` -> set, editable,
+    material)."""
+    out = set()
+    for w in _WORD.findall(name):
+        w = w.lower()
+        if len(w) > 3 and w.endswith("s"):
+            w = w[:-1]
+        if len(w) > 1:
+            out.add(w)
+    return out
+
+
+def _similar_funcs(db: SymDb, name: str, limit: int = 5) -> list[str]:
+    """Functions whose member name shares most CamelCase words with ``name`` (``FindEditableMaterialList`` ->
+    ``SetEditableMaterials``), the same class first; at least two shared words."""
+    cls, _, member = name.rpartition("::")
+    want = _words(member)
+    if len(want) < 2:
+        return []
+    keys = sorted(want, key=lambda w: (-len(w), w))[:3]       # letters and digits only: nothing to escape
+    sql = "SELECT DISTINCT qual FROM func WHERE " + " OR ".join("qual LIKE ?" for _ in keys) + " LIMIT 5000"
+    found: list[tuple[str, str, set[str]]] = []
+    df: dict[str, int] = {}                                    # how many candidates carry each word
+    for (qual,) in db.con.execute(sql, [f"%{k}%" for k in keys]):
+        c, _, m = str(qual).rpartition("::")
+        shared = want & _words(m)
+        for w in shared:
+            df[w] = df.get(w, 0) + 1
+        if len(shared) >= 2:
+            found.append((str(qual), c, shared))
+    scored = {q: (bool(cls) and c.lower() != cls.lower(), -round(sum(1.0 / df[w] for w in sh), 9), len(q), q)
+              for q, c, sh in found}                           # rare shared words weigh more
+    return sorted(scored, key=scored.__getitem__)[:limit]
 
 
 # --------------------------------------------------------------------------- re src
@@ -398,14 +473,129 @@ def _tree_for(db: SymDb, kind: str):
     return GitTree(repo, r["rev"])
 
 
+def _kb_location(key: str | int) -> dict | None:
+    """The knowledge base's location of a function (name or start address); ``None`` without a hit or a KB."""
+    try:
+        from ..kb.query import func_location
+
+        return func_location(key)
+    except (SatkError, OSError, ImportError):
+        return None
+
+
+def _kb_bases(cls: str) -> list[str]:
+    """Base classes of ``cls`` from the knowledge base, nearest first; ``[]`` without a KB."""
+    try:
+        from ..kb.query import class_bases
+
+        return class_bases(cls)
+    except (SatkError, OSError, ImportError, sqlite3.Error):
+        return []
+
+
+def inherited_name(name: str, known) -> str | None:
+    """``CVehicle::ApplySpringCollision`` -> ``CPhysical::ApplySpringCollision`` when the member is declared in
+    a base class: the first base (nearest first) for which ``known(qualified)`` is true."""
+    cls, sep, member = name.rpartition("::")
+    if not sep or not cls or not member:
+        return None
+    for base in _kb_bases(cls):
+        cand = f"{base}::{member}"
+        if known(cand):
+            return cand
+    return None
+
+
+def _kb_tree(kind: str):
+    """Source tree at the revision the knowledge base read ``kind`` from (no symbol DB needed)."""
+    from ..core.paths import cfg
+    from ..kb.query import source_rev
+    from .gitsrc import DirTree, GitTree
+
+    r = source_rev(kind)
+    if r is None:
+        raise SatkError("NOT_FOUND", f"source {kind} is not in the knowledge base")
+    repo = Path(r["repo"])
+    if not repo.is_absolute():
+        repo = cfg().paths.workspace / repo
+    return DirTree(repo) if r["rev"].startswith("dir:") else GitTree(repo, r["rev"])
+
+
+def _kb_src(db: SymDb | None, hit: dict, context: int, others: list[str] | None = None) -> dict:
+    """``re_src`` answer from a knowledge-base location: file:line, status and the lines when readable.
+
+    The source tree comes from the symbol DB when there is one, else from the knowledge base's revision.
+    """
+    path, line = hit["path"] or "", int(hit["line"] or 1)
+    kind = hit["src"]
+    hooked = hit.get("hook")
+    if hooked is False:
+        status = "not reversed (no install line in gta-reversed; the body may be a stub)"
+    else:
+        status = "not in the symbol DB"
+    rel = path[len("source/"):] if kind == "gta-reversed" and path.startswith("source/") else path
+    addr = hit.get("addr")
+    out: dict = {"fn": hit["name"], "addr": hx(addr) if addr is not None else None, "file": rel, "line": line,
+                 "def_line": line, "repo": kind, "status": status, "via": "kb",
+                 "note": f"{status} at {rel}:{line}"}
+    try:
+        tree = _tree_for(db, kind) if db is not None else _kb_tree(kind)
+        text = tree.read(path)
+    except SatkError as e:
+        text, tree = None, None
+        out["lines_unavailable"] = e.msg
+    if text is not None and tree is not None:
+        lines = text.splitlines()
+        cls, _, base = str(hit["name"]).rpartition("::")
+        def_line = None
+        if addr is not None:
+            def_line = _find_def(lines, addr, cls or None, base) or (_find_def(lines, addr, None, base) if cls else None)
+        if def_line and def_line != line:
+            out["def_line"] = def_line
+            if 0 < line <= len(lines):
+                out["install"] = f"{line}: {lines[line - 1]}"
+            line = def_line
+            out["note"] = f"{status} at {rel}:{def_line}"
+        lo, hi = max(1, line - 3), min(len(lines), line + context)
+        out.update(rev=tree.rev[:12], first=lo, lines=[f"{n}: {lines[n - 1]}" for n in range(lo, hi + 1)])
+    elif tree is not None:
+        out["lines_unavailable"] = f"{path} not readable at {tree.rev[:12]} ({kind})"
+    if others:
+        out["others"] = others[:5]
+    return obj(f"fn:0x{addr:x}" if addr is not None else None, **out)
+
+
 def src(db: SymDb, fn: str, context: int = 30) -> dict:
-    """``re_src``: gta-reversed source around the function (install line and definition)."""
+    """``re_src``: gta-reversed source around the function (install line and definition).
+
+    Functions without a source line in the symbol DB (not hooked by gta-reversed) fall back to the
+    knowledge base's location (``via: kb``) instead of a dead end.
+    """
     if context < 0 or context > 400:
-        raise SatkError("BAD_PARAMS", "context must be in 0..400")
-    start, f, others = resolve_fn(db, fn)
+        raise SatkError("BAD_PARAMS", f"context must be in 0..400 (got {context})",
+                        hint="--context 400 is the maximum; the answer names file and line for reading further")
+    try:
+        start, f, others = resolve_fn(db, fn)
+    except SatkError as e:
+        if e.code != "NOT_FOUND":
+            raise
+        name = fn.strip()[3:] if fn.strip().lower().startswith("fn:") else fn.strip()
+        hit = _kb_location(name)
+        if hit is not None:
+            return _kb_src(db, hit, context)
+        base = inherited_name(name, lambda q: bool(db.funcs_by_name(q)) or _kb_location(q) is not None)
+        if base is None:
+            raise
+        env = src(db, base, context)
+        env["inherited"] = f"{name} is not declared in {name.rpartition('::')[0]}; {base} (a base class) serves it"
+        return env
     if f is None or not f["src_file"]:
+        hit = _kb_location(start) or (_kb_location(f["qual"]) if f is not None and f["qual"] else None)
+        if hit is not None:
+            return _kb_src(db, hit, context, others)
         raise SatkError("NOT_FOUND", f"no source location for {fn_label(f, start)}",
-                        hint="only gta-reversed and plugin-sdk functions have sources")
+                        hint=f"only gta-reversed and plugin-sdk functions have sources; satk kb search "
+                             f"{fn_label(f, start)} (needs satk kb build)")
     if f["origin"] in ("hooks_json", "gta_reversed"):
         tree, rel, kind = _tree_for(db, "gta-reversed"), "source/" + f["src_file"], "gta-reversed"
     else:
@@ -489,7 +679,7 @@ def patches(db: SymDb, fn: str | None, rng: str | None, origin: str, kind: str |
 # --------------------------------------------------------------------------- re limits
 
 
-def limits(db: SymDb, kind: str | None, q: str | None, limit: int, offset: int) -> dict:
+def limits(db: SymDb, kind: str | None, q: str | None, limit: int, offset: int, *, summary: bool = False) -> dict:
     where, args = [], []
     if kind:
         where.append("l.kind = ?")
@@ -499,6 +689,11 @@ def limits(db: SymDb, kind: str | None, q: str | None, limit: int, offset: int) 
         args.append("%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
     w = (" WHERE " + " AND ".join(where)) if where else ""
     total = int(db.con.execute(f"SELECT count(*) FROM limit_def l{w}", args).fetchone()[0])
+    if summary:
+        by = {r[0]: r[1] for r in db.con.execute(f"SELECT l.kind, count(*) FROM limit_def l{w} GROUP BY l.kind", args)}
+        return obj(None, total=total, by_kind=by, arrays_with_len=int(db.con.execute(
+            "SELECT count(*) FROM limit_def WHERE kind='array' AND vanilla IS NOT NULL").fetchone()[0]),
+            hint="rows: satk re limits --kind pool (or --match <name>); stock pools and stores: satk kb fact pools")
     rows = db.con.execute(
         f"SELECT l.*, g.type AS gtype, g.elem_size AS esz FROM limit_def l LEFT JOIN global g ON g.addr = l.global_addr"
         f"{w} ORDER BY l.kind, l.name LIMIT ? OFFSET ?", args + [limit, offset])

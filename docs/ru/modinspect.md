@@ -56,13 +56,21 @@ data  carcols:testcar    modify   readme.txt:3         colours 1,2,2,1->3,3,0,0
 | `satk mod inspect PATH [--profile vanilla] [--change ...] [--kind ...]` | — (через `satk_op`) | строки `kind, target, change, by, detail`; сводка `changes`, `unchanged` (файлы, совпадающие с файлами игры), `new_ids` |
 | `satk mod conflicts [MODS...] [--profile installed] [--with-installed] [--ml-profile NAME] [--priority name=N ...]` | — | строки `target, kind, winner, losers, rule`; `mods` — в порядке установки; предупреждения `DROPS` |
 | `satk mod effective FILE [KEY] [--profile installed] [--mod PATH ...] [--with-installed] [--save]` | — | `FILE`: `handling`, `carcols`, `ide`, `gta`, `default`, `object`, имя файла данных или IDE; `KEY`: id handling либо ID/имя модели, ID модели, индекс цвета, путь |
-| `satk mod check PATH [--profile vanilla] [--engine satk\|inu] [--exe PATH] [--sev info] [--no-lint]` | — | строки `rule, sev, file, msg, sid`: коллизии ID, файлы, которые Mod Loader пропустит, выпавшие записи игры, ID за пределом и находки [`asset lint`](lint.md) |
+| `satk mod check PATH [--profile vanilla] [--engine satk\|inu] [--exe PATH] [--sev info] [--no-lint]` | — | строки `rule, sev, file, msg, sid`: коллизии ID, файлы, которые Mod Loader пропустит, выпавшие записи игры, ID за пределом, ёмкость движка (`mod.capacity`) и находки [`asset lint`](lint.md) |
 
 Значения `change`: `replace` (файл игры подменён), `add` (новый файл или запись), `modify` (запись отличается),
 `remove` (запись игры исчезает), `new-id`, `override-id` (ID в игре принадлежит другой модели), `load`
 (ASI/CLEO), `ignored` (Mod Loader файл не возьмёт; причина — в `detail`).
 
 ## Как это устроено
+
+- **Ёмкость (`mod.capacity`).** У стандартного одиночного движка хранилища фиксированы: 212 слотов моделей машин,
+  278 педов, 51 оружия, 14 070 объектов, 169 объектов со временем и 92 клампов, 255 слотов файлов COL (слот 0
+  занят самим движком), 5 000 слотов TXD, 100 записей IDE `2dfx` и 400 входов-выходов. Ванильная игра оставляет
+  свободными немногие (2 педа, 1 оружие, 3 COL, 3 `2dfx`, 24 входа-выхода). Для каждого хранилища, которое
+  пополняет мод, `mod check` добавляет строку: `error`, если итог больше стандартного размера, `warn`, если
+  остаётся меньше 10 слотов, иначе `info`. Расширители лимитов увеличивают эти хранилища. Если доступна команда
+  `satk texture budget`, мод с файлами TXD/DFF получает ещё подсказку `mod.streaming` о памяти стриминга 50 МиБ.
 
 - **Файлы** (`classify.py`): файл обрабатывает первый принявший его плагин Mod Loader — имена FX (`hud.txd`,
   `particle.txd`, `vehicle.txd` …), ASI/CLEO, std.data (файлы данных — по имени, IDE/IPL — по пути, readme —

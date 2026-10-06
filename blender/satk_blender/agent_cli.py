@@ -36,6 +36,22 @@ def _bootstrap(req: dict) -> None:
     for p in (req.get("satk_src"), os.path.dirname(here)):
         if p and p not in sys.path:
             sys.path.insert(0, p)
+    _prefs()
+
+
+def _prefs() -> None:
+    """Before anything is saved: no thumbnails (Blender on Windows writes them to the user's
+    ``.thumbnails`` folder whatever XDG_CACHE_HOME says), no ``.blend1`` backups, no autosave."""
+    try:
+        import bpy
+    except ImportError:  # pragma: no cover - outside Blender
+        return
+    fp = bpy.context.preferences.filepaths
+    for k, v in (("file_preview_type", "NONE"), ("save_version", 0), ("use_auto_save_temporary_files", False)):
+        try:
+            setattr(fp, k, v)
+        except (AttributeError, TypeError):
+            pass
 
 
 def _balance(args: dict) -> float:
@@ -294,8 +310,24 @@ def cmd_game_ready(req: dict, args: dict) -> dict:
     return {"stats": stats, "warnings": warn, "files": files, "extra": {"name": man["name"], "lod": man["lod"]}}
 
 
+def cmd_preview(req: dict, args: dict) -> dict:
+    """SA-look preview cells (``satk_blender.look.preview``); the satk side composes the sheet."""
+    from satk_blender import common
+    from satk_blender.look import preview
+
+    common.load_dragonff(req.get("dragonff"))
+    res = preview.run(args["spec"], os.path.join(req["out_dir"], "cells"))
+    files: dict = {"cells": [c[2] for c in res["cells"]]}
+    if args.get("save"):
+        files["blend"] = common.fwd(common.save_blend(os.path.join(req["out_dir"], "scene.blend")))
+    stats = {"seconds_import": res["seconds"]["import"], "seconds_render": res["seconds"]["render"],
+             "cells": len(res["cells"]), "cell_s": res["seconds"].get("cells")}
+    return {"stats": stats, "warnings": res["warnings"], "files": files,
+            "extra": {"preview": {k: res[k] for k in ("cells", "rows", "cols", "stats", "env", "seconds")}}}
+
+
 HANDLERS = {"doctor": cmd_doctor, "import_model": cmd_import_model, "import_area": cmd_import_area,
-            "render": cmd_render, "export": cmd_export, "game_ready": cmd_game_ready}
+            "render": cmd_render, "export": cmd_export, "game_ready": cmd_game_ready, "preview": cmd_preview}
 
 
 def main() -> int:

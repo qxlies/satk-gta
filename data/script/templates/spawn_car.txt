@@ -1,0 +1,27 @@
+// {{NAME}}: spawn vehicle {{MODEL}} with a cheat code. Made by 'satk script new spawn_car'.
+// Build: satk script asm {{NAME}}/{{NAME}}.txt; install: copy {{NAME}}.cs into the game's cleo folder (CLEO 4 or 5).
+// Vehicle ids: satk asset find <name> --kind model. 0@-2@ position, 3@ car, 4@ heading.
+{$CLEO .cs}
+03A4: script_name '{{SNAME}}'
+
+:LOOP
+0001: wait 250
+00D6: if 1                              // and: both conditions
+0256: is_player_playing $2
+0ADC: test_cheat "{{CHEAT}}"
+004D: goto_if_false @LOOP
+0247: request_model {{MODEL}}
+
+:LOAD
+0001: wait 0
+00D6: if 0
+0248: has_model_loaded {{MODEL}}
+004D: goto_if_false @LOAD
+04C4: get_offset_from_char_in_world_coords $3 0.0 5.0 0.0 0@ 1@ 2@
+00A5: create_car {{MODEL}} 0@ 1@ 2@ 3@
+0172: get_char_heading $3 4@
+0175: set_car_heading 3@ 4@
+0249: mark_model_as_no_longer_needed {{MODEL}}
+01C3: mark_car_as_no_longer_needed 3@   // the game may remove it when it is far away
+0ACA: print_help_string "{{TEXT}}"
+0002: goto @LOOP

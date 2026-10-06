@@ -1,0 +1,38 @@
+{
+  "format": "satk.texlib-recipes/1",
+  "source": "Original procedural node descriptions; no game pixels. Finishing bands: satk.style.texture.vanilla, clean PC 1.0 US, deterministic role samples measured 2026-10-06. Metrics are [p10, p50, p90, sample count].",
+  "nodes": {
+    "coordinates": "UV -> sine/cosine of both axes -> periodic 4D ShaderNodeTexNoise; integer-frequency ShaderNodeMath patterns share the same UVs",
+    "colour": "ShaderNodeMixRGB combines base/secondary colours, pattern occlusion and two scales of noise",
+    "bake": "ShaderNodeEmission -> ShaderNodeOutputMaterial; Cycles CPU EMIT, one sample, 4x size; optional second emission bake for alpha"
+  },
+  "roles": {
+    "wall": {"n": 160, "metrics": {"tex.colours": [188,772,4429,160], "tex.lum_mean": [63.518,125.9,184.112,160], "tex.lum_std": [8.216,31.285,62.191,160], "tex.sat_mean": [0.0508,0.1756,0.4503,160], "tex.val_mean": [0.283,0.5353,0.7963,160], "tex.hf_energy": [9.7835,22.7475,53.4698,160]}},
+    "ground": {"n": 160, "metrics": {"tex.colours": [352,1139,5428,160], "tex.lum_mean": [89.017,122.87,176.875,160], "tex.lum_std": [12.711,27.33,48.805,160], "tex.sat_mean": [0.0491,0.1852,0.4117,160], "tex.val_mean": [0.383,0.5248,0.7445,160], "tex.hf_energy": [11.7799,23.8815,53.0136,160]}},
+    "prop": {"n": 160, "metrics": {"tex.colours": [152,642,2468,160], "tex.lum_mean": [54.087,123.67,183.804,160], "tex.lum_std": [13.401,39.11,71.978,160], "tex.sat_mean": [0.0464,0.2638,0.7017,160], "tex.val_mean": [0.2724,0.5782,0.8471,160], "tex.hf_energy": [11.5611,25.3155,57.0733,160]}},
+    "interior": {"n": 84, "metrics": {"tex.colours": [344,607,928,84], "tex.lum_mean": [20.252,32.055,60.569,84], "tex.lum_std": [18.709,24.445,45.468,84], "tex.sat_mean": [0.0934,0.2169,0.3543,84], "tex.val_mean": [0.0885,0.1417,0.2427,84], "tex.hf_energy": [18.309,22.2015,27.2384,84]}},
+    "decal": {"n": 45, "metrics": {"tex.colours": [1,54,1273,45], "tex.lum_mean": [8.148,111.94,255,45], "tex.lum_std": [0,28.67,90.53,45], "tex.sat_mean": [0,0.1758,0.68,45], "tex.val_mean": [0.061,0.5672,1,45], "tex.hf_energy": [0,12.988,66.4462,45]}}
+  },
+  "presets": {
+    "concrete": {"role":"wall", "description":"Pitted warm concrete with cloudy aggregate", "pattern":"concrete", "base":[0.48,0.46,0.42], "secondary":[0.25,0.24,0.22], "scale":5, "grain":1.0},
+    "asphalt": {"role":"ground", "description":"Dusty asphalt with fine aggregate", "pattern":"asphalt", "base":[0.30,0.31,0.30], "secondary":[0.48,0.46,0.41], "scale":9, "grain":1.15, "value":0.43},
+    "brick": {"role":"wall", "description":"Staggered worn brick and recessed mortar", "pattern":"brick", "base":[0.55,0.34,0.27], "secondary":[0.40,0.37,0.32], "scale":5, "grid":[4,8], "grain":0.85},
+    "plaster": {"role":"wall", "description":"Blotchy lime plaster with fine pits", "pattern":"plaster", "base":[0.62,0.58,0.49], "secondary":[0.36,0.34,0.30], "scale":3, "grain":0.85, "value":0.62},
+    "rusty_metal": {"role":"prop", "description":"Oxidised steel with irregular rust islands", "pattern":"rust", "base":[0.38,0.40,0.39], "secondary":[0.54,0.29,0.15], "scale":4, "grain":1.05},
+    "painted_metal": {"role":"prop", "description":"Faded blue paint with exposed metal chips", "pattern":"paint", "base":[0.30,0.43,0.46], "secondary":[0.27,0.24,0.20], "scale":6, "grain":0.8},
+    "wood_planks": {"role":"prop", "description":"Staggered planks with wavy grain and dark joints", "pattern":"wood", "base":[0.49,0.37,0.25], "secondary":[0.25,0.20,0.14], "scale":3, "grid":[4,2], "grain":0.85},
+    "tiles": {"role":"wall", "description":"Worn ceramic squares and recessed grout", "pattern":"tiles", "base":[0.51,0.54,0.48], "secondary":[0.28,0.27,0.24], "scale":5, "grid":[8,8], "grain":0.75},
+    "grass": {"role":"ground", "description":"Dry grass with fine blades and earth patches", "pattern":"grass", "base":[0.35,0.42,0.25], "secondary":[0.43,0.35,0.23], "scale":6, "grain":1.05},
+    "dirt": {"role":"ground", "description":"Clumped soil with scattered pale grit", "pattern":"dirt", "base":[0.46,0.37,0.26], "secondary":[0.27,0.23,0.18], "scale":4, "grain":1.0},
+    "sand": {"role":"ground", "description":"Wind-rippled dusty sand", "pattern":"sand", "base":[0.63,0.55,0.39], "secondary":[0.44,0.38,0.27], "scale":3, "grain":0.8, "value":0.62},
+    "roof_tiles": {"role":"wall", "description":"Overlapping terracotta roof tiles with rounded ribs", "pattern":"roof", "base":[0.55,0.35,0.25], "secondary":[0.27,0.22,0.18], "scale":4, "grid":[8,8], "grain":0.85},
+    "corrugated_metal": {"role":"wall", "description":"Ribbed galvanised sheets with streaked grime", "pattern":"corrugated", "base":[0.45,0.48,0.47], "secondary":[0.30,0.28,0.24], "scale":5, "grain":0.8},
+    "glass_grime": {"role":"wall", "description":"Translucent dusty glass with vertical wipe marks", "pattern":"glass", "base":[0.37,0.43,0.43], "secondary":[0.47,0.43,0.34], "scale":3, "grain":0.75, "alpha":true},
+    "fabric": {"role":"interior", "description":"Dark woven upholstery with soft folds", "pattern":"fabric", "base":[0.20,0.23,0.25], "secondary":[0.09,0.08,0.07], "scale":5, "grain":1.0},
+    "leather": {"role":"interior", "description":"Dark leather with fine irregular creases", "pattern":"leather", "base":[0.26,0.21,0.17], "secondary":[0.08,0.07,0.06], "scale":7, "grain":1.0},
+    "rubber": {"role":"interior", "description":"Dark moulded rubber with shallow grooves", "pattern":"rubber", "base":[0.18,0.18,0.16], "secondary":[0.06,0.06,0.05], "scale":8, "grain":1.0},
+    "plastic": {"role":"interior", "description":"Dark textured dashboard plastic", "pattern":"plastic", "base":[0.22,0.23,0.24], "secondary":[0.09,0.08,0.07], "scale":5, "grain":1.0},
+    "grime_overlay": {"role":"decal", "description":"Transparent irregular stains for tiled surfaces", "pattern":"grime", "base":[0.33,0.28,0.20], "secondary":[0.16,0.15,0.13], "scale":3, "grain":0.8, "alpha":true, "value":0.32},
+    "decal_overlay": {"role":"decal", "description":"Chipped diagonal painted stripes on transparency", "pattern":"decal", "base":[0.64,0.58,0.37], "secondary":[0.38,0.35,0.28], "scale":7, "grain":0.75, "alpha":true}
+  }
+}

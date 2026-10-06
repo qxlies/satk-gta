@@ -13,6 +13,7 @@ import io
 import json
 import os
 import signal
+import sys
 import time
 from pathlib import Path
 
@@ -27,6 +28,9 @@ from satk.core.errors import SatkError  # noqa: E402
 from satk.mcp import adapter as A  # noqa: E402
 from satk.mcp.proctree import pid_alive  # noqa: E402
 from satk.mcp.server import SatkMcp  # noqa: E402
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))  # tests/: sandbox helper; appended, so it never shadows a conftest
+import sandbox_compat  # noqa: E402
 
 FIXTURE = Path(__file__).with_name("fixture_ops.py")
 
@@ -158,6 +162,7 @@ def test_in_thread_timeout(isolated_ops):
 
 
 def test_long_running_runs_in_subprocess_with_progress(isolated_ops, satk_home):
+    sandbox_compat.skip_unless_async_subprocess()
     _load_fixture_ops()
     app = SatkMcp(groups=None)
     seen: list[tuple] = []
@@ -179,6 +184,7 @@ def test_long_running_runs_in_subprocess_with_progress(isolated_ops, satk_home):
 
 
 def test_long_running_timeout_kills_worker(isolated_ops, satk_home):
+    sandbox_compat.skip_unless_async_subprocess()
     _load_fixture_ops()
     app = SatkMcp(groups=None, long_timeout=0.05)
 
@@ -219,6 +225,7 @@ def test_long_running_timeout_kills_the_whole_process_tree(isolated_ops, satk_ho
     This is the blender_job case (Blender is a grandchild of the worker): killing only the
     process the server started used to leave it running and writing.
     """
+    sandbox_compat.skip_unless_async_subprocess()
     _load_fixture_ops()
     pid_file = tmp_path / "child.pid"
     app = SatkMcp(groups=None, long_timeout=8.0)
@@ -243,6 +250,7 @@ def test_long_running_timeout_kills_the_whole_process_tree(isolated_ops, satk_ho
 
 def test_long_running_normal_end_leaves_helpers_alone(isolated_ops, satk_home, tmp_path):
     """Only a timeout/cancel kills the tree; a helper an operation leaves on purpose survives."""
+    sandbox_compat.skip_unless_async_subprocess()
     _load_fixture_ops()
     pid_file = tmp_path / "helper.pid"
     app = SatkMcp(groups=None)

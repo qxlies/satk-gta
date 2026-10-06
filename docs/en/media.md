@@ -48,6 +48,11 @@ Parameters:
   `zone` = zone rectangles with names (the answer's `zones` lists the zones that contain the centre).
 - `--area -1` shows all interiors at once; `--labels 0` turns the numbers off.
 - MCP: `inline=true` attaches the picture to the answer (at most 1024 px); by default only the path comes back.
+- `SID...` may also be the path of your own `.txd` (all its PC textures, legend `file:<name>.txd/<texture>`) or
+  `.png` file: your textures go on the same sheet as the vanilla ones (`txd:vehicle`), no index needed for them.
+- Small pictures for agents: `satk.media.encode` writes JPEG or WebP with a pixel limit (`max_px`) and a byte
+  limit (`max_bytes`: the quality steps down from 85, then the picture shrinks); previews use it
+  (`satk blender preview`: at most 1024 px and 300 KB, [look.md](look.md)). Textures stay lossless PNG.
 
 ## How it works
 
@@ -88,6 +93,8 @@ png = texture_png("tex:bistro/vent_64", size=256)                     # Path
 sheet, legend = contact_sheet(["txd:lawest1"], cols=0)                 # cols=0 = automatic (up to 8)
 mp, legend, m_per_px = map_image(2495, -1687, span=300, layers=("inst", "zone"))
 stats = export_all(jobs=12)                                            # {"written", "skipped", "seconds", "backend", ...}
+from satk.media.encode import save_image
+save_image("<work>/out/x.jpg", w, h, rgba, max_px=1024, max_bytes=300_000)   # {"path", "w", "h", "bytes", "quality"}
 ```
 
 Low level: `satk.media.texture.resolve_refs(db, sids)`, `decode_ref(TexRef)`, `png_for_ref(TexRef, size)`;

@@ -643,6 +643,10 @@ def open_index(profile: str = "vanilla", path: Path | None = None) -> IndexDB:
 
     * inside :func:`override_index` the given factory is used;
     * with ``SATK_INDEX_FAKE=1`` a cached :class:`FakeIndexDB` is returned (no files needed).
+
+    The cache is keyed by the profile and the *resolved* database path, so a configuration change (another workspace,
+    another ``work`` folder: tests, long-running servers) never serves a database opened under the old one: the new
+    path is a cache miss, and a missing file is ``INDEX_MISSING`` again.
     """
     if _override:
         return _override[-1](profile)
@@ -656,7 +660,11 @@ def open_index(profile: str = "vanilla", path: Path | None = None) -> IndexDB:
                 db = FakeIndexDB(profile)
                 _cache[key] = db
             return db
-    key = (str(profile), None if path is None else os.path.abspath(os.fspath(path)))
+    if path is None:
+        name = cfg().canonical_profile(str(profile))
+        key = (name, os.path.abspath(os.fspath(index_path(name))))
+    else:
+        key = (str(profile), os.path.abspath(os.fspath(path)))
     with _cache_lock:
         db = _cache.get(key)
         if db is not None:

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 
 
@@ -25,3 +28,13 @@ def test_available_root_in_no_skip_mode(satk_home, monkeypatch, request, fixture
     (root / "gta_sa.exe").write_bytes(b"synthetic fixture marker")
     monkeypatch.setenv("SATK_TEST_NO_SKIP", "1")
     assert request.getfixturevalue(fixture_name) == root
+
+
+def test_no_test_imports_the_bare_name_conftest():
+    """A bare ``conftest`` import binds to whichever folder's conftest pytest imported last, so such a test passes or
+    fails with the order of the test folders. Helpers live in a uniquely named module (``tests/re/re_synth.py``,
+    ``tests/batch/synth.py``) that the folder's conftest puts on ``sys.path``."""
+    pat = re.compile(r"^[ 	]*(?:from[ 	]+conftest[ 	]+import|import[ 	]+conftest)", re.M)
+    bad = [f.relative_to(Path(__file__).parents[1]).as_posix() for f in Path(__file__).parents[1].rglob("*.py")
+           if pat.search(f.read_text(encoding="utf-8", errors="replace"))]
+    assert bad == []

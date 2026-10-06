@@ -59,6 +59,10 @@ SOURCES: dict[str, tuple[str, str, str]] = {
     "cleo-ai": ("cleo-ai opcode reference (Sanny Builder Library data)", "none", "local-only"),
     "research": ("satk research reports (docs/research)", "ours", "ours"),
     "facts": ("curated engine facts (report 24 §6)", "ours", "ours"),
+    # scripting API references (satk.kb.scriptapi_build)
+    "mta-lua": ("MTA:SA Lua API: luadefs registrations, argument parsers, OOP, events, enums", "GPL-3.0", "mirror"),
+    "mta-lua-neon": ("MTA:SA Neon fork: Lua functions and events upstream does not have", "GPL-3.0", "mirror"),
+    "pawn": ("SA-MP/open.mp Pawn includes: natives, callbacks, constants", "varies", "local-only"),
 }
 
 
@@ -77,6 +81,7 @@ class Inputs:
     cleo: SourceTree | None = None
     research: SourceTree | None = None
     exe: Path | None = None
+    scriptapi: object | None = None    # satk.kb.scriptapi_build.ScriptApiInputs (MTA Lua API, Pawn natives)
     repos: dict[str, str] = field(default_factory=dict)     # key -> display path of the repository
     refs: dict[str, str] = field(default_factory=dict)      # key -> git ref
     skipped: dict[str, str] = field(default_factory=dict)
@@ -135,6 +140,9 @@ def default_inputs(*, research: bool = True) -> Inputs:
     inp.exe = exe if exe.is_file() else None
     if inp.exe is None:
         inp.skipped["exe"] = "gta_sa.exe not found: exe checks of facts are skipped"
+    from .scriptapi_build import default_inputs as scriptapi_inputs
+
+    inp.scriptapi = scriptapi_inputs()
     return inp
 
 
@@ -907,7 +915,9 @@ def build_kb(out: str | Path, inp: Inputs, *, progress: Callable[[str], None] | 
 
     t0 = time.perf_counter()
     out = ensure_writable(out)
-    if inp.gtarev is None and inp.pluginsdk is None and inp.upstream is None and inp.cleo is None:
+    sa = inp.scriptapi
+    if inp.gtarev is None and inp.pluginsdk is None and inp.upstream is None and inp.cleo is None \
+            and not (sa is not None and (getattr(sa, "mta", None) is not None or getattr(sa, "pawn", None))):
         raise SatkError("NOT_FOUND", "no knowledge sources found (gta-reversed, plugin-sdk-sa, mtasa-neon, cleo-ai)",
                         hint="clone them under paths.src (satk config show)", data={"skipped": inp.skipped})
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -930,6 +940,10 @@ def build_kb(out: str | Path, inp: Inputs, *, progress: Callable[[str], None] | 
         b.cleo()
         b.research()
         b.facts()
+        if inp.scriptapi is not None:
+            from .scriptapi_build import build_scriptapi
+
+            b.stats["scriptapi"] = build_scriptapi(b, inp.scriptapi)
         b.w.flush()
         t = time.perf_counter()
         con.execute("INSERT INTO chunk(chunk) VALUES('optimize')")

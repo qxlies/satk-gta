@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satk.local/saap/1/scene.clear.json",
+  "title": "scene.clear",
+  "description": "Remove every placed entity.",
+  "x-saap": {
+    "method": "scene.clear",
+    "capability": "view",
+    "since": 1
+  },
+  "$defs": {
+    "params": {
+      "type": "object",
+      "properties": {}
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "removed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "removed"
+      ]
+    }
+  }
+}

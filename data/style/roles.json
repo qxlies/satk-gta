@@ -1,0 +1,114 @@
+{
+  "format": "satk.style-roles/1",
+  "_comment": [
+    "Texture roles of satk.style.texture: what a texture is used for decides which vanilla distribution it is",
+    "compared with. 'match' = regular expressions on the texture name (first role that matches wins, in this",
+    "order); 'vanilla' = how the vanilla sample of the role is picked from the index (own textures of models of",
+    "these families/classes whose name matches). A role with fewer than min_samples vanilla textures falls back",
+    "to 'generic'.",
+    "Verdict: 'out' when a metric is beyond its fence (counts in log space: log_metrics), or when max_edges or more metrics sit outside p10..p90 at once (a texture at the edge of everything)."
+  ],
+  "min_samples": 12,
+  "per_role": 160,
+  "check": [
+    "tex.colours",
+    "tex.sat_mean",
+    "tex.val_mean",
+    "tex.hf_energy"
+  ],
+  "roles": {
+    "interior": {
+      "match": "interior|int\\d|seat|dash|cabin|cockpit",
+      "vanilla": {
+        "family": "vehicle",
+        "class_prefix": "car",
+        "name": "interior"
+      },
+      "what": "car interior seen through alpha-128 glass: dark, low saturation, photo-like (vanilla sample: IDE type car)"
+    },
+    "wheel": {
+      "match": "wheel|rim|tyre|tire|hub|aero",
+      "vanilla": {
+        "family": "vehicle",
+        "name": "wheel"
+      },
+      "what": "vehicle wheel rim (own TXD)"
+    },
+    "decal": {
+      "match": "decal|logo|badge|plate|sign|livery",
+      "vanilla": {
+        "family": "vehicle",
+        "name": "decal|logo|badge|plate|sign|vinyl"
+      },
+      "what": "vehicle decals, badges and liveries"
+    },
+    "body": {
+      "match": "body|remap|paint|detail",
+      "vanilla": {
+        "family": "vehicle",
+        "name": "body|remap"
+      },
+      "what": "vehicle body textures and paint jobs (own TXD)"
+    },
+    "ped": {
+      "match": "^ped|skin|face|head|hair|shirt|jeans|torso|legs",
+      "vanilla": {
+        "family": "ped"
+      },
+      "what": "ped clothes and skin"
+    },
+    "weapon": {
+      "match": "gun|weap|rifle|pistol|knife|bat|grenade|ammo",
+      "vanilla": {
+        "family": "weapon"
+      },
+      "what": "weapon textures"
+    },
+    "wall": {
+      "match": "wall|brick|bldg|build|window|facade|roof|concrete",
+      "vanilla": {
+        "classes": [
+          "building",
+          "interior_shell"
+        ]
+      },
+      "what": "building walls, windows and roofs (tiling)"
+    },
+    "ground": {
+      "match": "ground|grass|dirt|road|sand|mud|tarmac|pave|rock|grnd",
+      "vanilla": {
+        "classes": [
+          "terrain"
+        ]
+      },
+      "what": "terrain and road surfaces (tiling)"
+    },
+    "prop": {
+      "match": "prop|metal|wood|crate|barrel|(^|_)bin",
+      "vanilla": {
+        "classes": [
+          "prop",
+          "interior_prop"
+        ]
+      },
+      "what": "street and interior props"
+    },
+    "generic": {
+      "match": "",
+      "vanilla": {
+        "families": [
+          "map",
+          "vehicle",
+          "ped",
+          "weapon"
+        ]
+      },
+      "what": "any vanilla texture (fallback)"
+    }
+  },
+  "log_metrics": [
+    "tex.colours",
+    "tex.colours15"
+  ],
+  "max_edges": 4
+}

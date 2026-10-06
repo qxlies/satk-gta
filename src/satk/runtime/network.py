@@ -46,6 +46,8 @@ ALLOWED: dict[str, tuple[frozenset[str], str]] = {
     "src/satk/viewer/backends/mta_lua.py": (frozenset({"socket", "http.client"}),
                                             "loopback HTTP to the local MTA server (target=game)"),
     "src/satk/engine/smoke.py": (frozenset({"socket"}), "probes the local MTA server ports on 127.0.0.1"),
+    "src/satk/mta/servercheck.py": (frozenset({"socket"}),
+                                    "picks free 127.0.0.1 ports for the private MTA server of satk mta server-check"),
     "src/satk/engine/setup.py": (frozenset({"urllib.request"}),
                                  "satk engine setup downloads pinned MTA build dependencies (explicit command)"),
     "src/satk/release/fetch.py": (frozenset({"urllib.request"}),

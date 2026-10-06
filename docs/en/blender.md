@@ -122,10 +122,12 @@ the warning `TXD_PENDING`. `--render` adds `preview.png` to the job folder: EEVE
 | `satk blender render --blend B (--pos X,Y,Z --look X,Y,Z \| --ypr Y,P,R \| --bm NAME) [--time HH:MM] [--size WxH] [--fov 70] [--engine workbench\|eevee] [--objindex] [--limit N]` | `blender_job` (`render`) | PNG; with `--objindex` also a table of the visible SIDs with their pixel share |
 | `satk blender export --blend B --objects NAME… [--target mta-resource\|modloader] [--out DIR] [--name N]` | `blender_job` (`export`) | DFF/TXD/COL + IDE/IPL with the source definition and placement data (+ `meta.xml`, `client.lua`) |
 | `satk blender game-ready <src> [--name N] [--objects A,B] [--budget N] [--height M \| --scale S] [--origin base\|center\|keep] [--uv auto\|keep\|smart\|box] [--bake auto\|always\|never] [--tex-size N] [--prelight bake\|simple\|none] [--col hull\|box\|mesh\|none] [--surface N] [--lod R] [--draw D] [--out DIR] [--render]` | — | mesh → game model: DFF + COL + LOD + TXD in `work\out\blender\<name>\`, with checks |
+| `satk blender preview <subject>` | — | an SA-like preview sheet of a model, a DFF file, a mod folder or a session: [look.md](look.md) |
 | `satk blender addon-build` | — | the `satk_blender` extension zip in `work\out\blender\` |
 | `satk blender run <cmd> --args '<json>'` | `blender_job` | the same through JSON (`cmd` = `doctor`, `import_model`, `import_area`, `render`, `export`) |
 
-The model `id` is `model:411`, `model:infernus`, `411` or a name. The import commands also take `--profile`
+The model `id` is `model:411`, `model:infernus`, `411`, a name or the path of a `.dff` file of your own (the
+`.txd` of the same name next to it is used; a vehicle also gets the game's `vehicle.txd`). The import commands also take `--profile`
 and `--source auto|index|direct`. `--objects` of `export` is an object name in the scene, a model name
 (`lae2_roads89`) or a SID (`model:17613`, `inst:lae2_stream0#4`); a placement is exported as its model.
 
@@ -202,6 +204,28 @@ Blender runs Python with `ignore_environment`, so `PYTHONDONTWRITEBYTECODE` alon
 `agent_cli.py` set `sys.dont_write_bytecode` themselves (the add-on when the variable is set, as satk's runner
 sets it), and no `__pycache__` appears in `tools` or in `work\blender\dragonff`.
 
+## Blender 5.1 notes
+
+- **Normals.** Since Blender 4.1 there is no "auto smooth": custom normals are kept even on flat faces, but every
+  flat face is its own fan, so a DFF export writes one vertex per corner (a flat-shaded car gets about four
+  times the vertices). Weld first, set every face smooth, mark the sharp edges, and only then apply a Weighted
+  Normal modifier or custom normals; toggling smooth shading afterwards moves the custom normals.
+- **Smooth by Angle** is a modifier (a geometry-nodes asset) since 4.1; it works headless with
+  `--factory-startup`, and DragonFF exports the evaluated modifier stack.
+- **`use_nodes`** of materials and worlds is deprecated in 5.x (always on); satk sets it only where older
+  builds need it.
+- **Thumbnails.** Blender on Windows writes `.blend` thumbnails into the user's `.thumbnails` folder whatever
+  `XDG_CACHE_HOME` says. Every satk entry script sets `file_preview_type = 'NONE'` (and no `.blend1` backups,
+  no autosave) before anything is saved: a cold job that saves a `.blend` adds no thumbnail.
+- **Bytecode.** Blender ignores `PYTHONDONTWRITEBYTECODE` (it runs Python with `ignore_environment`); the entry
+  scripts set `sys.dont_write_bytecode`, so no `__pycache__` appears in the add-on folder.
+- **Threads.** Jobs pass `-t N` from `SATK_BLENDER_THREADS` or `[blender] threads` in `satk.toml` (unset or 0 =
+  all cores), so several jobs can share a machine.
+- **Background mode.** `bpy.app.timers` do not fire under `-b` and undo is unavailable; the live session
+  ([studio.md](studio.md)) uses a blocking main-thread loop and `.blend` checkpoints instead.
+- **EEVEE** (`BLENDER_EEVEE` in 5.x) compiles shaders on the first frame of a job; the SA game look of
+  [look.md](look.md) shares one node group between all materials to keep that short.
+
 ## Limitations and known issues
 
 - `export` writes the TXD as RGBA8888 without mipmaps (DragonFF's TXD writer has no DXT encoder;
@@ -213,7 +237,7 @@ sets it), and no `__pycache__` appears in `tools` or in `work\blender\dragonff`.
 - DragonFF loses a few degenerate or duplicate triangles (`lae2_roads89`: 219 of 225).
 - The whole map does not fit into Blender (50,935 placements): a job is limited to 5,000 placements
   (`--limit`, default 2,000); an area is the sensible unit.
-- There is no persistent Blender server yet: every call pays the 1.5 s start.
+- Every job pays the 1.5 s start; step-by-step work goes to a live session ([studio.md](studio.md)).
 - `game-ready`: UVs are smart project or a cube (xatlas and part-based UVs are not installed: no new
   dependencies); one COL surface for the whole model; the prelight is a lighting model, not `timecyc.dat`; the alpha of
   the source textures is lost when baking; game-ready does not fix the orientation of the source normals.

@@ -1,5 +1,9 @@
 """TXD checks (``txd.*`` rules): platform, format, names, sizes (power of two, DXT blocks), mip chain.
 
+The model class of a TXD (``cars`` for ``premier.txd``, ``map`` ...) comes from the models that use it
+(:func:`satk.lint.runner.lint` resolves it); rules with a ``class_sev`` table take their severity from it
+(vanilla vehicle, ped and weapon textures have no mipmaps, so ``txd.mips_missing`` is only info there).
+
 The mip chain is walked from :attr:`TexInfo.mip0_off` (``u32 size`` + data per level, already bounds-checked
 by :func:`satk.formats.txd.parse_txd`); each level must hold at least the bytes its format and size need.
 """
@@ -14,12 +18,14 @@ from ..formats.rw import FormatError
 from ..formats.txd import TexInfo, parse_txd
 from .rules import Collector
 
-__all__ = ["TxdFacts", "check_txd", "level_bytes"]
+__all__ = ["TxdFacts", "check_txd", "level_bytes", "BLEND_ALPHA"]
 
 #: Bits per pixel of uncompressed formats.
 _BPP = {"A8R8G8B8": 32, "X8R8G8B8": 32, "R8G8B8": 24, "R5G6B5": 16, "A1R5G5B5": 16, "X1R5G5B5": 16,
         "A4R4G4B4": 16, "A8L8": 16, "L8": 8, "A8": 8, "PAL8": 8}
 _BLOCK = {"DXT1": 8, "DXT2": 16, "DXT3": 16, "DXT4": 16, "DXT5": 16}
+#: Formats whose alpha is blended (needs draw order), not just tested (DXT1/A1R5G5B5 cut-outs).
+BLEND_ALPHA = frozenset({"DXT2", "DXT3", "DXT4", "DXT5", "A8R8G8B8", "A4R4G4B4", "A8L8", "A8"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +37,7 @@ class TxdFacts:
     archive: str | None
     loose: bool
     textures: frozenset[str]
+    alpha: frozenset[str] = frozenset()     # textures with blended alpha (BLEND_ALPHA formats, alpha flag on)
 
 
 def level_bytes(fmt: str, w: int, h: int, depth: int = 0) -> int | None:
@@ -71,9 +78,9 @@ def _mips(c: Collector, label: str, buf, t: TexInfo) -> None:
         p += 4 + size
 
 
-def check_txd(c: Collector, label: str, data: bytes, *, archive: str | None = None, loose: bool = False
-              ) -> TxdFacts | None:
-    """Run the ``txd.*`` rules on one TXD blob."""
+def check_txd(c: Collector, label: str, data: bytes, *, archive: str | None = None, loose: bool = False,
+              cls: str | None = None) -> TxdFacts | None:
+    """Run the ``txd.*`` rules on one TXD blob; ``cls`` = model class of the models using it (or ``None``)."""
     stem = label.rsplit("/", 1)[-1].rsplit(".", 1)[0].lower()
     try:
         txd = parse_txd(data)
@@ -112,8 +119,10 @@ def check_txd(c: Collector, label: str, data: bytes, *, archive: str | None = No
             c.add("txd.size_max", label, tex=shown, w=t.w, h=t.h)
         if fmt in _BLOCK and (t.w % 4 or t.h % 4):
             c.add("txd.dxt_block", label, tex=shown, fmt=t.d3dfmt, w=t.w, h=t.h)
-        if t.levels <= 1 and max(t.w, t.h) >= mip_min:
-            c.add("txd.mips_missing", label, tex=shown, w=t.w, h=t.h)
+        if max(t.w, t.h) >= mip_min:
+            c.seen("txd.mips_missing")
+            if t.levels <= 1:
+                c.add("txd.mips_missing", label, tex=shown, w=t.w, h=t.h, cls=cls)
         if fmt in alpha_fmts and not t.alpha:
             c.add("txd.alpha_off", label, tex=shown, fmt=t.d3dfmt)
         try:
@@ -123,4 +132,6 @@ def check_txd(c: Collector, label: str, data: bytes, *, archive: str | None = No
     mb = len(data) / (1024 * 1024)
     if mb > float(c.rules.param("txd.total_size", "max_mb", 8.0)):
         c.add("txd.total_size", label, mb=round(mb, 1))
-    return TxdFacts(stem, label, archive, loose, frozenset(names))
+    blend = frozenset(t.name.lower() for t in texs if t.name and not t.unsupported and t.alpha
+                      and t.d3dfmt.upper() in BLEND_ALPHA)
+    return TxdFacts(stem, label, archive, loose, frozenset(names), blend)

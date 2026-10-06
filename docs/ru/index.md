@@ -65,6 +65,10 @@ satk index verify
 | `satk asset refs <sid> [--rel R]` | `asset_refs` | без `--rel` — сколько связей каждого вида; с `--rel` — таблица |
 | `satk world near X Y [Z] [--r R \| --box x0,y0,x1,y1] [--match aabb\|center] [--area N\|any] [--lod hd\|lod\|all] [--kinds inst,item,zone,water]` | `world_near` | расстановки рядом, ближние первыми; `water` — полигоны `water.dat` (v3) |
 
+Скан идёт в рабочих процессах (`--jobs N` или переменная окружения `SATK_JOBS=N`; `1` — скан в одном процессе).
+Если машина запрещает рабочие процессы (урезанная песочница, `WinError 5`), сборка сама сканирует в одном процессе
+и сообщает об этом в `warn`; индекс и его хеш содержимого те же.
+
 У всех запросов есть `--profile` (по умолчанию `vanilla`; без чистой копии это алиас профиля `game` — вашей
 папки с игрой, см. [install.md](install.md)). Если DAT/IDE/IPL/IMG изменились после сборки, в ответе появится
 `warn: ["INDEX_STALE: … (satk index build)"]`.

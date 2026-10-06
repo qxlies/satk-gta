@@ -8,6 +8,8 @@
 * A job = ``work/blender/jobs/<yyyymmdd-HHMMSS-xxxx>/`` with ``request.json``, ``response.json``,
   ``blender.log`` and the outputs (``scene.blend``, PNG, exports). The result is read from
   ``response.json``, never from Blender's stdout.
+* Threads: ``-t N`` from ``SATK_BLENDER_THREADS`` or ``[blender] threads`` of ``satk.toml``
+  (:func:`thread_args`; unset or 0 = all cores), so parallel jobs can share a machine.
 
 Call::
 
@@ -37,7 +39,7 @@ from . import contract as C
 __all__ = [
     "DRAGONFF_COMMIT", "DRAGONFF_SHA", "blender_exe", "addon_dir", "agent_cli", "satk_src", "dragonff_root",
     "dragonff_dir", "dragonff_info", "ensure_dragonff", "profile_dir", "blender_env", "new_job", "run_job",
-    "run_blender", "log_tail", "DEFAULT_TIMEOUT",
+    "run_blender", "log_tail", "DEFAULT_TIMEOUT", "blender_threads", "thread_args",
 ]
 
 #: DragonFF commit used by satk (SPEC §4.11; master is 74 commits ahead of the store build).
@@ -174,6 +176,27 @@ def blender_env(job_dir: Path | None = None) -> dict[str, str]:
     return env
 
 
+def blender_threads() -> int:
+    """Render/compute threads for Blender: ``SATK_BLENDER_THREADS``, else ``[blender] threads`` (0 = all)."""
+    raw = os.environ.get("SATK_BLENDER_THREADS")
+    if raw is None or not str(raw).strip():
+        raw = cfg().get("blender.threads", 0)
+    try:
+        n = int(str(raw).strip() or 0)
+    except ValueError:
+        raise SatkError("BAD_PARAMS", f"Blender threads must be an integer, got {raw!r}",
+                        hint="SATK_BLENDER_THREADS=4 or [blender] threads = 4 in satk.toml") from None
+    if not 0 <= n <= 1024:
+        raise SatkError("BAD_PARAMS", f"Blender threads must be 0..1024, got {n}")
+    return n
+
+
+def thread_args() -> list[str]:
+    """``["-t", "N"]`` for the Blender command line (empty when all cores are allowed)."""
+    n = blender_threads()
+    return ["-t", str(n)] if n else []
+
+
 def new_job(cmd: str) -> tuple[str, Path]:
     """``(job id, job dir)`` under ``work/blender/jobs``."""
     jid = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(2)}"
@@ -234,6 +257,7 @@ def run_job(cmd: str, args: dict | None = None, *, profile: str = "vanilla", pla
     argv = ["-b"]
     if blend is not None:
         argv.append(str(blend))
+    argv += thread_args()
     argv += ["--factory-startup", "--python-exit-code", "1", "--python", str(agent_cli()), "--", str(req_path)]
     code, secs = run_blender(argv, log=log, timeout=timeout, env=blender_env(jdir))
     resp_path = jdir / "response.json"

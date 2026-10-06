@@ -11,7 +11,8 @@
 (`setCameraMatrix`), снимает кадр (`dxCreateScreenSource` → `dxGetTexturePixels` → PNG), пикает мир
 (`processLineOfSight` с информацией о здании → `model_pos` → SID индекса), меняет время и погоду, отдаёт лог и
 исполняет Lua на обеих сторонах. Ariane — «быстрые глаза», `game` — истина. Пишет только в `work\mta\server\`
-(копия сервера, логи) и `work\out\captures\` (кадры).
+(копия сервера, логи) и `work\out\captures\` (кадры). Сценарные проверки мода в этой игре —
+[ingame.md](ingame.md); проверки скриптов ресурса MTA — [mta.md](mta.md).
 
 ## Быстрый пример
 

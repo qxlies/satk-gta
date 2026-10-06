@@ -1,0 +1,39 @@
+// {{NAME}}: live text on screen, toggled with a key. Made by 'satk script new text'.
+// Build: satk script asm {{NAME}}/{{NAME}}.txt; install: copy {{NAME}}.cs into the game's cleo folder (CLEO 4 or 5).
+// print_formatted_now takes a printf format and its values: 0@-2@ position, 3@ heading; 10@ = 1 while shown.
+{$CLEO .cs}
+03A4: script_name '{{SNAME}}'
+0006: set_lvar_int 10@ 1
+
+:LOOP
+0001: wait 0
+00D6: if 0
+0AB0: is_key_pressed {{KEY}}
+004D: goto_if_false @DRAW
+
+:RELEASE                                // toggle once per press
+0001: wait 0
+00D6: if 0
+0AB0: is_key_pressed {{KEY}}
+004D: goto_if_false @TOGGLE
+0002: goto @RELEASE
+
+:TOGGLE
+00D6: if 0
+0039: is_int_lvar_equal_to_number 10@ 0
+004D: goto_if_false @OFF
+0006: set_lvar_int 10@ 1
+0002: goto @DRAW
+
+:OFF
+0006: set_lvar_int 10@ 0
+
+:DRAW
+00D6: if 1                              // and: both conditions
+0039: is_int_lvar_equal_to_number 10@ 1
+0256: is_player_playing $2
+004D: goto_if_false @LOOP
+00A0: get_char_coordinates $3 0@ 1@ 2@
+0172: get_char_heading $3 3@
+0AD1: print_formatted_now "{{TEXT}}" 100 0@ 1@ 2@ 3@
+0002: goto @LOOP

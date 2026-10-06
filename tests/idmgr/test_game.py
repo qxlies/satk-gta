@@ -81,3 +81,15 @@ def test_vanilla_facts(real_profiles, run_cli):
     assert blk["ids"] == list(range(blk["ids"][0], blk["ids"][0] + 100))
     c = run_cli(["id", "conflicts", "--profile", next(iter(real_profiles))]).json
     assert c["ok"] and c["errors"] == 0
+
+
+def test_vanilla_store_low_warnings(real_profiles, run_cli):
+    if "vanilla" not in real_profiles:
+        pytest.skip("no vanilla index")
+    ped = run_cli(["id", "free", "--kind", "ped", "--profile", "vanilla"]).json
+    assert ped["capacity"] == {"store": 278, "used": 276}
+    assert any(w.startswith("STORE_LOW: only 2 of 278") for w in ped["warn"])
+    weap = run_cli(["id", "free", "--kind", "weapon", "--profile", "vanilla"]).json
+    assert any(w.startswith("STORE_LOW: only 1 of 51") for w in weap["warn"])
+    obj = run_cli(["id", "free", "--kind", "object", "--profile", "vanilla"]).json
+    assert obj["capacity"]["used"] == 14045 and not any(w.startswith("STORE_") for w in obj.get("warn", []))
