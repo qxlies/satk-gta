@@ -1,0 +1,77 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "ped",
+ "ref": "style_ped_weapon",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (265; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "skinned",
+   "what": "a skinned mesh on the 32-bone skeleton",
+   "how": {
+    "flags": "skinned"
+   },
+   "fix": "skin the mesh to the vanilla skeleton (kit.template --like a vanilla ped)",
+   "vanilla": "265/265"
+  },
+  {
+   "id": "head",
+   "what": "a head at the Head bone",
+   "how": {
+    "near_frames": {
+     "frames": [
+      "head"
+     ],
+     "radius": 0.15
+    }
+   },
+   "fix": "model the head around the Head bone",
+   "vanilla": "265/265"
+  },
+  {
+   "id": "hands",
+   "what": "both hands at the hand bones",
+   "how": {
+    "near_frames": {
+     "frames": [
+      "l hand",
+      "r hand"
+     ],
+     "radius": 0.12
+    }
+   },
+   "fix": "model both hands around the hand bones",
+   "vanilla": "265/265"
+  },
+  {
+   "id": "feet",
+   "what": "both feet at the foot bones",
+   "how": {
+    "near_frames": {
+     "frames": [
+      "l foot",
+      "r foot"
+     ],
+     "radius": 0.15
+    }
+   },
+   "fix": "model both feet (shoes) around the foot bones",
+   "vanilla": "265/265"
+  },
+  {
+   "id": "textured",
+   "what": "every material textured",
+   "how": {
+    "flags": "textured"
+   },
+   "fix": "texture every material from the ped TXD",
+   "vanilla": "265/265"
+  }
+ ]
+}

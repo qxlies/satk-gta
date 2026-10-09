@@ -50,7 +50,7 @@ class FakeBridge:
 def fakes(satk_home, monkeypatch, vanilla):
     state = {"started": [], "bridge": FakeBridge()}
     monkeypatch.setattr(MS, "Vanilla", lambda profile="vanilla": vanilla)
-    monkeypatch.setattr(S, "ensure_server", lambda port, httpport, timeout: (
+    monkeypatch.setattr(S, "ensure_server", lambda port, httpport, timeout, conf=None: (
         {"pid": 4242, "server_port": port, "reused": bool(state["started"])}, []))
     monkeypatch.setattr(S, "Bridge", lambda backend=None: state["bridge"])
 
@@ -217,3 +217,104 @@ def test_write_scripts_names_the_clean_copy(satk_home):
     assert str(Path(paths.cfg().paths.game)) in text
     assert "connect 127.0.0.1 22041" in Path(s["play"]).read_text(encoding="utf-8")
     assert S.play_info(22041, s)["client"].endswith("mtasa://127.0.0.1:22041")
+
+
+# --------------------------------------------------------------------------- --conf / --cvar / --windowed / cvar-restore
+
+
+COREFG = "<mainconfig>\n    <settings>\n        <fps_limit>100</fps_limit>\n        <vsync>1</vsync>\n    </settings>\n</mainconfig>\n"
+
+
+@pytest.fixture
+def cvfx(fakes, satk_home, monkeypatch):
+    from satk.ingame import cvars as CV
+
+    cfg = satk_home / "client" / "coreconfig.xml"
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text(COREFG, encoding="utf-8")
+    running: list[int] = []
+    monkeypatch.setattr(CV, "config_path", lambda: cfg)
+    monkeypatch.setattr(CV, "gta_running", lambda: list(running))
+    seen = {}
+
+    def ensure_server(port, httpport, timeout, conf=None):
+        seen["conf"] = conf
+        return {"pid": 4242, "server_port": port, "reused": False, "template": "fork-source",
+                "conf": conf or None}, ["STALE_TEMPLATE: the Bin copy is stale"]
+
+    monkeypatch.setattr(S, "ensure_server", ensure_server)
+    return {"cfg": cfg, "running": running, "seen": seen, "CV": CV}
+
+
+def test_start_with_conf_cvar_and_windowed(cvfx):
+    r = O.ingame_start(clear=True, conf=["sae_policy=0", "fpslimit=0"], cvar=["vsync=0", "fps_limit=0"], windowed=True)
+    assert cvfx["seen"]["conf"] == {"sae_policy": "0", "fpslimit": "0"}
+    assert r["server"]["conf"] == {"sae_policy": "0", "fpslimit": "0"} and r["server"]["template"] == "fork-source"
+    assert r["warn"] == ["STALE_TEMPLATE: the Bin copy is stale"]
+    assert r["cvars"]["set"] == {"display_windowed": "1", "display_fullscreen_style": "0", "vsync": "0", "fps_limit": "0"}
+    assert any(c.startswith("vsync: 1 -> 0") for c in r["cvars"]["changed"]) and r["cvars"]["backup"]
+    text = cvfx["cfg"].read_text(encoding="utf-8")
+    assert "<vsync>0</vsync>" in text and "<fps_limit>0</fps_limit>" in text and "<display_windowed>1</display_windowed>" in text
+    assert O.ingame_status()["cvars"]["cvars"]["vsync"] == "0"
+    # the same values again are a no-op even while the game runs; new values are refused
+    cvfx["running"].append(4)
+    O.ingame_start(cvar=["vsync=0"])
+    with pytest.raises(SatkError) as e:
+        O.ingame_start(cvar=["vsync=1"])
+    assert e.value.code == "NOT_READY" and "gta_sa.exe is running" in e.value.msg
+    assert "<vsync>0</vsync>" in cvfx["cfg"].read_text(encoding="utf-8")
+    with pytest.raises(SatkError) as e:
+        O.ingame_cvar_restore()
+    assert e.value.code == "NOT_READY"
+    cvfx["running"].clear()
+    out = O.ingame_cvar_restore()
+    assert out["restored"] is True and cvfx["cfg"].read_text(encoding="utf-8") == COREFG
+    assert O.ingame_cvar_restore()["restored"] is False
+    assert O.ingame_status().get("cvars") is None
+
+
+def test_start_validates_conf_and_cvar_before_anything_starts(cvfx):
+    for kw in ({"conf": ["serverip=0.0.0.0"]}, {"conf": ["ase=1"]}, {"conf": ["nonsense"]}, {"cvar": ["nonsense"]},
+               {"cvar": ["a b=1"]}):
+        with pytest.raises(SatkError) as e:
+            O.ingame_start(clear=True, **kw)
+        assert e.value.code == "BAD_PARAMS"
+    assert "conf" not in cvfx["seen"] and cvfx["cfg"].read_text(encoding="utf-8") == COREFG
+
+
+def test_stop_restores_the_client_config(cvfx, monkeypatch):
+    from satk.viewer.backends import mta_lua
+
+    O.ingame_start(clear=True, cvar=["vsync=0"])
+    monkeypatch.setattr(mta_lua, "stop", lambda: {"target": "game", "up": False, "stopped": True, "how": "quit"})
+    out = O.ingame_stop()
+    assert out["stopped"] is True and out["cvars"]["restored"] is True
+    assert cvfx["cfg"].read_text(encoding="utf-8") == COREFG
+    assert "cvars" not in O.ingame_stop()                          # nothing recorded the second time
+
+
+def test_play_writes_cvars_before_the_client_starts(cvfx, monkeypatch):
+    from satk.viewer.backends import mta_lua
+
+    monkeypatch.setattr(S, "preflight", lambda: {"ready": True, "setup_done": True, "game_running": False})
+    seen = {}
+
+    def start_client(*, timeout=180.0, force=False):
+        seen["cfg"] = cvfx["cfg"].read_text(encoding="utf-8")
+        return {"target": "game", "client": {"w": 1}, "client_pid": 55}
+
+    monkeypatch.setattr(mta_lua, "start_client", start_client)
+    r = O.ingame_play(cvar=["vsync=0"], windowed=True)
+    assert "<vsync>0</vsync>" in seen["cfg"] and "<display_windowed>1</display_windowed>" in seen["cfg"]
+    assert r["client_pid"] == 55 and cvfx["CV"].load_state()["launched"]["pid"] == 55
+
+
+def test_cvar_ops_are_registered():
+    from satk.mcp.generic import denial
+
+    for n in ("ingame.cvar_restore", "ingame.stop", "ingame.bench"):
+        spec = get_op(n)
+        assert spec.mcp is False and len(spec.summary) <= 300 and spec.summary_ru and denial(spec) is None
+    for n, names in (("ingame.start", {"conf", "cvar", "windowed"}), ("ingame.play", {"cvar", "windowed"}),
+                     ("ingame.bench", {"cvar", "restore_cvars", "settle"})):
+        assert names <= {p.name for p in get_op(n).params}

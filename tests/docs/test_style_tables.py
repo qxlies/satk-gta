@@ -28,9 +28,10 @@ STYLE = REPO_ROOT / "docs" / "agent" / "style"
 TOPICS = REPO_ROOT / "data" / "style" / "topics"
 SKILL = REPO_ROOT / "docs" / "agent" / "SKILL.md"
 BRIEF = REPO_ROOT / "docs" / "agent" / "briefs" / "asset-brief.md"
-GUIDES = ("README", "shading", "vehicles", "world", "peds-weapons", "textures", "modelling", "limits")
-TOPIC_NAMES = ("style", "style_shading", "style_vehicle", "style_world", "style_ped_weapon", "style_texture",
-               "authoring", "visual_qa", "creation")
+GUIDES = ("README", "construction", "references", "shading", "vehicles", "world", "peds-weapons", "textures",
+          "modelling", "limits", "done", "kinds")
+TOPIC_NAMES = ("style", "style_construction", "style_references", "style_shading", "style_vehicle", "style_world",
+               "style_ped_weapon", "style_texture", "authoring", "visual_qa", "creation", "done", "style_kinds")
 #: Wording that prescribed the anti-patterns of agent-built assets (flat colours, vector art, faceted bodies,
 #: real-world scale, light damage parts). ``style.brief_check`` owns the full vocabulary; this is the floor.
 BRIEF_BANNED = ("crisp", "clean shapes", "clean readable shapes", "flat colour", "flat color", "flat material",
@@ -183,7 +184,7 @@ def test_each_metric_band_has_exactly_one_table():
     keys, _ = _bands()
     dup = {k: sorted(v) for k, v in keys.items() if len(v) > 1}
     assert dup == {}, dup
-    assert len(keys) >= 150, len(keys)  # the guides really are data, not adjectives
+    assert len(keys) >= 150, len(keys)  # the vanilla reference stays complete (numbers are reference, not targets)
 
 
 def test_glossary_points_to_the_files_that_hold_the_bands():

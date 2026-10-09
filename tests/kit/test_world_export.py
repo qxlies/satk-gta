@@ -20,11 +20,12 @@ def _shape(size_xyz, volume=None) -> dict:
     return d
 
 
-def test_lod_name_is_the_vanilla_form():
-    assert P.lod_name("sa_bin1") == "lodbin1" and P.lod_name("kitbuilding") == "lodbuilding"
+def test_lod_name_is_unique_like_the_name():
+    assert P.lod_name("sa_bin1") == "lodsa_bin1" and P.lod_name("kitbuilding") == "lodkitbuilding"
+    assert P.lod_name("vbld") != P.lod_name("abld") and len(P.lod_name("a" * 30)) == 19
     assert P.lod_name("bin") == "lodbin" and P.lod_name("ab") == "lodab"
-    assert P.lod_name("shabbyhouse03_lvs") == "lodbbyhouse03_lvs"
-    assert len(P.lod_name("x" * 19)) <= 19 and P.lod_name("ABCdef") == "loddef"
+    assert P.lod_name("shabbyhouse03_lvs") == "lodshabbyhouse03_lv"
+    assert len(P.lod_name("x" * 19)) <= 19 and P.lod_name("ABCdef") == "lodabcdef"
 
 
 def test_col_rule_data_is_in_the_classes_file():

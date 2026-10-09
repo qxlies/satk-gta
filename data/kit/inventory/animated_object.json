@@ -1,0 +1,94 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "animated_object",
+ "summary": "animated map object: a static base and moving parts as frames named like the IFP bones, each with its pivot at the hinge or axle and a hub so nothing floats as it moves.",
+ "regions": {
+  "overall": {
+   "summary": "the whole object, 3/4 views",
+   "views": []
+  },
+  "base": {
+   "summary": "static base and supports",
+   "views": [
+    "base"
+   ]
+  },
+  "moving": {
+   "summary": "the moving parts at two poses",
+   "views": [
+    "sides",
+    "details"
+   ]
+  },
+  "details": {
+   "summary": "close-ups of hubs, hinges, small parts",
+   "views": [
+    "details"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to.",
+  "This starter is generic: rename every item to the real part ('bin body', 'lid', 'wheel pair') and split the body into the pieces the design has."
+ ],
+ "items": [
+  {
+   "key": "base",
+   "name": "Static base",
+   "region": "base",
+   "category": "structure",
+   "construction": "support, tower or housing as closed pieces",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "moving_parts",
+   "name": "Moving parts",
+   "region": "moving",
+   "category": "mechanism",
+   "construction": "each moving part a frame named like its IFP bone with the pivot at the hinge or axle",
+   "attaches_to": "base",
+   "stage": "G1",
+   "detail": "simple",
+   "notes": "one item per moving part"
+  },
+  {
+   "key": "hubs_hinges",
+   "name": "Hubs and hinges",
+   "region": "details",
+   "category": "mechanism",
+   "construction": "hub or hinge geometry at each pivot",
+   "attaches_to": [
+    "base",
+    "moving_parts"
+   ],
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "secondary_parts",
+   "name": "Secondary parts",
+   "region": "details",
+   "category": "detail",
+   "construction": "braces, guards, panels",
+   "attaches_to": "base",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "cables_lamps",
+   "name": "Cables and lamps",
+   "region": "details",
+   "category": "fixture",
+   "construction": "cables, warning lamps",
+   "attaches_to": "base",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/animated_object.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

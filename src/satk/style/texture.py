@@ -4,16 +4,20 @@
 * :func:`role_of` - the role from the texture name (``data/style/roles.json``);
 * :func:`vanilla` - per-role distributions of the vanilla textures (a deterministic sample of the own
   textures of each role, decoded once and cached next to the style cache);
-* :func:`judge_texture` - one texture against its role: verdict rows with the fence of :mod:`satk.style.profile`.
+* :func:`judge_texture` - one texture against its role: verdict rows with the fence of :mod:`satk.style.profile`;
+* :func:`look_advice` - the look against the role: ``flat/CG-clean`` (no fine tonal variation, dead-flat patches)
+  and ``too sharp`` (crisp marks on a flat ground), advice only.
 
 Photo-like vanilla textures have hundreds of colours, low saturation and real high-frequency detail;
-vector art (a few flat colours) and bright interiors behind tinted glass fall out of band.
+vector art (a few flat colours) and bright interiors behind tinted glass fall out of band. Within a region a photo
+varies softly everywhere (light, tone, a little hue); a clean CG fill is dead flat between crisp painted marks.
 """
 
 from __future__ import annotations
 
 import functools
 import json
+import math
 import os
 import re
 from pathlib import Path
@@ -23,8 +27,11 @@ from ..core.errors import SatkError
 from . import classes as C
 from .profile import fence, judge
 
-__all__ = ["texture_stats", "role_of", "roles", "vanilla", "judge_texture", "judge_metric", "verdict_of",
-           "load_images", "loo"]
+__all__ = ["texture_stats", "role_of", "role_for", "roles", "vanilla", "judge_texture", "judge_metric",
+           "verdict_of", "load_images", "loo", "look_stats", "look_advice", "LOOK_METRICS"]
+
+#: The look metrics (:func:`look_stats`): reported by ``style.texture --full`` and judged by :func:`look_advice`.
+LOOK_METRICS = ("tex.tone_lo", "tex.tone_mid", "tex.chroma_lo", "tex.flat_share", "tex.crisp")
 
 _lock_cache: dict[str, dict] = {}
 
@@ -40,6 +47,37 @@ def role_of(name: str) -> str:
         if r["match"] and re.search(r["match"], n):
             return role
     return "generic"
+
+
+#: Roles a family's textures may take from their names, and the class default when the name says nothing.
+_FAMILY_ROLES = {"vehicle": ("interior", "wheel", "decal", "body"), "map": ("wall", "ground", "prop"),
+                 "upgrade": ("wheel", "decal", "body"), "ped": ("ped",), "weapon": ("weapon",)}
+_CLASS_ROLE = {"building": "wall", "interior_shell": "wall", "terrain": "ground", "seabed": "ground",
+               "vegetation": "generic", "lod": "generic", "overlay": "generic"}
+
+
+def role_for(name: str, cls: str | None) -> str:
+    """The role of a texture of a model of class ``cls``: the name decides within the roles of the model's family
+    (``ls_bin_paint`` of a prop is a prop texture, not car paint), else the class default (vehicles: body;
+    buildings: wall; terrain: ground; other map models: prop; peds; weapons)."""
+    r = role_of(name)
+    if not cls:
+        return r
+    try:
+        base = C.split_peer(cls)[0]
+        fam = C.family(base)
+    except (KeyError, SatkError):
+        return r
+    allowed = _FAMILY_ROLES.get(fam)
+    if allowed is None:
+        return r
+    if r in allowed:
+        return r
+    if fam == "vehicle":
+        return "body"
+    if fam == "map":
+        return _CLASS_ROLE.get(base, "prop")
+    return allowed[0]
 
 
 def texture_stats(rgba: bytes, w: int, h: int) -> dict:
@@ -68,6 +106,130 @@ def texture_stats(rgba: bytes, w: int, h: int) -> dict:
     if h >= 3 and w >= 3:
         lap = (4 * luma[1:-1, 1:-1] - luma[:-2, 1:-1] - luma[2:, 1:-1] - luma[1:-1, :-2] - luma[1:-1, 2:])
         out["tex.hf_energy"] = round(float(np.abs(lap).mean()), 3)
+    if h >= 8 and w >= 8:
+        out.update(look_stats(np, rgb, luma, vis))
+    return out
+
+
+# ----------------------------------------------------------------------------- the look (photo-like or CG-clean)
+#: Scales of the look metrics, as fractions of the shorter side: fine = 1/64 (about 2 px at 128), coarse = 1/8.
+LOOK_FINE, LOOK_COARSE = 1.0 / 64.0, 1.0 / 8.0
+#: A pixel is in a dead-flat patch when its 5x5 window spans at most this many luma levels.
+FLAT_LEVELS = 2.0
+#: Strong edges (the marks of the "crisp" ratio) span at least this many luma levels in their 5x5 window ...
+EDGE_LEVELS = 24.0
+#: ... and the ratio needs at least this many edge pixels.
+EDGE_MIN = 20
+
+
+def _box(np, a, r: int, axis: int):
+    """Box filter of radius ``r`` along ``axis`` (wrap-around, textures tile)."""
+    if r <= 0:
+        return a
+    n = a.shape[axis]
+    pad = [(0, 0)] * a.ndim
+    pad[axis] = (r + 1, r)
+    c = np.cumsum(np.pad(a, pad, mode="wrap"), axis=axis)
+    hi = np.take(c, np.arange(2 * r + 1, 2 * r + 1 + n), axis=axis)
+    lo = np.take(c, np.arange(0, n), axis=axis)
+    return (hi - lo) / (2 * r + 1)
+
+
+def gauss(np, a, sigma: float):
+    """Approximate Gaussian blur of a 2-D array (three box passes per axis, wrap-around)."""
+    if sigma <= 0:
+        return a
+    r = max(1, int(round((math.sqrt(4.0 * sigma * sigma + 1.0) - 1.0) / 2.0)))
+    for axis in (0, 1):
+        for _ in range(3):
+            a = _box(np, a, r, axis)
+    return a
+
+
+def _win5(np, a, fn):
+    """5x5 max or min filter (wrap-around): separable shifts."""
+    out = a
+    for axis in (0, 1):
+        s = out
+        for k in (-2, -1, 1, 2):
+            s = fn(s, np.roll(out, k, axis=axis))
+        out = s
+    return out
+
+
+def look_stats(np, rgb, luma, vis) -> dict:
+    """The look metrics of an image (``tex.tone_lo``, ``tex.tone_mid``, ``tex.chroma_lo``, ``tex.flat_share``,
+    ``tex.crisp``): photo-like textures vary softly everywhere; CG-clean ones are dead flat between crisp marks.
+
+    * ``tex.tone_lo``   - median |luma blurred at 1/64 - luma blurred at 1/8 of the side|: soft tonal drift and
+      light gradients inside regions (a flat fill is 0 away from its edges);
+    * ``tex.tone_mid``  - median |luma - luma blurred at 1/64|: fine tonal variation (the grain and texture of a
+      photo); the median ignores the few pixels on painted marks;
+    * ``tex.chroma_lo`` - median of the largest channel of the same band as ``tone_lo`` on the colour minus luma:
+      slight hue and saturation drift;
+    * ``tex.flat_share`` - share of pixels whose 5x5 window spans at most 2 luma levels (dead-flat patches);
+    * ``tex.crisp``     - median 5x5 contrast at strong edges / max(``tone_mid``, 0.5): crisp marks on a flat
+      ground score high (omitted with fewer than 20 edge pixels)."""
+    side = min(luma.shape)
+    s1, s2 = max(1.0, side * LOOK_FINE), max(2.0, side * LOOK_COARSE)
+    l1 = gauss(np, luma, s1)
+    out = {"tex.tone_lo": round(float(np.median(np.abs(l1 - gauss(np, luma, s2))[vis])), 3),
+           "tex.tone_mid": round(float(np.median(np.abs(luma - l1)[vis])), 3)}
+    ch = rgb - luma[..., None]
+    band = np.stack([gauss(np, ch[..., k], s1) - gauss(np, ch[..., k], s2) for k in range(3)], axis=-1)
+    out["tex.chroma_lo"] = round(float(np.median(np.abs(band).max(axis=-1)[vis])), 3)
+    rng = _win5(np, luma, np.maximum) - _win5(np, luma, np.minimum)
+    out["tex.flat_share"] = round(float((rng[vis] <= FLAT_LEVELS).mean()), 4)
+    d = np.maximum(np.abs(np.roll(luma, -1, axis=1) - luma), np.abs(np.roll(luma, -1, axis=0) - luma))
+    edge = (d >= _win5(np, d, np.maximum) - 1e-9) & (rng >= EDGE_LEVELS) & vis
+    if int(edge.sum()) >= EDGE_MIN:
+        out["tex.crisp"] = round(float(np.median(rng[edge])) / max(out["tex.tone_mid"], 0.5), 2)
+    return out
+
+
+def _pct(values: list, q: float) -> float | None:
+    import numpy as np
+
+    v = [float(x) for x in values if x is not None]
+    return float(np.percentile(np.asarray(v), q)) if v else None
+
+
+def look_advice(stats: dict, dist: dict, role: str) -> list[dict]:
+    """Advice on the look of one texture against the vanilla textures of ``role`` (``data/style/roles.json``
+    ``look``): ``flat/CG-clean`` (fine tonal variation below the role's low percentile, or a large share of
+    dead-flat patches) and ``too sharp`` (crisp marks far above the role's variation). Each item is ``{"look",
+    "why", "fix", "metrics"}``; empty when the texture reads photo-like. Advice only: it never fails a check."""
+    rr = dist.get("roles") or {}
+    used = role if rr.get(role, {}).get("n", 0) >= int(roles()["min_samples"]) else "generic"
+    vals = (rr.get(used) or {}).get("values") or {}
+    cfg = roles().get("look") or {}
+    out: list[dict] = []
+    tm, fs = stats.get("tex.tone_mid"), stats.get("tex.flat_share")
+    tm_lo = _pct(vals.get("tex.tone_mid", []), float(cfg.get("tone_mid_pct", 5)))
+    fs_hi = _pct(vals.get("tex.flat_share", []), float(cfg.get("flat_share_pct", 95)))
+    p50 = _pct(vals.get("tex.tone_mid", []), 50.0)
+    why, which = [], []
+    if tm is not None and tm_lo is not None and tm < tm_lo:
+        why.append(f"fine tonal variation {tm:g} levels (vanilla {used} p{cfg.get('tone_mid_pct', 5)} {tm_lo:.2f}, "
+                   f"p50 {p50:.2f})")
+        which.append("tex.tone_mid")
+    if fs is not None and fs_hi is not None and fs > fs_hi and fs >= float(cfg.get("flat_share_min", 0.2)):
+        why.append(f"{fs:.0%} of the pixels in dead-flat patches (vanilla {used} p{cfg.get('flat_share_pct', 95)} "
+                   f"{fs_hi:.0%})")
+        which.append("tex.flat_share")
+    if why:
+        out.append({"look": "flat/CG-clean", "why": "; ".join(why), "metrics": which,
+                    "fix": "add the quiet variation of a photo, not dirt: soft low-frequency tonal drift, a slight hue "
+                           "drift and a soft light gradient (texture.finish --photo 0.6 on the 4x paint), then look at "
+                           "it after DXT1 at native size"})
+    cr = stats.get("tex.crisp")
+    cr_hi = _pct(vals.get("tex.crisp", []), float(cfg.get("crisp_pct", 95)))
+    if cr is not None and cr_hi is not None and cr > cr_hi:
+        out.append({"look": "too sharp", "metrics": ["tex.crisp"],
+                    "why": f"marks {cr:g}x the variation around them (vanilla {used} p{cfg.get('crisp_pct', 95)} "
+                           f"{cr_hi:.1f})",
+                    "fix": "soften the painted marks (paint at 4x, texture.finish --soft 1) and put tonal variation "
+                           "under them, so lines read like a downscaled photo, not vector art"})
     return out
 
 
@@ -259,7 +421,9 @@ def verdict_of(rows: list[list]) -> str:
 
 
 def judge_texture(name: str, stats: dict, dist: dict, role: str) -> dict:
-    """``{"texture", "role", "used_role", "verdict", "rows": [[metric, value, p10, p50, p90, verdict]]}``."""
+    """``{"texture", "role", "used_role", "verdict", "rows": [[metric, value, p10, p50, p90, verdict]], "look":
+    [advice], "look_rows": [[metric, value, p10, p50, p90, verdict]]}`` (the verdict comes from the band metrics;
+    the look is advice, :func:`look_advice`)."""
     rr = dist["roles"]
     used = role if rr.get(role, {}).get("n", 0) >= int(roles()["min_samples"]) else "generic"
     peer = rr.get(used, {}).get("metrics", {})
@@ -269,8 +433,15 @@ def judge_texture(name: str, stats: dict, dist: dict, role: str) -> dict:
             continue
         s = peer[m]
         rows.append([m, stats[m], s[0], s[1], s[2], judge_metric(m, stats[m], s)])
+    look = look_advice(stats, dist, role)
+    flagged = {m for a in look for m in a.get("metrics", ())}
+    look_rows = []                      # advice, never a band verdict: "advice" on the metrics behind an advice
+    for m in LOOK_METRICS:
+        if m in stats and m in peer:
+            s = peer[m]
+            look_rows.append([m, stats[m], s[0], s[1], s[2], "advice" if m in flagged else "ok"])
     return {"texture": name, "role": role, "used_role": used, "size": f"{stats['w']}x{stats['h']}",
-            "verdict": verdict_of(rows), "rows": rows}
+            "verdict": verdict_of(rows), "rows": rows, "look": look, "look_rows": look_rows}
 
 
 def loo(dist: dict) -> dict:

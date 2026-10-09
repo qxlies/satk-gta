@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sae-obs-record.schema.json",
+  "title": "sa-engine observability: one JSONL record (sae-obs/1)",
+  "description": "A line of a sae-obs/1 JSONL stream, or a record inside an OBSJ chunk of a .saenet/.saerec container. The member 'rec' selects the kind. Producers may add members (additive minor versions); a reader ignores members it does not know unless it runs in strict mode.",
+  "type": "object",
+  "required": ["rec"],
+  "properties": {
+    "rec": {"enum": ["hdr", "frame", "tick", "stats", "event", "net", "input", "seed", "snap", "end"]}
+  },
+  "allOf": [
+    {"if": {"required": ["rec"], "properties": {"rec": {"const": "hdr"}}}, "then": {"$ref": "#/$defs/hdr"}},
+    {"if": {"required": ["rec"], "properties": {"rec": {"const": "frame"}}}, "then": {"$ref": "#/$defs/frame"}},
+    {"if": {"required": ["rec"], "properties": {"rec": {"const": "tick"}}}, "then": {"$ref": "#/$defs/tick"}},
+    {"if": {"required": ["rec"], "properties": {"rec": {"const": "stats"}}}, "then": {"$ref": "#/$defs/stats"}},
+    {"if": {"required": ["rec"], "properties": {"rec": {"const": "event"}}}, "then": {"$ref": "#/$defs/event"}},
+    {"if": {"required": ["rec"], "properties": {"rec": {"const": "net"}}}, "then": {"$ref": "#/$defs/net"}},
+    {"if": {"required": ["rec"], "properties": {"rec": {"const": "input"}}}, "then": {"$ref": "#/$defs/input"}},
+    {"if": {"required": ["rec"], "properties": {"rec": {"const": "seed"}}}, "then": {"$ref": "#/$defs/seed"}},
+    {"if": {"required": ["rec"], "properties": {"rec": {"const": "snap"}}}, "then": {"$ref": "#/$defs/snap"}},
+    {"if": {"required": ["rec"], "properties": {"rec": {"const": "end"}}}, "then": {"$ref": "#/$defs/end"}}
+  ],
+  "$defs": {
+    "hdr": {
+      "type": "object",
+      "description": "The stream header: the first line of a JSONL stream and the payload of the META chunk. It carries no key.",
+      "required": ["rec", "schema", "role", "node", "clock"],
+      "properties": {
+        "rec": {"const": "hdr"},
+        "schema": {"type": "string", "pattern": "^sae-obs/[1-9][0-9]*$", "description": "Family and major version."},
+        "minor": {"type": "integer", "minimum": 0, "description": "Minor version of the specification the producer wrote against (default 0)."},
+        "role": {"enum": ["client", "server", "bot", "tool"]},
+        "node": {"$ref": "sae-obs-common.schema.json#/$defs/node"},
+        "session": {"type": "string", "pattern": "^[0-9a-f]{8,32}$", "description": "Session id shared by the files of one session (lower-case hex)."},
+        "clock": {
+          "type": "object",
+          "required": ["dt_s_us"],
+          "properties": {
+            "dt_s_us": {"$ref": "sae-obs-common.schema.json#/$defs/u32", "description": "Server tick period in microseconds; 0 = no tick grid."},
+            "sub_n": {"type": "integer", "minimum": 1, "maximum": 16, "description": "Client sub-ticks per server tick in fixed mode (dt_c = dt_s / n)."},
+            "domain": {"enum": ["server", "local"]}
+          }
+        },
+        "sim": {"enum": ["classic", "fixed"], "description": "Simulation mode of the client."},
+        "pulse": {"enum": ["standard", "alt"], "description": "Network pulse order of the client."},
+        "fences": {"type": "array", "items": {"$ref": "sae-obs-common.schema.json#/$defs/fence"}, "uniqueItems": true},
+        "engine": {
+          "type": "object",
+          "properties": {
+            "build": {"type": "string", "maxLength": 128},
+            "commit": {"type": "string", "pattern": "^[0-9a-f]{7,40}$"},
+            "arch": {"enum": ["x86", "x64"]},
+            "preset": {"type": "string", "maxLength": 64},
+            "profile": {"type": "string", "maxLength": 64}
+          }
+        },
+        "producer": {
+          "type": "object",
+          "properties": {"name": {"type": "string", "maxLength": 64}, "version": {"type": "string", "maxLength": 64}}
+        },
+        "started": {"type": "string", "description": "Wall-clock anchor (ISO 8601, UTC) of the first record; informational."},
+        "merged": {"type": "boolean", "description": "True in a stream made by obs.merge: records carry 'node'."}
+      }
+    },
+    "frame": {
+      "description": "One rendered frame, written at F7 (frame end).",
+      "allOf": [{"$ref": "sae-obs-common.schema.json#/$defs/key"}, {"$ref": "sae-obs-common.schema.json#/$defs/key_required"}],
+      "type": "object",
+      "required": ["rec", "frame_ms", "ticks"],
+      "properties": {
+        "rec": {"const": "frame"},
+        "node": {"$ref": "sae-obs-common.schema.json#/$defs/node"},
+        "frame_ms": {"$ref": "sae-obs-common.schema.json#/$defs/ms", "description": "Interval between this frame's F0 and the previous frame's F0 (what onClientPreRender's timeSlice measures)."},
+        "work_ms": {"$ref": "sae-obs-common.schema.json#/$defs/ms", "description": "CPU time from F0 to F7, limiter wait excluded."},
+        "ticks": {"type": "integer", "minimum": 0, "maximum": 64, "description": "Simulation ticks run in this frame (classic: 1 for a simulated frame, 0 for a frame without simulation)."},
+        "dropped_ms": {"$ref": "sae-obs-common.schema.json#/$defs/ms", "description": "Simulated time dropped by the spiral-of-death guard in this frame."},
+        "fence_ms": {"$ref": "sae-obs-common.schema.json#/$defs/fence_ms"},
+        "gpu_ms": {"$ref": "sae-obs-common.schema.json#/$defs/ms_map", "description": "GPU time per pass (resolved with a delay of two frames)."},
+        "va_owner_mib": {"$ref": "sae-obs-common.schema.json#/$defs/mib_map", "description": "Address space per budget owner."},
+        "stream": {"$ref": "sae-obs-common.schema.json#/$defs/stream"},
+        "ctr": {"$ref": "sae-obs-common.schema.json#/$defs/number_map", "description": "Counters: cumulative since the start of the stream, never decreasing."},
+        "gauge": {"$ref": "sae-obs-common.schema.json#/$defs/number_map", "description": "Gauges: the level at this frame."},
+        "sim": {"enum": ["classic", "fixed"]},
+        "pulse": {"enum": ["standard", "alt"]},
+        "flags": {"type": "array", "uniqueItems": true,
+                  "items": {"enum": ["minimized", "skipped_render", "loading", "front_end", "cutscene", "rebase"]}}
+      }
+    },
+    "tick": {
+      "description": "One simulation tick of the fixed mode, written after the tick part (F2 post). In classic mode there are no tick records.",
+      "allOf": [{"$ref": "sae-obs-common.schema.json#/$defs/key"}, {"$ref": "sae-obs-common.schema.json#/$defs/key_required"}],
+      "type": "object",
+      "required": ["rec", "tick_ms", "dt_us"],
+      "properties": {
+        "rec": {"const": "tick"},
+        "node": {"$ref": "sae-obs-common.schema.json#/$defs/node"},
+        "tick_ms": {"$ref": "sae-obs-common.schema.json#/$defs/ms", "description": "CPU time of the tick part."},
+        "dt_us": {"type": "integer", "minimum": 1, "description": "Simulated step of the tick in microseconds (dt_c)."},
+        "fence_ms": {"$ref": "sae-obs-common.schema.json#/$defs/fence_ms"},
+        "ctr": {"$ref": "sae-obs-common.schema.json#/$defs/number_map"},
+        "gauge": {"$ref": "sae-obs-common.schema.json#/$defs/number_map"}
+      }
+    },
+    "stats": {
+      "description": "A windowed statistics record, about once a second (the v1 getEngineStats numbers, extended).",
+      "allOf": [{"$ref": "sae-obs-common.schema.json#/$defs/key"}, {"$ref": "sae-obs-common.schema.json#/$defs/key_required"},
+                {"$ref": "sae-obs-common.schema.json#/$defs/snapshot"}],
+      "type": "object",
+      "required": ["rec", "frames"],
+      "properties": {
+        "rec": {"const": "stats"},
+        "node": {"$ref": "sae-obs-common.schema.json#/$defs/node"},
+        "frames": {"$ref": "sae-obs-common.schema.json#/$defs/frame_stats", "description": "Frame statistics over the last window (the engine keeps the last 1024 frames)."},
+        "ticks": {"$ref": "sae-obs-common.schema.json#/$defs/ms_stats", "description": "Tick part durations over the same window (fixed mode)."},
+        "fences": {"$ref": "sae-obs-common.schema.json#/$defs/ms_stats_map", "description": "Per-fence duration statistics over the window."}
+      }
+    },
+    "event": {
+      "description": "A discrete event: a clock rebase, a mode switch, a guard transition.",
+      "allOf": [{"$ref": "sae-obs-common.schema.json#/$defs/key"}, {"$ref": "sae-obs-common.schema.json#/$defs/key_required"}],
+      "type": "object",
+      "required": ["rec", "name"],
+      "properties": {
+        "rec": {"const": "event"},
+        "node": {"$ref": "sae-obs-common.schema.json#/$defs/node"},
+        "name": {"$ref": "sae-obs-common.schema.json#/$defs/name"},
+        "level": {"enum": ["info", "warn", "error"]},
+        "data": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "net": {
+      "description": "A transport row. The row identity is (element_id, packet_id, subtype). The payload layout belongs to the network trace package and extends this record additively.",
+      "allOf": [{"$ref": "sae-obs-common.schema.json#/$defs/key"}, {"$ref": "sae-obs-common.schema.json#/$defs/key_required"}],
+      "type": "object",
+      "required": ["rec", "dir", "element_id", "packet_id", "bytes"],
+      "properties": {
+        "rec": {"const": "net"},
+        "node": {"$ref": "sae-obs-common.schema.json#/$defs/node"},
+        "dir": {"enum": ["tx", "rx"]},
+        "peer": {"type": ["string", "integer"], "description": "The remote node or connection."},
+        "element_id": {"$ref": "sae-obs-common.schema.json#/$defs/u32", "description": "4294967295 = no element."},
+        "packet_id": {"type": "integer", "minimum": 0, "maximum": 65535},
+        "subtype": {"type": "integer", "minimum": 0, "maximum": 65535, "description": "Absent when the packet has no subtype."},
+        "bytes": {"type": "integer", "minimum": 0, "description": "Wire size."},
+        "lane": {"type": "integer", "minimum": 0, "maximum": 255},
+        "seq": {"type": "integer", "minimum": 0}
+      }
+    },
+    "input": {
+      "description": "A recorded input for replay (pad, keyboard, mouse, script, bot, console). The replay package refines the payload additively.",
+      "allOf": [{"$ref": "sae-obs-common.schema.json#/$defs/key"}, {"$ref": "sae-obs-common.schema.json#/$defs/key_required"}],
+      "type": "object",
+      "required": ["rec", "src", "name"],
+      "properties": {
+        "rec": {"const": "input"},
+        "node": {"$ref": "sae-obs-common.schema.json#/$defs/node"},
+        "src": {"enum": ["pad", "keyboard", "mouse", "script", "bot", "console"]},
+        "name": {"type": "string", "minLength": 1, "maxLength": 96},
+        "value": {"type": ["number", "string", "boolean", "array", "null"]},
+        "data": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "seed": {
+      "description": "A random seed or a deterministic-mode parameter of the session.",
+      "allOf": [{"$ref": "sae-obs-common.schema.json#/$defs/key"}, {"$ref": "sae-obs-common.schema.json#/$defs/key_required"}],
+      "type": "object",
+      "required": ["rec", "name", "value"],
+      "properties": {
+        "rec": {"const": "seed"},
+        "node": {"$ref": "sae-obs-common.schema.json#/$defs/node"},
+        "name": {"$ref": "sae-obs-common.schema.json#/$defs/name"},
+        "value": {"type": ["integer", "string"]}
+      }
+    },
+    "snap": {
+      "description": "A snap event: a position or state correction of an entity (a remote player, a vehicle).",
+      "allOf": [{"$ref": "sae-obs-common.schema.json#/$defs/key"}, {"$ref": "sae-obs-common.schema.json#/$defs/key_required"}],
+      "type": "object",
+      "required": ["rec", "entity", "kind"],
+      "properties": {
+        "rec": {"const": "snap"},
+        "node": {"$ref": "sae-obs-common.schema.json#/$defs/node"},
+        "entity": {"$ref": "sae-obs-common.schema.json#/$defs/u32", "description": "Element id."},
+        "kind": {"$ref": "sae-obs-common.schema.json#/$defs/name"},
+        "err_m": {"type": "number", "minimum": 0, "description": "Size of the correction in metres."},
+        "data": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "end": {
+      "description": "The footer of a stream: its key is the key of the last record; 'counts' are the number of records written per kind (hdr and end excluded).",
+      "allOf": [{"$ref": "sae-obs-common.schema.json#/$defs/key"}, {"$ref": "sae-obs-common.schema.json#/$defs/key_required"}],
+      "type": "object",
+      "required": ["rec", "counts"],
+      "properties": {
+        "rec": {"const": "end"},
+        "node": {"$ref": "sae-obs-common.schema.json#/$defs/node"},
+        "counts": {
+          "type": "object",
+          "propertyNames": {"enum": ["frame", "tick", "stats", "event", "net", "input", "seed", "snap"]},
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        },
+        "dropped_records": {"type": "integer", "minimum": 0, "description": "Records the producer dropped because its ring was full."},
+        "clean": {"type": "boolean", "description": "False when the producer stopped abnormally."}
+      }
+    }
+  }
+}

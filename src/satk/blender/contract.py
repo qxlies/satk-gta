@@ -47,7 +47,8 @@ Commands and arguments (defaults in :data:`ARG_DEFAULTS`):
 * ``export {blend, objects, target, out, name}`` - DFF/TXD/COL (+ MTA resource or modloader files);
 * ``game_ready {src, objects, name, budget, height, scale, origin, uv, bake, tex_size, prelight, col,
   surface, lod, draw, out, render, save}`` - any mesh (``.blend``/``.obj``/``.glb``/``.fbx``...) made
-  game-ready: decimated to a triangle budget, UV, day/night prelight, COL, LOD; DFF + COL (+ LOD DFF)
+  game-ready: the mesh kept (an explicit budget reduces it; the engine cap of 65,535 vertices per geometry always
+  holds), UV, day/night prelight, COL, LOD; DFF + COL (+ LOD DFF)
   and PNG textures into ``out`` (added in M2-08; the TXD is packed on the satk side);
 * ``preview {spec, save}`` - SA-look preview cells of model plans or a map context
   (``satk_blender.look.preview``; the spec is built by ``satk.look.ops``, added in wave A1).
@@ -100,8 +101,9 @@ GR_COL = ("hull", "box", "mesh", "none")
 GR_TEX_SIZES = (16, 32, 64, 128, 256, 512, 1024)
 #: Model names: a COL model name holds 21 characters + NUL (``ColHelpers.h``, report 22 §3.4).
 GR_NAME_RE = re.compile(r"[a-z0-9_]{1,21}")
-#: Default HD triangle budget: p90 of the vanilla map models (report 22 §3.1: p50 216, p90 1 040).
-GR_BUDGET = 1040
+#: Default HD triangle reduction: none (0). Triangle counts are never a target; game-ready keeps the mesh and
+#: only enforces the engine cap of 65,535 vertices per geometry (an explicit ``budget`` still reduces).
+GR_BUDGET = 0
 #: Highest surface type (``eSurfaceType``: SURFACE_RAILTRACK = 178).
 GR_MAX_SURFACE = 178
 
@@ -405,9 +407,9 @@ def _game_ready_args(a: dict) -> None:
         a["name"] = str(a["name"]).strip().lower()
         if not GR_NAME_RE.fullmatch(a["name"]):
             raise ContractError("name: 1-21 characters a-z 0-9 _ (the COL model name holds 21 characters)")
-    a["budget"] = int(_num(a["budget"], "budget"))
-    if not 12 <= a["budget"] <= 60000:
-        raise ContractError("budget must be in 12..60000 triangles")
+    a["budget"] = int(_num(a["budget"] or 0, "budget"))
+    if a["budget"] and not 12 <= a["budget"] <= 60000:
+        raise ContractError("budget must be 0 (keep every triangle) or 12..60000 triangles")
     if a["height"] is not None:
         a["height"] = _num(a["height"], "height")
         if not 0 < a["height"] <= 500:

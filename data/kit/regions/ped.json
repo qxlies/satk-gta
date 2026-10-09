@@ -1,0 +1,92 @@
+{
+ "kind": "ped",
+ "version": 1,
+ "summary": "Close-up review regions of a ped skin (standing).",
+ "leak": {
+  "cull": true,
+  "gap": false,
+  "inside": false,
+  "see_through_block": true,
+  "floor_exclude": [],
+  "floor_pct": 0.5,
+  "slit": false
+ },
+ "regions": [
+  {
+   "name": "front",
+   "summary": "front",
+   "cameras": [
+    {
+     "az": 0,
+     "el": 5
+    }
+   ]
+  },
+  {
+   "name": "back",
+   "summary": "back",
+   "cameras": [
+    {
+     "az": 180,
+     "el": 5
+    }
+   ]
+  },
+  {
+   "name": "left",
+   "summary": "left side",
+   "cameras": [
+    {
+     "az": -90,
+     "el": 5
+    }
+   ]
+  },
+  {
+   "name": "right",
+   "summary": "right side",
+   "cameras": [
+    {
+     "az": 90,
+     "el": 5
+    }
+   ]
+  },
+  {
+   "name": "face",
+   "summary": "head and face: hair line, ears, neck seam",
+   "box": {
+    "z": [
+     0.84,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 0,
+     "el": 5
+    },
+    {
+     "az": 45,
+     "el": 8
+    }
+   ]
+  },
+  {
+   "name": "feet",
+   "summary": "shoes and trouser ends",
+   "box": {
+    "z": [
+     0.0,
+     0.14
+    ]
+   },
+   "cameras": [
+    {
+     "az": 30,
+     "el": 25
+    }
+   ]
+  }
+ ]
+}

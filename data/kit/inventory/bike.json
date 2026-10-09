@@ -1,0 +1,396 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "bike",
+ "summary": "motorbike or scooter: frame, tank, seat and body panels on a fork and a swingarm, two wheel models; the steering axis runs through the headset and the rider's seat and grips match the anim group.",
+ "regions": {
+  "overall": {
+   "summary": "the whole bike, side and 3/4 views",
+   "views": []
+  },
+  "front": {
+   "summary": "headlamp, fork, front mudguard, fairing nose",
+   "views": [
+    "front"
+   ]
+  },
+  "rear": {
+   "summary": "tail, tail lamp, plate, rear mudguard",
+   "views": [
+    "rear"
+   ]
+  },
+  "sides": {
+   "summary": "frame, tank, side panels, footpegs, stand",
+   "views": [
+    "left",
+    "right"
+   ]
+  },
+  "wheels": {
+   "summary": "both wheels, brakes, fork lowers, swingarm end",
+   "views": [
+    "wheels"
+   ]
+  },
+  "cockpit": {
+   "summary": "handlebars, grips, mirrors, instruments",
+   "views": [
+    "cockpit"
+   ]
+  },
+  "engine": {
+   "summary": "engine, exhaust, radiator",
+   "views": [
+    "engine"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "frame",
+   "name": "Frame",
+   "region": "sides",
+   "category": "structure",
+   "construction": "spars or tubes swept from the headstock to the swingarm pivot (scooter: the step-through backbone)",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "chassis"
+  },
+  {
+   "key": "bodywork",
+   "name": "Bodywork (fairing, side panels or leg shield)",
+   "region": "overall",
+   "category": "shell",
+   "construction": "lofted soft panels welded into one body around the frame; scooter: leg shield and rear body",
+   "attaches_to": "frame",
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "fuel_tank",
+   "name": "Fuel tank",
+   "region": "sides",
+   "category": "shell",
+   "construction": "lofted tank on the frame top with knee recesses (scooter: under the seat, waive)",
+   "attaches_to": "frame",
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "wheel_front",
+   "name": "Front wheel",
+   "region": "wheels",
+   "category": "wheel",
+   "construction": "mesh.lathe tyre, rim and hub",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "wheel_front"
+  },
+  {
+   "key": "wheel_rear",
+   "name": "Rear wheel",
+   "region": "wheels",
+   "category": "wheel",
+   "construction": "mesh.lathe tyre, rim and hub",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "wheel_rear"
+  },
+  {
+   "key": "forks_front",
+   "name": "Front fork",
+   "region": "front",
+   "category": "running_gear",
+   "construction": "fork legs and triple clamps; the steering axis passes through the headset inside the body",
+   "attaches_to": "frame",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "forks_front"
+  },
+  {
+   "key": "swingarm",
+   "name": "Swingarm",
+   "region": "rear",
+   "category": "running_gear",
+   "construction": "arm from the pivot to the rear axle",
+   "attaches_to": "frame",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "forks_rear"
+  },
+  {
+   "key": "handlebars",
+   "name": "Handlebars with grips and levers",
+   "region": "cockpit",
+   "category": "control",
+   "construction": "bar on the top clamp, grips at the rider's hands (bargrip), brake and clutch levers",
+   "attaches_to": "forks_front",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "handlebars"
+  },
+  {
+   "key": "seat",
+   "name": "Seat",
+   "region": "sides",
+   "category": "interior",
+   "construction": "soft lofted seat at the rider pose height",
+   "attaches_to": "frame",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "engine",
+   "name": "Engine",
+   "region": "engine",
+   "category": "engine",
+   "construction": "cylinders, head, cases and covers in the frame",
+   "attaches_to": "frame",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "engine"
+  },
+  {
+   "key": "mudguards",
+   "name": "Mudguards",
+   "region": "wheels",
+   "category": "shell",
+   "construction": "front guard on the fork, rear hugger or tail guard",
+   "attaches_to": [
+    "forks_front",
+    "bodywork",
+    "frame"
+   ],
+   "stage": "G2",
+   "detail": "simple",
+   "count": 2,
+   "frame": "mudguard"
+  },
+  {
+   "key": "exhaust",
+   "name": "Exhaust",
+   "region": "engine",
+   "category": "engine",
+   "construction": "header pipe swept to a muffler at the exhaust dummy",
+   "attaches_to": [
+    "engine",
+    "frame"
+   ],
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "headlamp",
+   "name": "Headlamp",
+   "region": "front",
+   "category": "lamp",
+   "construction": "lens in a bowl or set into the fairing",
+   "attaches_to": [
+    "bodywork",
+    "forks_front"
+   ],
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "tail_lamp",
+   "name": "Tail lamp",
+   "region": "rear",
+   "category": "lamp",
+   "construction": "lens set into the tail",
+   "attaches_to": "bodywork",
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "footpegs",
+   "name": "Footpegs",
+   "region": "sides",
+   "category": "structure",
+   "construction": "pegs or boards at the rider's feet",
+   "attaches_to": "frame",
+   "stage": "G3",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "number_plate",
+   "name": "Number plate",
+   "region": "rear",
+   "category": "sign",
+   "construction": "plate card on a hanger under the tail",
+   "attaches_to": [
+    "bodywork",
+    "mudguards"
+   ],
+   "stage": "G3",
+   "detail": "simple",
+   "frame": "plate_rear"
+  },
+  {
+   "key": "rear_shock",
+   "name": "Rear shock",
+   "region": "rear",
+   "category": "running_gear",
+   "construction": "coil-over from the frame to the swingarm",
+   "attaches_to": [
+    "frame",
+    "swingarm"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "final_drive",
+   "name": "Chain and sprockets (or belt or shaft)",
+   "region": "rear",
+   "category": "running_gear",
+   "construction": "chain band from the gearbox sprocket to the rear sprocket with a guard",
+   "attaches_to": [
+    "engine",
+    "swingarm"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "mirrors",
+   "name": "Mirrors",
+   "region": "cockpit",
+   "category": "trim",
+   "construction": "heads on stalks from the bar or the fairing",
+   "attaches_to": [
+    "handlebars",
+    "bodywork"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "count": 2
+  },
+  {
+   "key": "instruments",
+   "name": "Instruments",
+   "region": "cockpit",
+   "category": "control",
+   "construction": "speedo and tacho pods behind the bar",
+   "attaches_to": [
+    "handlebars",
+    "bodywork"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "indicators",
+   "name": "Indicators",
+   "region": "front",
+   "category": "lamp",
+   "construction": "small amber lenses on stalks front and rear",
+   "attaches_to": "bodywork",
+   "stage": "G3",
+   "detail": "standard",
+   "count": 2
+  },
+  {
+   "key": "kickstand",
+   "name": "Side stand",
+   "region": "sides",
+   "category": "structure",
+   "construction": "stand folded under the left footpeg",
+   "attaches_to": "frame",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "radiator",
+   "name": "Radiator or cooling fins",
+   "region": "engine",
+   "category": "engine",
+   "construction": "radiator between the frame spars, or fins on an air-cooled cylinder",
+   "attaches_to": [
+    "frame",
+    "engine"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "brake_discs",
+   "name": "Brake discs and calipers",
+   "region": "wheels",
+   "category": "running_gear",
+   "construction": "lathe discs on the hubs with calipers on the fork leg and the swingarm",
+   "attaches_to": [
+    "wheel_front",
+    "wheel_rear"
+   ],
+   "stage": "G3",
+   "detail": "hero",
+   "count": 2
+  },
+  {
+   "key": "cables_hoses",
+   "name": "Cables and hoses",
+   "region": "cockpit",
+   "category": "engine",
+   "construction": "brake lines and throttle and clutch cables swept from the bar to the fork and the frame",
+   "attaches_to": [
+    "handlebars",
+    "frame"
+   ],
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "airbox_battery",
+   "name": "Airbox and battery box",
+   "region": "sides",
+   "category": "engine",
+   "construction": "soft boxes under the seat",
+   "attaches_to": "frame",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "controls_feet",
+   "name": "Brake and gear pedals",
+   "region": "sides",
+   "category": "control",
+   "construction": "levers ahead of the footpegs",
+   "attaches_to": "footpegs",
+   "stage": "G3",
+   "detail": "hero",
+   "count": 2
+  },
+  {
+   "key": "chain_guard",
+   "name": "Chain guard and hugger",
+   "region": "rear",
+   "category": "trim",
+   "construction": "thin guard over the chain run",
+   "attaches_to": "swingarm",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "grab_rail",
+   "name": "Grab rail",
+   "region": "rear",
+   "category": "structure",
+   "construction": "rail behind or beside the seat",
+   "attaches_to": "bodywork",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/bike.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

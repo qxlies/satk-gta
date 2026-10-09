@@ -103,7 +103,7 @@ def test_ref_import_strips_exif_and_shrinks(satk_home):
     assert max(out.size) == 1600 and out.size == (900, 1600)  # EXIF rotation applied, then shrunk
     assert not out.info.get("exif") and r["exif_removed"] is True and r["source_size"] == [3200, 1800]
     assert r["image"].startswith(str(satk_home / "work" / "assets" / "car1" / "refs").replace("\\", "/"))
-    assert os.path.isfile(r["grid"]) and Image.open(r["grid"]).size == out.size
+    assert "grid" not in r and "features.md" in r["next"]  # the pixel grid is opt-in (--grid)
     again = get_op("ref.import").call({"photo": str(src), "project": "car1"})
     assert again["reused"] is True and again["image"] == r["image"]
     plain = get_op("ref.import").call({"photo": str(src)})
@@ -220,3 +220,22 @@ def test_export_and_check_results_are_recorded_in_the_project(satk_home):
     assert data["last_check"] == {"rows": 2, "blocking": 0, "n": 43}
     assert "last_export" in P.status("car3")
     C.remove_discovery("blender-car3")
+
+
+def test_gate_states_review_skip_reasons_and_done_needs_the_items(satk_home):
+    P.init("gates1", kind="prop", detail="simple")
+    P.record("gates1", {"gate": "G1", "state": "review"})
+    assert P.status("gates1")["gates"].startswith("G0- G1?")
+    with pytest.raises(SatkError) as e:                       # no session, no checkpoint: nothing proves the items
+        P.record("gates1", {"gate": "G1", "state": "done"})
+    assert e.value.code == "BAD_PARAMS" and "G1 is not done" in e.value.msg
+    with pytest.raises(SatkError) as e:
+        P.record("gates1", {"gate": "G3", "state": "skipped"})
+    assert "needs a reason" in e.value.msg
+    P.record("gates1", {"gate": "G3", "state": "skipped", "why": "the bin has no detail stage of its own"})
+    card = P.status("gates1")
+    assert "G3~" in card["gates"] and card["skipped"] == {"G3": "the bin has no detail stage of its own"}
+    P.init("gates2", kind="prop", detail="none")              # no inventory: nothing to verify, strict blocks later
+    data = json.loads((P.project_dir("gates2") / "asset.json").read_text(encoding="utf-8"))
+    assert data["detail"] == "none"
+    P.record("gates2", {"gate": "G1", "state": "done"})

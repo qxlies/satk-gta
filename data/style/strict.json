@@ -1,0 +1,68 @@
+{
+ "format": "satk.style-strict/1",
+ "_comment": [
+  "What asset.check --strict does with a WARNING row (satk.style.check.strict_status): a warning is a real flaw at",
+  "the place given that vanilla models of the class show too. Above the limit here (calibrated on every vanilla",
+  "vehicle, 300 map objects, the weapons, peds, time and animated objects: about 9 in 10 vanilla models of a family",
+  "stay below it, and every kit kind's exemplar) it blocks; at or below it, or marked advice, it is listed under",
+  "'advice' (fix it in the polish, it does not block). Defects, engine errors and missing checklist items always",
+  "block; a warning of a check not named here always blocks. Merged default <- family <- parent classes <- class.",
+  "over: the row's value (form.floating mm, mesh.zfight cm2, mesh.crack mm of seam, mesh.normals share, mesh.flipped cm2, mesh.degenerate triangles, mesh.inside_out m3, col.outside m,",
+  "col.uncovered share); width_over: mesh.crack seam width (mm); self: the overlap of one part with itself (decals, double cards); advice: never blocks.",
+  "under: a share where less is worse (lod.silhouette: the HD outline the LOD covers)."
+ ],
+ "warn_block": {
+  "default": {
+   "form.floating": {
+    "over": 30.0
+   },
+   "mesh.zfight": {
+    "over": 200.0,
+    "self": 400.0
+   },
+   "mesh.crack": {
+    "over": 1500.0,
+    "width_over": 5.0
+   },
+   "mesh.normals": {
+    "over": 0.25
+   },
+   "mesh.flipped": {
+    "over": 900.0
+   },
+   "mesh.degenerate": {
+    "over": 24
+   },
+   "mesh.inside_out": {
+    "over": 0.025
+   },
+   "col.outside": {
+    "over": 0.6
+   },
+   "col.uncovered": {
+    "over": 0.15
+   },
+   "lod.silhouette": {
+    "under": 0.4
+   },
+   "form.dense_flat": {
+    "advice": true
+   }
+  },
+  "animated": {
+   "form.floating": {
+    "over": 300.0
+   }
+  },
+  "interior_prop": {
+   "geom.prelit": {
+    "advice": true
+   }
+  },
+  "ped": {
+   "col.check": {
+    "advice": true
+   }
+  }
+ }
+}

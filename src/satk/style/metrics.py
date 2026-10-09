@@ -310,7 +310,7 @@ def mesh_metrics(pos, tris, corner_normals=None, uv=None, mat=None, *, normals=N
 
 def is_hd_part(name: str) -> bool:
     """True for a part that renders undamaged at full detail: not ``*_dam`` and not ``*_vlo``."""
-    n = (name or "").strip().lower()
+    n = (name or "").strip().lower().rstrip("0123456789")
     return not (n.endswith("_dam") or n.endswith("_vlo"))
 
 

@@ -156,6 +156,34 @@ def test_reply_fits_the_budget():
     assert r["stats"]["scene"]["objects"] == 60
 
 
+def test_method_reply_budget_and_long_text():
+    core = _core()
+
+    @K.reply_budget(5120)
+    def big(ctx, p):
+        return {"value": "z" * int(p.get("n", 3000))}
+
+    def small(ctx, p):
+        return {"value": "z" * int(p.get("n", 3000))}
+
+    table: dict = {}
+    mod = type(sys)("m2")
+    mod.METHODS = {"t.big": big, "t.small": small}
+    K.methods_from_module(mod, table, [])
+    assert table["t.big"].reply == 5120 and table["t.small"].reply == 0
+    core.methods.update(table)
+    r = core.call({"method": "t.big", "params": {"n": 3900}, "stats": "none"})
+    assert len(r["result"]["value"]) == 3900 and "truncated" not in r          # fits the bigger budget
+    r = core.call({"method": "t.small", "params": {"n": 3900}, "stats": "none"})
+    size = len(json.dumps(r, separators=(",", ":")).encode())
+    assert size <= K.MAX_REPLY, size
+    kept = len(r["result"]["value"]) - 3
+    assert kept > 1000, kept                                                     # as much text as fits, not 200
+    assert r["truncated"] == [f"result.value: {kept} of 3900 chars"]
+    r = core.call({"method": "t.big", "params": {"n": 9000}, "stats": "none"})
+    assert len(json.dumps(r, separators=(",", ":")).encode()) <= 5120
+
+
 def test_fit_reply_leaves_small_replies_alone():
     small = {"method": "x", "n": 1, "ms": 0.1}
     assert K.fit_reply(small) is small

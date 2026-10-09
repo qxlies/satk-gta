@@ -1,0 +1,252 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "satk.inventory/1",
+ "title": "satk asset inventory (design/inventory.json)",
+ "description": "The task list of an asset: every part and detail as an item with its plan. satk.inventory.schema.validate checks it with readable errors (and more: unique ids, existing attaches_to targets, no cycles, starter items dropped without a waiver).",
+ "type": "object",
+ "required": [
+  "kind",
+  "detail",
+  "items"
+ ],
+ "properties": {
+  "format": {
+   "const": "satk.inventory/1"
+  },
+  "kind": {
+   "type": "string",
+   "description": "asset kind (satk kit kinds)"
+  },
+  "detail": {
+   "enum": [
+    "simple",
+    "standard",
+    "hero"
+   ]
+  },
+  "name": {
+   "type": "string"
+  },
+  "notes": {
+   "type": [
+    "string",
+    "array"
+   ]
+  },
+  "source": {
+   "type": "string"
+  },
+  "regions": {
+   "type": "object"
+  },
+  "items": {
+   "type": "array",
+   "minItems": 1,
+   "items": {
+    "$ref": "#/$defs/item"
+   }
+  },
+  "waived": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "key",
+     "why"
+    ],
+    "properties": {
+     "key": {
+      "type": "string"
+     },
+     "why": {
+      "type": "string",
+      "minLength": 8,
+      "description": "a design fact (two-door coupe); never effort, time, distance or visibility (those are errors)"
+     },
+     "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 64,
+      "description": "the design's lower piece count of a counted starter item"
+     }
+    }
+   }
+  }
+ },
+ "$defs": {
+  "item": {
+   "type": "object",
+   "required": [
+    "id",
+    "name",
+    "region",
+    "category",
+    "construction",
+    "attaches_to",
+    "stage"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "pattern": "^I\\d{2,4}$",
+     "description": "I + 2-4 digits, unique"
+    },
+    "key": {
+     "type": "string",
+     "pattern": "^[a-z][a-z0-9_]{1,47}$",
+     "description": "the starter item it came from (data/kit/inventory/<kind>.json)"
+    },
+    "name": {
+     "type": "string",
+     "minLength": 2,
+     "maxLength": 400
+    },
+    "region": {
+     "type": "string",
+     "minLength": 1,
+     "description": "a review region of the kind (the starter's 'regions')"
+    },
+    "category": {
+     "enum": [
+      "shell",
+      "panel",
+      "glass",
+      "lamp",
+      "trim",
+      "wheel",
+      "running_gear",
+      "mechanism",
+      "engine",
+      "interior",
+      "control",
+      "underbody",
+      "structure",
+      "fixture",
+      "opening",
+      "clutter",
+      "sign",
+      "decal",
+      "body_part",
+      "clothing",
+      "accessory",
+      "weapon_part",
+      "effect",
+      "detail",
+      "other"
+     ]
+    },
+    "construction": {
+     "type": "string",
+     "minLength": 12,
+     "maxLength": 400,
+     "description": "how it is built: method and idea"
+    },
+    "attaches_to": {
+     "description": "null only for a root item (category shell, wheel, structure, body_part); else an item id, or a list of ids (any one)",
+     "oneOf": [
+      {
+       "type": "null"
+      },
+      {
+       "type": "string",
+       "pattern": "^I\\d{2,4}$"
+      },
+      {
+       "type": "array",
+       "minItems": 1,
+       "items": {
+        "type": "string",
+        "pattern": "^I\\d{2,4}$"
+       }
+      }
+     ]
+    },
+    "stage": {
+     "enum": [
+      "G1",
+      "G2",
+      "G3",
+      "G4"
+     ],
+     "description": "G1 form, G2 compose, G3 detail, G4 surface"
+    },
+    "required": {
+     "type": "boolean",
+     "default": true
+    },
+    "detail": {
+     "enum": [
+      "simple",
+      "standard",
+      "hero"
+     ],
+     "description": "the lowest detail level that needs it"
+    },
+    "frame": {
+     "oneOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     ],
+     "description": "the game frame(s) the item ends up in"
+    },
+    "count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 64,
+     "description": "separate pieces (a left/right pair = 2)"
+    },
+    "max_gap_mm": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 150,
+     "description": "attachment tolerance override (0-150 mm; over 3x the category's is a warning)"
+    },
+    "mirror": {
+     "type": "boolean"
+    },
+    "notes": {
+     "type": "string"
+    },
+    "rejected": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 3
+      },
+      {
+       "type": "object",
+       "required": [
+        "reason"
+       ],
+       "properties": {
+        "reason": {
+         "type": "string",
+         "minLength": 3
+        },
+        "by": {
+         "type": "string"
+        }
+       }
+      }
+     ],
+     "description": "set by a reviewer (satk inventory mark --reject); cleared only by a reviewer (--accept)"
+    },
+    "verify": {
+     "enum": [
+      "geometry",
+      "texture",
+      "paint"
+     ],
+     "description": "how the report proves the item built: pieces of its own (default), an image texture on its faces (the default of category decal), or the vehicle paint key"
+    }
+   }
+  }
+ }
+}

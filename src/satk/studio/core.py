@@ -7,8 +7,9 @@ Stdlib only: this module is also imported from Blender's Python (3.13), next to 
 ``satk_blender.kit.methods`` and ``satk_blender.look.methods`` when they import. A method returns a
 JSON-able dict; two keys are taken out of it: ``changed`` (names of the objects it created or changed;
 the stats cover them) and ``warn`` (strings ``"CODE: text"``). Optional attributes on the function:
-``readonly`` (no journal replay, no stats by default; :func:`readonly`) and ``checkpoint`` (always save
-a ``.blend`` checkpoint after it; :func:`checkpointed`). ``ctx`` is supplied by the host; in Blender it
+``readonly`` (no journal replay, no stats by default; :func:`readonly`), ``checkpoint`` (always save
+a ``.blend`` checkpoint after it; :func:`checkpointed`) and ``reply_max`` (a bigger reply budget in bytes for
+this method, :func:`reply_budget`; ``python`` has 5,120). ``ctx`` is supplied by the host; in Blender it
 gives ``scene``, ``out_dir``, ``n``, ``stats(names)``, ``snapshot(...)``, ``journal``, ``warn(text)``,
 ``obj(name)``, ``objects(pattern)`` and ``call(method, params)`` (another method, not journaled).
 
@@ -78,6 +79,7 @@ __all__ = [
     "Method",
     "readonly",
     "checkpointed",
+    "reply_budget",
     "methods_from_module",
     "discover_methods",
     "Journal",
@@ -132,6 +134,14 @@ def checkpointed(fn: Callable) -> Callable:
     return fn
 
 
+def reply_budget(n: int) -> Callable[[Callable], Callable]:
+    """Give a method a reply budget of ``n`` bytes instead of :data:`MAX_REPLY` (single calls, not batch steps)."""
+    def mark(fn: Callable) -> Callable:
+        fn.reply_max = int(n)  # type: ignore[attr-defined]
+        return fn
+    return mark
+
+
 @dataclass(frozen=True)
 class Method:
     name: str
@@ -139,6 +149,7 @@ class Method:
     module: str
     readonly: bool = False
     checkpoint: bool = False
+    reply: int = 0
 
     @property
     def doc(self) -> str:
@@ -165,7 +176,8 @@ def methods_from_module(mod: Any, out: dict[str, Method], errors: list[str]) -> 
         if name in out:
             errors.append(f"{where}: method {name!r} is already defined in {out[name].module}; the first one is kept")
             continue
-        out[name] = Method(name, fn, where, bool(getattr(fn, "readonly", False)), bool(getattr(fn, "checkpoint", False)))
+        out[name] = Method(name, fn, where, bool(getattr(fn, "readonly", False)), bool(getattr(fn, "checkpoint", False)),
+                           int(getattr(fn, "reply_max", 0) or 0))
 
 
 def _absent(e: ImportError, name: str) -> bool:
@@ -471,8 +483,9 @@ def fit_reply(reply: dict, limit: int = MAX_REPLY) -> dict:
             if isinstance(v, list) and len(v) > 1:
                 _cut_list(out, res, key, limit, cut, f"result.{key}")
             elif isinstance(v, str) and len(v) > _STR_MAX:
-                res[key] = v[:_STR_MAX] + "..."
-                cut.append(f"result.{key}: {_STR_MAX} of {len(v)} chars")
+                keep = max(_STR_MAX, len(v) - (_size(out) - limit) - 96)   # as much of the text as still fits
+                res[key] = v[:keep] + "..."
+                cut.append(f"result.{key}: {keep} of {len(v)} chars")
             if _size(out) <= limit:
                 break
     if _size(out) > limit and "result" in out:
@@ -770,6 +783,7 @@ class AuthorCore:
             if res:
                 reply["result"] = jsonable(res)
             ro_all = m.readonly
+            budget = max(budget, m.reply)
         if changed_all:
             reply["changed"] = changed_all
         mode = p.get("stats") or "auto"

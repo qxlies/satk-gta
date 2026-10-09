@@ -64,6 +64,9 @@ satk (San Andreas ToolKit) — набор инструментов для мод
 | изменить игровые тексты, зоны, воду или цикл времени | `satk gxt get CRED001`, `satk zone list --at 2495,-1687` | [worldfiles.md](worldfiles.md) |
 | изменить или добавить анимацию | `satk anim list ifp:ped --name walk`, `satk anim extract anim:ped/walk_civi --out walk.json` | [anim.md](anim.md) |
 | узнать, укладываются ли мои моды в лимиты движка | `satk limits plan --profile installed` | [limits.md](limits.md) |
+| [obs.md](obs.md) | проверка, чтение, сводки, преобразование и слияние трассировок движка, результатов бенча и контейнеров `.saenet` / `.saerec` | `satk obs` |
+| [obs-spec.md](obs-spec.md) | форматы наблюдаемости: ключ времени, записи JSONL, JSON бенча, устройство контейнера, версии | `satk obs schema` |
+| упаковать файлы в один проверяемый `.saepak`, получить кэши для рендера, посчитать дубли текстур | `satk pack build mymod`, `satk pack census` | [pack.md](pack.md) |
 | сконвертировать карту (SA-MP, MTA, IPL) | `satk map convert my_map.pwn --to mta` | [mapconv.md](mapconv.md) |
 | сравнить свою игру со стоковой | `satk index diff vanilla installed` | [index.md](index.md) |
 | понять, почему игра упала | `satk crash analyze --last` | [crash.md](crash.md) |
@@ -71,6 +74,7 @@ satk (San Andreas ToolKit) — набор инструментов для мод
 | полетать камерой и спросить «что это за объект» | `satk view goto`, `satk view capture --marks 6` | [viewer.md](viewer.md) |
 | открыть район в Blender и выгрузить его в MTA | `satk blender import-area --center 2495,-1687 --r 60` | [blender.md](blender.md) |
 | создать в Blender новую машину, проп или здание, похожие на стоковую игру | `satk blender session start --gui` | [authoring.md](authoring.md), [sa-style.md](sa-style.md) |
+| создать ассет со своими ИИ-агентами | `satk asset inventory`, `asset check --strict` | [asset-pipeline.md](asset-pipeline.md) |
 | проверить модель по стоковому стилю её класса | `satk asset check model:426 --tier vanilla` | [style.md](style.md) |
 | начать новый ассет с шаблона или чистой заготовки | `satk kit kinds`, `satk kit blank` | [kit.md](kit.md) |
 | увидеть свою модель такой, какой её рисует игра, рядом со стоковыми | `satk blender preview model:426 --lineup model:405,model:560` | [look.md](look.md) |
@@ -111,10 +115,14 @@ satk (San Andreas ToolKit) — набор инструментов для мод
 | [models.md](models.md) | превью моделей без GPU, экспорт в glTF, OBJ и raw | `satk model`, `asset export` |
 | [catalog.md](catalog.md) | офлайн-каталог моделей, текстур и зон в HTML с миниатюрами | `satk catalog build` |
 | [lint.md](lint.md) | линтер ассетов: DFF, TXD, COL, IDE и связи между ними | `satk asset lint`, `asset lint-rules` |
-| [style.md](style.md) | оригинальный стиль SA в числах по классам и уровням; проверка модели или текстуры по нему | `satk style profile`, `asset check`, `style texture` |
+| [style.md](style.md) | руководство по стилю SA и справка по классам; дефекты, полнота и строгая готовность модели или текстуры | `satk style profile`, `asset check`, `style texture` |
 | [batch.md](batch.md) | любая операция на много файлов, сохранённые многошаговые рецепты | `satk batch`, `recipe` |
 | [modinspect.md](modinspect.md) | что меняет мод и как Mod Loader совмещает моды | `satk mod inspect`, `conflicts`, `effective`, `check` |
 | [limits.md](limits.md) | оценка ёмкости движка, запаса исходных лимитов, сигнатур вылетов и настроек регуляторов | `satk limits plan` |
+| [pack.md](pack.md) | контейнеры контента `.saepak` (адресация по содержимому, совместимость с IMG, хеши чанков), файлы кэша производных данных и перепись дедупликации текстур | `satk pack build`, `verify`, `inspect`, `dac`, `census` |
+| [saepak.md](saepak.md) | раскладка байтов контейнера `.saepak`, формат 1.0 | `satk pack build`, `verify`, `inspect` |
+| [dac.md](dac.md) | раскладка байтов файла DAC (кэша производных данных), формат 1.0 | `satk pack dac` |
+| [imagegen.md](imagegen.md) | значки интерфейса через API картинок (хромакей, масштаб, проверка, происхождение) и набор-заглушка на Pillow без ключа | `satk imagegen` |
 | [idmgr.md](idmgr.md) | свободные id моделей, конфликты id между модами, перенос мода | `satk id` |
 | [mapconv.md](mapconv.md) | конвертеры карт (Pawn SA-MP, `.map` MTA, IPL, JSON), бинарный IPL, чистка района | `satk map convert`, `map validate`, `ipl`, `map clean` |
 | [worldfiles.md](worldfiles.md) | данные мира для тотальных конверсий: тексты GXT/FXT, зоны, вода, цикл времени, цикл населения, тайлы радара | `satk gxt`, `fxt`, `zone`, `water`, `timecyc`, `popcycle`, `radar` |
@@ -130,6 +138,7 @@ satk (San Andreas ToolKit) — набор инструментов для мод
 | [ingame.md](ingame.md) | игровой цикл проверок: мод в настоящей игре (форк MTA), тестовые точки, проверки поведения против ванили с кадрами, горячая перезагрузка | `satk ingame start`, `drive`, `check`, `reload` |
 | [blender.md](blender.md) | Blender без окна: импорт моделей и районов, рендер, экспорт в MTA; аддон | `satk blender` |
 | [studio.md](studio.md) | живая сессия Blender для пошагового моделирования ИИ-ассистентом | `satk blender session`, `call` |
+| [inventory.md](inventory.md) | список задач ассета: каждая деталь пунктом, проверка «построен, нет, не прикреплён, отклонён» | `satk asset inventory`, `inventory starter` |
 | [look.md](look.md) | превью в стиле SA для моделей игры, своих DFF и живых сессий, рядом друг с другом | `satk blender preview` |
 | [kit.md](kit.md) | шаблоны, затенение, генераторы и экспорт для любого вида ассетов (от машин до педов) | `satk kit kinds`, `kit template`, `kit export` |
 | [convert.md](convert.md) | преобразование неподвижных трёхмерных моделей в масштаб, геометрию, текстуры и пакеты SA | `satk asset convert`, `convert prepare`, `convert finish` |
@@ -139,6 +148,7 @@ satk (San Andreas ToolKit) — набор инструментов для мод
 | [ai.md](ai.md) | подключение ИИ-клиентов (Claude Code, Codex, Cursor, VS Code, LM Studio и другие), skill | `satk mcp config --client`, `agent install-skill` |
 | [sa-style.md](sa-style.md) | почему ассет выглядит как San Andreas: текстуры, форма, затенение, размер, уровни детализации, ошибки | `satk asset get`, `texture image` |
 | [authoring.md](authoring.md) | создание ассетов любого вида в живой сессии Blender, этап за этапом | `satk blender session`, `asset check` |
+| [asset-pipeline.md](asset-pipeline.md) | создание ассета со своими ИИ-агентами: исполнитель, критик, доводка и шесть этапов с доказательствами | `satk asset inventory`, `asset check --strict` |
 | [bugreport.md](bugreport.md) | приватный локальный отчёт о проблемах satk | `satk bug-report` |
 | [release.md](release.md) | переносимый релиз для Windows | `satk dev release` |
 | [credits.md](credits.md) | благодарности и все источники satk и его исследований по темам | — |

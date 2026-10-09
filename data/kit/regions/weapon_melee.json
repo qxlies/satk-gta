@@ -1,0 +1,102 @@
+{
+ "kind": "weapon_melee",
+ "version": 1,
+ "summary": "Close-up review regions of a melee or thrown weapon (long axis +Z: blade or head up, grip down).",
+ "leak": {
+  "cull": true,
+  "gap": false,
+  "inside": false,
+  "see_through_block": true,
+  "floor_exclude": [],
+  "floor_pct": 0.5,
+  "slit": true
+ },
+ "regions": [
+  {
+   "name": "sides",
+   "summary": "both faces of the whole weapon (flat side, edge side)",
+   "cameras": [
+    {
+     "az": 0,
+     "el": 4,
+     "ortho": true
+    },
+    {
+     "az": 90,
+     "el": 4,
+     "ortho": true
+    }
+   ]
+  },
+  {
+   "name": "blade",
+   "summary": "blade, head or body: edge bevel, fuller, striking face",
+   "box": {
+    "z": [
+     0.4,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 30,
+     "el": 10
+    },
+    {
+     "az": 210,
+     "el": 10
+    }
+   ]
+  },
+  {
+   "name": "tip",
+   "summary": "the tip or the end of the head",
+   "box": {
+    "z": [
+     0.8,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 45,
+     "el": 25
+    }
+   ]
+  },
+  {
+   "name": "grip",
+   "summary": "grip, guard, wrap and pommel",
+   "box": {
+    "z": [
+     0.0,
+     0.45
+    ]
+   },
+   "cameras": [
+    {
+     "az": 30,
+     "el": 10
+    },
+    {
+     "az": 210,
+     "el": 10
+    }
+   ]
+  },
+  {
+   "name": "ends",
+   "summary": "the weapon seen along its axis from the tip and from the pommel",
+   "cameras": [
+    {
+     "az": 0,
+     "el": 80
+    },
+    {
+     "az": 0,
+     "el": -80
+    }
+   ]
+  }
+ ]
+}

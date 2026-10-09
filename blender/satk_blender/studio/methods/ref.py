@@ -5,11 +5,15 @@
 # License, or (at your option) any later version. See LICENSE in this directory.
 """``ref.*``: reference photos as image planes behind the model, with a matched orthographic camera.
 
-Prepare a photo with ``satk ref import`` first (at most 1,600 px, no EXIF, a pixel grid sheet to read
-coordinates from). Scale comes from ``width`` (metres the full image width spans) or from two pixel
-points ``points`` and their real ``distance`` in metres (wheel centres = wheelbase). ``origin_px`` is the
-pixel that lies on the model origin (default: the image centre). The plane is placed behind the model
-for its view (``front``: the photo looks at the front, camera on +Y; ``left``: camera on -X; ...).
+Only TRUE elevations belong here (``satk ref import --view side|front|rear|top``: far away, both wheels round);
+three-quarter and detail photos are described in ``refs/features.md``, never put on a plane or measured. Scale
+comes from ``length`` (the real length of the object in metres - the width for front/rear photos): the object is
+found in the photo against its border colour (or give its pixel columns ``span`` [x0, x1]) and the plane is placed
+so that the object spans the model and stands on the model's lowest point. Without ``length``: ``width`` (metres
+the full image width spans) or two pixel points ``points`` and their real ``distance`` (wheel centres = the
+wheelbase), with ``origin_px`` = the pixel on the model origin (default: the image centre). The plane is placed
+behind the model for its view (``front``: the photo looks at the front, camera on +Y; ``left`` or ``side``: camera
+on -X; ...).
 
 Snapshots taken from the matched camera ``ref_cam_<view>`` (or the named view) show the photo with the
 model drawn over it (``ref_alpha``). Planes are tagged ``satk_ref`` and are never counted in stats.
@@ -72,9 +76,24 @@ def _scene_extent(view: str) -> float:
     return far + 0.25
 
 
+def _object_span(img, flip: bool = False) -> tuple[float, float, float, float] | None:
+    """Pixel box (x0, y0, x1, y1; y down) of the object in a Blender image, found against its border colour."""
+    import numpy as np
+
+    from satk.look import silhouette as SIL
+
+    w, h = img.size
+    a = np.empty(w * h * 4, dtype=np.float32)
+    img.pixels.foreach_get(a)
+    rgb = np.clip(np.rint(a.reshape(h, w, 4)[::-1, :, :3] * 255.0), 0, 255).astype(np.uint8)
+    return SIL.photo_box(rgb)
+
+
 def plane(ctx, p: dict) -> dict:
-    """Put a photo behind the model for a view (front|rear|left|right|top): image, width m or points+distance, origin_px."""
+    """Put a TRUE elevation photo behind the model (front|rear|left|side|right|top): length m (the object spans the model, found in the photo or span [x0, x1] px), or width m / points+distance with origin_px."""
     M = "ref.plane"
+    if p.get("view") == "side":
+        p = dict(p, view="left")
     view = U.text(p, "view", M, required=True, choices=tuple(FRAMES))
     path = os.path.abspath(U.text(p, "image", M, required=True))
     if not os.path.isfile(path):
@@ -83,7 +102,21 @@ def plane(ctx, p: dict) -> dict:
     w, h = img.size
     if not w or not h:
         raise U.bad(M, f"cannot read {path.replace(os.sep, '/')} as an image")
-    if p.get("width") is not None:
+    fit = None
+    if p.get("length") is not None:
+        length = U.num(p, "length", M, lo=0.05)
+        if p.get("span") is not None:
+            sp = U.vec(p, "span", M, n=2)
+            box = (min(sp), 0.0, max(sp), float(h))
+        else:
+            box = _object_span(img)
+            if box is None:
+                raise U.bad(M, "no object found against the photo's border colour", hint="give span [x0, x1] px")
+        if box[2] - box[0] < 2:
+            raise U.bad(M, "the object span is narrower than 2 px")
+        s = length / (box[2] - box[0])
+        fit = box
+    elif p.get("width") is not None:
         s = U.num(p, "width", M, lo=0.01) / w
     elif p.get("points") is not None:
         pts = U.points2(p, "points", M, min_n=2, max_n=2)
@@ -92,9 +125,24 @@ def plane(ctx, p: dict) -> dict:
             raise U.bad(M, "the two points are the same pixel")
         s = U.num(p, "distance", M, lo=0.001, required=True) / dpx
     else:
-        raise U.bad(M, "give 'width' (m) or 'points' [[x1, y1], [x2, y2]] (px) and 'distance' (m)")
+        raise U.bad(M, "give 'length' (m: the object's real length), 'width' (m) or 'points' [[x1, y1], [x2, y2]] (px) "
+                       "and 'distance' (m)")
     ox, oy = U.vec(p, "origin_px", M, [w / 2, h / 2], n=2)
     right, up, toward = FRAMES[view]
+    if fit is not None and p.get("origin_px") is None:
+        # the object's box centre on the model's centre along the image's right axis, its bottom on the lowest point
+        objs = [o for o in geometry_objects() if not o.get("satk_ref")]
+        if objs:
+            lo, hi = S.bounds(objs)
+            centre = (lo + hi) / 2.0
+            r_c = centre.dot(right)
+            if view == "top":
+                u_c = centre.dot(up)
+                ox = (fit[0] + fit[2]) / 2.0 - r_c / s
+                oy = (fit[1] + fit[3]) / 2.0 + u_c / s
+            else:
+                ox = (fit[0] + fit[2]) / 2.0 - r_c / s
+                oy = fit[3] + lo.z / s
     off = U.num(p, "offset", M) if p.get("offset") is not None else _scene_extent(view)
     back = -toward * off
 
@@ -120,6 +168,8 @@ def plane(ctx, p: dict) -> dict:
     ob["satk_ref_alpha"] = U.num(p, "alpha", M, 0.6, lo=0.0, hi=1.0)
     out: dict = {"object": ob.name, "view": view, "size_m": [round(w * s, 3), round(h * s, 3)],
                  "m_per_px": round(s, 5), "image": img.name}
+    if fit is not None:
+        out["object_px"] = [round(v) for v in fit]
     if U.flag(p, "camera", M, True):
         cam_name = f"ref_cam_{view}" if name == f"ref_{view}" else f"{name}_cam"
         cam = bpy.data.objects.get(cam_name)

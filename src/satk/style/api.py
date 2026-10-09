@@ -7,16 +7,17 @@
 * :func:`anatomy` - ``asset.anatomy`` of one model.
 
 ``cls_or_sid`` is a class (``car.sedan``, ``sedan``, ``prop@1-2m``, ``ped``) or a model (``model:426``,
-``premier``, ``426``). ``tier`` is ``vanilla`` or ``sa_plus`` (default ``sa_plus``, the tier of new assets;
-its numbers are a proposal). The style cache is built on first use (``satk style build``).
+``premier``, ``426``). ``tier`` is ``vanilla`` or ``sa_plus`` (default ``sa_plus``, the tier of new assets; it
+changes only texture density). Every number is vanilla reference, never a target. The style cache is built on
+first use (``satk style build``).
 
 Example::
 
     from satk.style import api
     api.profile("car.sedan", "vanilla")["shade.normal_bend"]["p50"]     # 9.98
-    api.band("veh.hd_tris", "car", "sa_plus")                           # (3000, 4500)
+    api.band("veh.hd_tris", "car", "sa_plus")                           # vanilla p10..p90 (reference)
     r = api.check("mymod/premier.dff", tier="sa_plus")[0]
-    r["verdict"], [row for row in r["rows"] if row[6] in ("error", "low", "high")]
+    r["verdict"], [row for row in r["rows"] if row[6] in ("error", "defect")]
 """
 
 from __future__ import annotations

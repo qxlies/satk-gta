@@ -1,9 +1,8 @@
-"""Leave-one-out validation of the style bands (the Goodhart guard of ``asset.check``).
+"""Leave-one-out spread of the vanilla reference numbers (``style build --validate``).
 
-Every vanilla model is checked against its own peer set with itself left out, on the ``check`` metrics
-of its family (``data/style/tiers.json``) at tier ``vanilla``. A useful band lets almost every vanilla
-model through (0-1 out-of-band rows) while a known-bad asset still fails; :func:`loo` measures the first
-half (the plan's target: at least 90 % of the models of each family get 0-1 rows).
+Every vanilla model is compared with its own peer set with itself left out, on the ``reference`` metrics
+of its family (``data/style/tiers.json``). It measures how tight a peer set is (the share of vanilla models
+with 0-1 numbers beyond the fence); nothing judges an asset by it: the numbers are reference only.
 
 Example::
 
@@ -59,7 +58,7 @@ def loo(cache, *, families: tuple[str, ...] | None = None, max_rows: int = 1) ->
     for key, rs in sorted(groups.items()):
         mem = members[key]
         idx = {id(r): i for i, r in enumerate(mem)}
-        checks = metric_list(key, "check")
+        checks = metric_list(key, "reference")
         cols = {}
         for m in checks:
             v = np.array([r["m"].get(m, np.nan) for r in mem], dtype=np.float64)

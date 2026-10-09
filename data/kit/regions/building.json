@@ -1,0 +1,112 @@
+{
+ "kind": "building",
+ "version": 1,
+ "summary": "Close-up review regions of a building with its LOD.",
+ "leak": {
+  "cull": true,
+  "gap": false,
+  "inside": false,
+  "floor_exclude": [],
+  "floor_pct": 0.5,
+  "slit": true
+ },
+ "regions": [
+  {
+   "name": "facade_north",
+   "summary": "facade facing +Y (north)",
+   "cameras": [
+    {
+     "az": 0,
+     "el": 6
+    }
+   ]
+  },
+  {
+   "name": "facade_east",
+   "summary": "facade facing +X (east)",
+   "cameras": [
+    {
+     "az": 90,
+     "el": 6
+    }
+   ]
+  },
+  {
+   "name": "facade_south",
+   "summary": "facade facing -Y (south)",
+   "cameras": [
+    {
+     "az": 180,
+     "el": 6
+    }
+   ]
+  },
+  {
+   "name": "facade_west",
+   "summary": "facade facing -X (west)",
+   "cameras": [
+    {
+     "az": -90,
+     "el": 6
+    }
+   ]
+  },
+  {
+   "name": "roof",
+   "summary": "roof: parapets, plant, roof edges",
+   "cameras": [
+    {
+     "az": 45,
+     "el": 60
+    },
+    {
+     "az": 225,
+     "el": 60
+    }
+   ]
+  },
+  {
+   "name": "entrance",
+   "summary": "street level at eye height: doors, shopfronts, steps, base",
+   "box": {
+    "z": [
+     0.0,
+     0.35
+    ]
+   },
+   "cameras": [
+    {
+     "az": 0,
+     "el": 3
+    },
+    {
+     "az": 90,
+     "el": 3
+    },
+    {
+     "az": 180,
+     "el": 3
+    },
+    {
+     "az": -90,
+     "el": 3
+    }
+   ]
+  },
+  {
+   "name": "lod",
+   "summary": "the HD model and its LOD from the same camera (silhouette and colours must match)",
+   "states": [
+    "ok",
+    "vlo"
+   ],
+   "leak": false,
+   "cameras": [
+    {
+     "az": 45,
+     "el": 20
+    }
+   ]
+  }
+ ]
+}

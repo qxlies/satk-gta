@@ -71,7 +71,7 @@ def test_street_prop_with_a_lod_from_nothing_but_satk(prop):
     # G0/G1: the scaffold with a LOD slot (no re-scaffold as a building), the shape from a profile
     t = satk("kit.template", like="model:1300", name=NAME, dims=[0.63, 0.63, 1.09], tier="sa_plus", lod=True,
              session=s.name)
-    assert t["blender"]["lod"] == "lodbin1" and t["blender"]["slots"] == 1 and not t.get("warn")
+    assert t["blender"]["lod"] == "lodsa_bin1" and t["blender"]["slots"] == 1 and not t.get("warn")
     lathe = blender("mesh.lathe", name="bin_body", segments=16, axis="z", profile=PROFILE)
     assert lathe["faces"] == 176
     blender("kit.fill", slot=NAME, objects=["bin_body"])
@@ -98,18 +98,18 @@ def test_street_prop_with_a_lod_from_nothing_but_satk(prop):
         assert p10 <= stats[metric] <= p90, (metric, stats[metric], (p10, p90))
     blender("kit.material_preset", object=NAME, role="map", slot=0, image=fin["file"])
     lod = blender("kit.lod")
-    assert lod["object"] == "lodbin1" and 0.15 <= lod["ratio"] <= 0.3 and "slot" not in lod   # the slot was scaffolded
+    assert lod["object"] == "lodsa_bin1" and 0.15 <= lod["ratio"] <= 0.3 and "slot" not in lod   # the slot was scaffolded
 
     # G5: one export: prelight, a primitive COL, the LOD and its IDE line, the placement that links them
     res = satk("kit.export", add=True, session=s.name, place=[2495.0, -1687.0, 13.0])
-    assert res["package"]["by"] == "mod.add" and res["package"]["lod"]["name"] == "lodbin1", res
+    assert res["package"]["by"] == "mod.add" and res["package"]["lod"]["name"] == "lodsa_bin1", res
     pkg = Path(res["package"]["out"])
     mid = int(res["package"]["id"].split(":")[1])
     lod_id = int(res["package"]["lod"]["id"].split(":")[1])
     assert lod_id > mid and sorted(p.name for p in pkg.iterdir() if p.is_file()) == \
-        ["lodbin1.dff", f"{NAME}.col", f"{NAME}.dff", f"{NAME}.txd", f"{NAME}.txt"]
+        ["lodsa_bin1.dff", f"{NAME}.col", f"{NAME}.dff", f"{NAME}.inventory.json", f"{NAME}.txd", f"{NAME}.txt"]
     ide = (pkg / "data" / "maps" / f"{NAME}.ide").read_text(encoding="latin-1").splitlines()
-    assert ide[1] == "objs" and ide[2].startswith(f"{mid}, {NAME}, {NAME}, ") and ide[3] == f"{lod_id}, lodbin1, {NAME}, 800, 0"
+    assert ide[1] == "objs" and ide[2].startswith(f"{mid}, {NAME}, {NAME}, ") and ide[3] == f"{lod_id}, lodsa_bin1, {NAME}, 800, 0"
     ipl = (pkg / "data" / "maps" / f"{NAME}.ipl").read_text(encoding="latin-1").splitlines()
     assert ipl[2].endswith(", 1") and ipl[3].endswith(", -1") and ipl[2].split(", ")[3:6] == ["2495", "-1687", "13"]
 
@@ -117,7 +117,7 @@ def test_street_prop_with_a_lod_from_nothing_but_satk(prop):
     assert len(hd.meshes) == 1 and hd.meshes[0].prelit is not None and hd.meshes[0].night is not None
     assert hd.meshes[0].normals is None                                      # map models carry no normals
     assert res["prelight"]["mode"] == "auto" and res["prelight"]["objects"] == 1 and res["prelight"]["night"] is True
-    lod_scene = build_scene((pkg / "lodbin1.dff").read_bytes(), name="lodbin1")
+    lod_scene = build_scene((pkg / "lodsa_bin1.dff").read_bytes(), name="lodsa_bin1")
     assert lod_scene.meshes[0].prelit is not None and lod_scene.meshes[0].night is not None
     cols = list(iter_col((pkg / f"{NAME}.col").read_bytes()))
     assert [c.name for c in cols] == [NAME] and cols[0].boxes == 1 and cols[0].faces == 0   # one box, no faces

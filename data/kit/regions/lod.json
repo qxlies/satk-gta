@@ -1,0 +1,50 @@
+{
+ "kind": "lod",
+ "version": 1,
+ "summary": "Review regions of a map LOD model: seen from afar (no street-level cameras; the bottom and the inside are never seen).",
+ "leak": {
+  "cull": true,
+  "gap": false,
+  "inside": false,
+  "floor_exclude": [],
+  "floor_pct": 2.0
+ },
+ "regions": [
+  {
+   "name": "silhouette",
+   "summary": "the four sides from a distance: the outline must match the HD model",
+   "cameras": [
+    {
+     "az": 0,
+     "el": 12
+    },
+    {
+     "az": 90,
+     "el": 12
+    },
+    {
+     "az": 180,
+     "el": 12
+    },
+    {
+     "az": -90,
+     "el": 12
+    }
+   ]
+  },
+  {
+   "name": "roof",
+   "summary": "the roof seen from above",
+   "cameras": [
+    {
+     "az": 45,
+     "el": 55
+    },
+    {
+     "az": 225,
+     "el": 55
+    }
+   ]
+  }
+ ]
+}

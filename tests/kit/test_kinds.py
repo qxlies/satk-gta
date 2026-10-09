@@ -10,7 +10,8 @@ from satk.kit import kinds as K
 
 #: Every kind of PLAN L3 task 1.
 ALL_KINDS = {"automobile", "mtruck", "quad", "bike", "bmx", "boat", "plane", "heli", "trailer", "train", "prop",
-             "building", "interior_shell", "interior_prop", "breakable", "animated_object", "weapon", "ped",
+             "building", "interior_shell", "interior_prop", "breakable", "animated_object", "weapon", "weapon_melee",
+             "ped",
              "pickup", "vehicle_upgrade"}
 
 

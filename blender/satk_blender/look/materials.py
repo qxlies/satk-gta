@@ -306,12 +306,37 @@ def _image_by_name(name: str | None):
     return None
 
 
+#: Kit kinds and blank kinds that are vehicles (a kit collection's ``satk_kit``, a blank's ``satk_blank`` kind).
+_VEHICLE_KINDS = ("automobile", "bike", "boat", "heli", "plane", "trailer", "mtruck", "quad", "bmx", "train")
+
+
+def _kit_kind(o) -> str:
+    for c in getattr(o, "users_collection", ()) or ():
+        if c.get("satk_kit"):
+            return str(c.get("satk_group") or "") if c.get("satk_group") == "vehicle" else str(c.get("satk_kit"))
+    blank = o.get("satk_blank")
+    if isinstance(blank, str) and '"kind"' in blank:
+        try:
+            import json
+
+            return str(json.loads(blank).get("kind") or "")
+        except ValueError:
+            return ""
+    return ""
+
+
 def classify(objs) -> str:
-    """``vehicle`` | ``ped`` | ``building`` | ``object`` of a model from its objects' tags and data."""
+    """``vehicle`` | ``ped`` | ``building`` | ``object`` of a model from its objects' tags and data: ``satk_sec``,
+    a kit collection's group or kind, a vehicle blank, armatures, vehicle dummy names, prelight."""
     secs = {str(o.get("satk_sec") or "") for o in objs}
     if "cars" in secs:
         return "vehicle"
     if "peds" in secs or any(o.type == "ARMATURE" for o in objs):
+        return "ped"
+    kinds = {_kit_kind(o) for o in objs}
+    if "vehicle" in kinds or kinds & set(_VEHICLE_KINDS):
+        return "vehicle"
+    if "ped" in kinds:
         return "ped"
     names = {o.name.split(".")[0].lower() for o in objs}
     if "chassis_dummy" in names or any(n.startswith("wheel_") and n.endswith("_dummy") for n in names):
@@ -322,10 +347,24 @@ def classify(objs) -> str:
     return "object"
 
 
+def material_rgb(mat) -> tuple:
+    """The material colour the DFF carries (0..1 per channel = byte / 255), read the way DragonFF exports it: the
+    Principled BSDF's Base Color value when the material has one, else ``diffuse_color``. Studio materials keep a
+    linear ``diffuse_color`` for the viewport (paint key 60,255,0 -> 0.045), so that is not the exported colour."""
+    nt = mat.node_tree if getattr(mat, "use_nodes", True) else None
+    if nt is not None:
+        bsdf = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
+        if bsdf is not None:
+            v = bsdf.inputs["Base Color"].default_value
+            return (float(v[0]), float(v[1]), float(v[2]))
+    c = mat.diffuse_color
+    return (float(c[0]), float(c[1]), float(c[2]))
+
+
 def _paint(mat, colors) -> tuple | None:
     slot = mat.get("satk_paint_slot")
     if slot is None:
-        slot = G.paint_slot([round(v * 255) for v in mat.diffuse_color[:3]])
+        slot = G.paint_slot([round(v * 255) for v in material_rgb(mat)])
     if slot is None:
         return None
     colors = colors or G.PAINT_DEFAULT
@@ -387,8 +426,7 @@ def apply_game(mat, *, kind: str, prelit: bool, has_night: bool, dirt: float, li
         b.link(img_node.outputs["Color"], g.inputs["Texture"])
         b.link(img_node.outputs["Alpha"], g.inputs["Texture Alpha"])
         g.inputs["Has Texture"].default_value = 1.0
-    c = mat.diffuse_color
-    rgb = (c[0], c[1], c[2])
+    rgb = material_rgb(mat)
     unlit = 0.0
     if is_lamp:
         lamp = G.lamp_index([round(v * 255) for v in rgb])

@@ -1,0 +1,315 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "quad",
+ "summary": "quad bike: a tube frame with plastic fenders, four wheels on arms and an axle, rider on a saddle with handlebars.",
+ "regions": {
+  "overall": {
+   "summary": "the whole quad, 3/4 views",
+   "views": []
+  },
+  "front": {
+   "summary": "front fenders, rack, lamps, A-arms",
+   "views": [
+    "front"
+   ]
+  },
+  "rear": {
+   "summary": "rear fenders, rack, tail lamp, axle",
+   "views": [
+    "rear"
+   ]
+  },
+  "sides": {
+   "summary": "flanks: footrests, engine, exhaust",
+   "views": [
+    "left",
+    "right"
+   ]
+  },
+  "wheels": {
+   "summary": "wheels, suspension arms, hubs",
+   "views": [
+    "wheels"
+   ]
+  },
+  "underside": {
+   "summary": "frame and engine from below",
+   "views": [
+    "underside"
+   ]
+  },
+  "cockpit": {
+   "summary": "handlebars, seat, instruments",
+   "views": [
+    "cockpit"
+   ]
+  },
+  "engine": {
+   "summary": "engine, exhaust, radiator",
+   "views": [
+    "left",
+    "right"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "frame",
+   "name": "Tube frame",
+   "region": "underside",
+   "category": "structure",
+   "construction": "tubes swept between joints (mesh.sweep with a round profile): rails, cradle, footrest mounts",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "chassis"
+  },
+  {
+   "key": "body_fenders",
+   "name": "Fenders and body",
+   "region": "overall",
+   "category": "shell",
+   "construction": "front and rear fenders and the tank cover lofted as one welded soft body that sits on the frame",
+   "attaches_to": "frame",
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "wheel",
+   "name": "Wheel (cloned to the four dummies)",
+   "region": "wheels",
+   "category": "wheel",
+   "construction": "kit.wheel or mesh.lathe balloon tyre with a deep tread band, a rim and a hub",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "wheel"
+  },
+  {
+   "key": "front_suspension",
+   "name": "Front A-arms and shocks",
+   "region": "wheels",
+   "category": "running_gear",
+   "construction": "upper and lower arms with a shock to each front hub (frames suspension_lf / suspension_rf)",
+   "attaches_to": "frame",
+   "stage": "G2",
+   "detail": "simple",
+   "count": 2,
+   "frame": [
+    "suspension_lf",
+    "suspension_rf"
+   ]
+  },
+  {
+   "key": "rear_axle",
+   "name": "Rear axle",
+   "region": "wheels",
+   "category": "running_gear",
+   "construction": "axle tube with hubs and a sprocket",
+   "attaches_to": "frame",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "rear_axle"
+  },
+  {
+   "key": "handlebars",
+   "name": "Handlebars",
+   "region": "cockpit",
+   "category": "control",
+   "construction": "bar on a stem with grips and levers; the steering axis runs through the stem",
+   "attaches_to": "frame",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "handlebars"
+  },
+  {
+   "key": "seat",
+   "name": "Seat",
+   "region": "cockpit",
+   "category": "interior",
+   "construction": "long soft saddle lofted on the body",
+   "attaches_to": "body_fenders",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "engine",
+   "name": "Engine",
+   "region": "engine",
+   "category": "engine",
+   "construction": "block with cylinder, cases and covers between the feet",
+   "attaches_to": "frame",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "exhaust",
+   "name": "Exhaust",
+   "region": "engine",
+   "category": "engine",
+   "construction": "pipe swept from the cylinder to a muffler at the rear",
+   "attaches_to": [
+    "engine",
+    "frame"
+   ],
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "footrests",
+   "name": "Footrests",
+   "region": "sides",
+   "category": "structure",
+   "construction": "plates or pegs on each side of the frame",
+   "attaches_to": "frame",
+   "stage": "G3",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "headlamps",
+   "name": "Headlamps",
+   "region": "front",
+   "category": "lamp",
+   "construction": "lenses set into the front fender or the bar pod",
+   "attaches_to": [
+    "body_fenders",
+    "handlebars"
+   ],
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "tail_lamp",
+   "name": "Tail lamp",
+   "region": "rear",
+   "category": "lamp",
+   "construction": "lens set into the rear fender",
+   "attaches_to": "body_fenders",
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "racks",
+   "name": "Front and rear racks",
+   "region": "rear",
+   "category": "structure",
+   "construction": "tube racks swept over the fenders",
+   "attaches_to": [
+    "body_fenders",
+    "frame"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "count": 2
+  },
+  {
+   "key": "fender_liners",
+   "name": "Fender inner faces",
+   "region": "wheels",
+   "category": "shell",
+   "construction": "inner faces of the fenders over the tyres: never see-through",
+   "attaches_to": "body_fenders",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "rear_shock",
+   "name": "Rear shock",
+   "region": "wheels",
+   "category": "running_gear",
+   "construction": "coil-over from the frame to the axle carrier",
+   "attaches_to": [
+    "frame",
+    "rear_axle"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "instruments",
+   "name": "Instruments",
+   "region": "cockpit",
+   "category": "control",
+   "construction": "small gauge pod on the bars",
+   "attaches_to": "handlebars",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "number_plate",
+   "name": "Number plate",
+   "region": "rear",
+   "category": "sign",
+   "construction": "plate card on a bracket at the rear",
+   "attaches_to": [
+    "body_fenders",
+    "frame"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "required": false
+  },
+  {
+   "key": "chain_drive",
+   "name": "Chain and sprockets",
+   "region": "rear",
+   "category": "running_gear",
+   "construction": "chain band from the engine sprocket to the axle sprocket with a guard",
+   "attaches_to": [
+    "engine",
+    "rear_axle"
+   ],
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "brake_discs",
+   "name": "Brake discs and calipers",
+   "region": "wheels",
+   "category": "running_gear",
+   "construction": "lathe discs behind the rims",
+   "attaches_to": "wheel",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "cables_hoses",
+   "name": "Cables and hoses",
+   "region": "cockpit",
+   "category": "engine",
+   "construction": "brake lines and throttle cables swept from the bars down to the frame",
+   "attaches_to": "handlebars",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "radiator",
+   "name": "Radiator",
+   "region": "engine",
+   "category": "engine",
+   "construction": "small radiator with a grille in front of the engine",
+   "attaches_to": "frame",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "grab_handles",
+   "name": "Grab handles",
+   "region": "rear",
+   "category": "structure",
+   "construction": "tube handles beside the seat",
+   "attaches_to": "body_fenders",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/quad.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

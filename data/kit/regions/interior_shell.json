@@ -1,0 +1,113 @@
+{
+ "kind": "interior_shell",
+ "version": 1,
+ "summary": "Review views of an interior room shell (cameras inside the room). Inside cameras stand in every room (up to 6, largest first; per storey).",
+ "leak": {
+  "cull": true,
+  "gap": true,
+  "inside": false,
+  "escape_max_m": 0.12,
+  "floor_exclude": [],
+  "floor_pct": 0.5
+ },
+ "regions": [
+  {
+   "name": "overview",
+   "summary": "the room from above (layout, wall tops)",
+   "leak": false,
+   "cameras": [
+    {
+     "az": 30,
+     "el": 70
+    }
+   ]
+  },
+  {
+   "name": "walls",
+   "summary": "inside at eye height towards each wall: corners, skirting, doors, windows; no light through seams",
+   "rooms": true,
+   "cameras": [
+    {
+     "az": 0,
+     "el": 0,
+     "inside": true,
+     "at": [
+      0.5,
+      0.5,
+      0.35
+     ],
+     "fov": 80
+    },
+    {
+     "az": 90,
+     "el": 0,
+     "inside": true,
+     "at": [
+      0.5,
+      0.5,
+      0.35
+     ],
+     "fov": 80
+    },
+    {
+     "az": 180,
+     "el": 0,
+     "inside": true,
+     "at": [
+      0.5,
+      0.5,
+      0.35
+     ],
+     "fov": 80
+    },
+    {
+     "az": -90,
+     "el": 0,
+     "inside": true,
+     "at": [
+      0.5,
+      0.5,
+      0.35
+     ],
+     "fov": 80
+    }
+   ]
+  },
+  {
+   "name": "ceiling",
+   "summary": "ceiling from inside: lights, edges",
+   "rooms": true,
+   "cameras": [
+    {
+     "az": 0,
+     "el": 70,
+     "inside": true,
+     "at": [
+      0.5,
+      0.5,
+      0.35
+     ],
+     "fov": 90
+    }
+   ]
+  },
+  {
+   "name": "floor",
+   "summary": "floor from inside: edges, rugs, thresholds",
+   "rooms": true,
+   "cameras": [
+    {
+     "az": 45,
+     "el": -60,
+     "inside": true,
+     "at": [
+      0.5,
+      0.5,
+      0.6
+     ],
+     "fov": 90
+    }
+   ]
+  }
+ ]
+}

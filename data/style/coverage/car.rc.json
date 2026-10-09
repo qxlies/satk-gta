@@ -1,0 +1,82 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "car.rc",
+ "ref": "style_vehicle",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (3; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "glass",
+   "what": "windows: glass with alpha below 255 (windscreen part, doors or body)",
+   "how": {
+    "glass": true
+   },
+   "fix": "glass panes on the generic glass region of vehiclegeneric256 with alpha 128 (windscreen_ok, door and body windows)",
+   "optional": true,
+   "vanilla": "1/3"
+  },
+  {
+   "id": "wheels",
+   "what": "wheel geometry",
+   "how": {
+    "frame_geom": "^wheel"
+   },
+   "fix": "build the wheel (tyre + rim) as the atomic 'wheel' under a wheel dummy; the game copies it to the others",
+   "vanilla": "3/3"
+  },
+  {
+   "id": "mirrors",
+   "what": "door mirrors standing out of the body side",
+   "how": {
+    "mirrors": 0.05
+   },
+   "fix": "add mirrors on short stalks that touch the doors, head 18-32 cm, glass on vehiclelights128",
+   "optional": true,
+   "vanilla": "1/3"
+  },
+  {
+   "id": "interior",
+   "what": "an interior (seats, dashboard) inside the cabin",
+   "how": {
+    "region": {
+     "name": "cabin",
+     "min_tris": 60,
+     "skip": "^(door|windscreen|bonnet|boot|bump)"
+    }
+   },
+   "fix": "build shaped seats, a dashboard with a gauge hood and door cards on a dark interior atlas",
+   "optional": true,
+   "vanilla": "1/3"
+  },
+  {
+   "id": "engine_bay",
+   "what": "an engine block and inner walls under the bonnet",
+   "how": {
+    "region": {
+     "name": "engine_bay",
+     "min_tris": 20,
+     "skip": "^(bonnet|bump|windscreen|door)"
+    }
+   },
+   "fix": "put an engine block (and an air cleaner) under the bonnet so an open bonnet is not empty",
+   "optional": true,
+   "vanilla": "1/3"
+  },
+  {
+   "id": "arch_liners",
+   "what": "closed wheel arches (liners, no see-through)",
+   "how": {
+    "lined_arches": true
+   },
+   "fix": "close every arch with a short return face and a liner plate",
+   "optional": true,
+   "vanilla": "2/3"
+  }
+ ]
+}

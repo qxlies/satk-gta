@@ -168,11 +168,20 @@
       "hint": "satk rw patch <dff> --recalc-bsphere (exporters such as DragonFF write world-space spheres)",
       "prevents": "parts of the model vanishing at the screen edge"
     },
+    "dff.clump_ext_dup": {
+      "sev": "error",
+      "msg": "clump {clump} has {n} Extension chunks: the game reads only the first, so the plug-ins of the others (collision {where}) are lost and the model may never appear",
+      "what": "DFF clump with more than one Extension chunk at clump level (a broken writer appended a second one instead of merging)",
+      "what_ru": "У клампа DFF больше одного Extension-чанка: игра читает только первый, коллизия и плагины из остальных теряются",
+      "ref": "RenderWare stream: one Extension per chunk; an agent moped exported this way (embedded COL in the second Extension) streamed but stayed invisible in game",
+      "hint": "merge the Extension chunks into one (kit.export re-export with the fixed embed_col; satk rw patch can rewrite the file)",
+      "prevents": "a vehicle that streams but is never created (invisible), lost embedded collision"
+    },
     "dff.tris_budget": {
       "sev": "warn",
       "params": {"budget": {"map": 12000, "lod": 2500, "cars": 7000, "peds": 3000, "weap": 2000, "other": 20000}},
-      "msg": "{tris} triangles > {limit} (budget of class {cls})",
-      "what": "triangle budget per model class",
+      "msg": "{tris} triangles > {limit} (class {cls}: streaming and fill cost of the whole file)",
+      "what": "triangles of the whole file above the class limit (a performance hint for mods; the tier presets vanilla and sa_plus never grade triangles)",
       "what_ru": "Бюджет треугольников по классу модели",
       "ref": "research 22 sec. 3.1 (vanilla p50/p90/max per class)"
     },
@@ -295,12 +304,12 @@
     },
     "veh.hd_tris": {
       "sev": "warn", "params": {"budget": {"default": 3200, "bike": 3500, "mtruck": 5200, "plane": 3500, "train": 3300}},
-      "msg": "veh.hd_tris {tris} > {limit} for a {vtype} (chassis + parts + the wheel once; _dam and _vlo not counted)",
+      "msg": "veh.hd_tris {tris} > {limit} for a {vtype} (chassis + parts + the wheel once; _dam and _vlo not counted): above the vanilla maximum, a reference only",
       "what": "high-detail triangles of a vehicle (the canonical veh.hd_tris: chassis, every _ok part and extra, the wheel mesh once)",
       "what_ru": "Треугольники высокой детализации машины (veh.hd_tris: кузов, все _ok-части, колесо один раз)",
       "ref": "satk.style veh.hd_tris; vanilla maximum per type: car 3,104, bike 3,453, mtruck 5,125, plane 3,460, train 3,258",
-      "hint": "satk asset lint <dff> --preset sa_plus applies the higher sa_plus tier",
-      "prevents": "streaming and fill cost above the tier"
+      "hint": "information: richer detail in the SA style is welcome; mind the 65,535 vertices per geometry (dff.verts_max)",
+      "prevents": "nothing by itself: a count is never a target"
     },
     "veh.part_tris": {
       "sev": "warn", "params": {"types": ["car", "mtruck", "quad"], "budget": {"chassis": 2600, "chassis_vlo": 340, "wheel": 400, "door": 260, "bump": 340, "bonnet": 180, "boot": 290, "windscreen": 40}},
@@ -308,8 +317,8 @@
       "what": "triangles of one vehicle part (chassis, chassis_vlo, wheel, doors, bumpers, bonnet, boot, windscreen)",
       "what_ru": "Треугольники одной части машины (кузов, chassis_vlo, колесо, двери, бамперы, капот, багажник, стекло)",
       "ref": "satk.style part.tris; vanilla maximum (cars, monster trucks, quad): chassis 2,495, chassis_vlo 338, wheel 382, door 256, bump 332, bonnet 174, boot 282, windscreen 40",
-      "hint": "move detail to where the silhouette lives; satk asset lint --preset sa_plus applies the higher tier",
-      "prevents": "one part eating the budget of the whole car"
+      "hint": "information: a part count is never a target",
+      "prevents": "nothing by itself: a count is never a target"
     },
     "veh.dam_ratio": {
       "sev": "warn", "params": {"lo": 0.5, "hi": 1.4, "min_tris": 24},
@@ -714,22 +723,24 @@
       "mat.alpha_draw_last": {"enabled": true}
     },
     "vanilla": {
-      "_comment": "Detail tier 'vanilla' (satk.style): new content that must sit unnoticed next to vanilla. Conventions vanilla follows in at least 95 % of its files are warnings; budgets are the vanilla p98 per model class (whole file), vehicles on veh.hd_tris and veh.part_tris (vanilla maxima). Mipmaps stay info: vanilla vehicle, ped and weapon textures have none, most map textures below 256 px neither.",
+      "_comment": "Detail tier 'vanilla' (satk.style): new content that must sit unnoticed next to vanilla. Conventions vanilla follows in at least 95 % of its files are warnings; triangle counts are reported as information (vanilla p98 per model class and the vanilla maxima per vehicle part), never graded. Mipmaps stay info: vanilla vehicle, ped and weapon textures have none, most map textures below 256 px neither.",
       "txd.size_max": {"params": {"max": 512}},
       "txd.pow2": {"sev": "error"},
       "dff.night_missing": {"sev": "warn"},
       "dff.prelight_black": {"sev": "warn"},
-      "dff.tris_budget": {"params": {"budget": {"map": 1900, "lod": 560, "cars": 5300, "peds": 2100, "weap": 1300, "upgrade": 800, "pickup": 460, "interior_prop": 1600, "interior_shell": 5600, "other": 1900}}},
-      "dff.materials_budget": {"params": {"budget": {"map": 18, "lod": 12, "cars": 125, "peds": 3, "weap": 4, "upgrade": 8, "pickup": 5, "interior_prop": 10, "interior_shell": 34, "other": 30}}},
+      "dff.tris_budget": {"sev": "info", "params": {"budget": {"map": 1900, "lod": 560, "cars": 5300, "peds": 2100, "weap": 1300, "upgrade": 800, "pickup": 460, "interior_prop": 1600, "interior_shell": 5600, "other": 1900}}},
+      "dff.materials_budget": {"sev": "info", "params": {"budget": {"map": 18, "lod": 12, "cars": 125, "peds": 3, "weap": 4, "upgrade": 8, "pickup": 5, "interior_prop": 10, "interior_shell": 34, "other": 30}}},
+      "veh.hd_tris": {"sev": "info"},
+      "veh.part_tris": {"sev": "info"},
       "link.texture_missing": {"sev": "error"}
     },
     "sa_plus": {
       "_base": "vanilla",
-      "_comment": "Detail tier 'sa_plus' (satk.style, default for new assets; the numbers are a PROPOSAL until validated in game): the vanilla visual language with higher budgets where silhouette and curvature live. Vehicles: veh.hd_tris 3,000-4,500 (cap 5,000), chassis 2,000-3,000, wheels 16-24 sides; map models up to 2x the class p90; peds 1,600-2,500; weapons 400-1,200; LODs unchanged.",
-      "dff.tris_budget": {"params": {"budget": {"map": 2000, "lod": 560, "cars": 9000, "peds": 3000, "weap": 1500, "upgrade": 1200, "pickup": 500, "interior_prop": 1600, "interior_shell": 6000, "other": 2200}}},
-      "dff.materials_budget": {"params": {"budget": {"cars": 160}}},
-      "veh.hd_tris": {"params": {"budget": {"default": 5000, "bike": 5600, "mtruck": 8300, "plane": 5600, "train": 5300}}},
-      "veh.part_tris": {"params": {"budget": {"chassis": 3600, "chassis_vlo": 340, "wheel": 480, "door": 300, "bump": 360, "bonnet": 290, "boot": 460, "windscreen": 48}}},
+      "_comment": "Detail tier 'sa_plus' (satk.style, default for new assets): the vanilla visual language at a free detail level. No triangle or material budget runs (richer interiors, engine bays and lamp housings in the same style are welcome); the engine limits stay: 65,535 vertices per geometry, names, frames, TXD formats, collision, vehicle semantics.",
+      "dff.tris_budget": {"enabled": false},
+      "dff.materials_budget": {"enabled": false},
+      "veh.hd_tris": {"enabled": false},
+      "veh.part_tris": {"enabled": false},
       "mat.alpha_draw_last": {"enabled": true}
     }
   }

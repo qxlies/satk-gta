@@ -94,18 +94,21 @@ def texture_new(name: str, size: list[int] | None = None, color: str = "#808080"
 
 
 @op("texture.finish", mcp=False,
-    summary="Give a flat or drawn image the San Andreas texture look without photos: two-scale noise, AO from a "
-            "mask, worn edges from an edge mask, desaturation, grime; then pulls value, saturation, detail and "
-            "colour count into the inner vanilla band of its role. Writes the PNG and its DXT1 preview.",
+    summary="Give a flat, drawn or 4x-painted image the soft SA texture look: photo-like variation (--photo: "
+            "tonal drift, hue drift, light gradient; no grime) or soft noise, AO from a mask, optional grime and "
+            "edge wear, a soft filter, a supersampled path; lands in its role's vanilla band. PNG + DXT1 preview.",
     summary_ru="Придать плоской или нарисованной картинке вид текстур SA без фото: шум двух масштабов, AO по "
                "маске, потёртые края по маске краёв, обесцвечивание, грязь; значения подгоняются под полосу "
                "ванили для роли. PNG и превью DXT1.",
     examples=("satk texture finish interior.png --preset interior",
+              "satk texture finish seat_512.png --preset interior --supersample 4",
               "satk texture finish wall.png --preset wall --mask wall_ao.png",
-              "satk texture finish bin.png --mask bin_ao.png --edge bin_edge.png --role prop"))
+              "satk texture finish bin.png --mask bin_ao.png --edge bin_edge.png --role prop",
+              "satk texture finish bin_paint_1024.png --supersample 4 --photo 0.6 --role prop"))
 def texture_finish(image: str, preset: Literal["photo_like", "interior", "wheel", "wall"] = "photo_like",
                    mask: str | None = None, out: str | None = None, edge: str | None = None, role: str = "auto",
-                   profile: Profile = "vanilla") -> dict:
+                   profile: Profile = "vanilla", grime: float | None = None, wear: float | None = None,
+                   grain: float | None = None, soft: float = 0.5, supersample: int = 1, photo: float = 0.0) -> dict:
     """Finish one image for the SA look (deterministic: the same image and preset give the same file).
 
     Args:
@@ -117,10 +120,22 @@ def texture_finish(image: str, preset: Literal["photo_like", "interior", "wheel"
         role: style role whose vanilla band the result lands in (interior wheel decal body ped weapon wall ground
             prop generic); auto = the preset's, else guessed from the name, else prop.
         profile: profile whose vanilla textures give the role bands.
+        grime: 0..1 darker blotches heavier at the bottom; default the preset's, 0 for vehicle roles (interior,
+            wheel, decal, body: the engine's dirt level dirties a car).
+        wear: 0..1 strength of the edge wear from --edge; default 0.35, 0 for vehicle roles.
+        grain: 0..1 share of fine grain in the noise (default the preset's); lower is softer.
+        soft: blur of the soft filter in output pixels (0 = sharp; default 0.5: slightly out of focus like SA).
+        supersample: the image was painted at 1, 2, 4 or 8 times the texture size; the finish works at that size
+            and downsizes with the soft filter (paint at 4x, e.g. 512 px for a 128 px texture).
+        photo: 0..1 photo-like variation instead of the noise: soft low-frequency tonal drift, mottling and a soft
+            grain, a slight hue drift and a soft light gradient (none on wall and ground), landed on the role's
+            vanilla fine tonal variation (p10 + photo x (p50 - p10)); keeps the painted structure, grime 0 by
+            default. 0 = off. Use it on clean paint that style.texture calls flat/CG-clean (0.6 is a good start).
     """
     from .finish import finish
 
-    return finish(image, preset=preset, mask=mask, out=out, edge=edge, role=role, profile=profile)
+    return finish(image, preset=preset, mask=mask, out=out, edge=edge, role=role, profile=profile, grime=grime,
+                  wear=wear, grain=grain, soft=soft, supersample=supersample, photo=photo)
 
 
 @op("texture.replace", mcp=False,

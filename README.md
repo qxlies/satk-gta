@@ -4,18 +4,19 @@
 
 [![CI](https://github.com/qxlies/satk-gta/actions/workflows/ci.yml/badge.svg)](https://github.com/qxlies/satk-gta/actions/workflows/ci.yml)
 
-> **Status: public preview (0.3.0).** satk works and its checks pass, but commands, answers and file layouts may
+> **Status: public preview (0.4.0).** satk works and its checks pass, but commands, answers and file layouts may
 > still change before 1.0. Bug reports and ideas are welcome on the
 > [Issues](https://github.com/qxlies/satk-gta/issues) page.
 
 satk is a toolkit for GTA San Andreas (PC) modders, reverse engineers and people who debug the game. It indexes your
 game and lets you, or an AI assistant, find and inspect models, textures, map placements and crash addresses, build
 texture and model mods, register add-on cars, peds and weapons, tune handling, write CLEO scripts, generate
-collision, shrink textures, check mods for errors and conflicts, and convert maps. New in 0.3.0: create new cars,
-props, buildings and other assets in Blender that look like the stock game, check them against the vanilla style
-in numbers, edit animations, game text, zones and the time cycle, lint MTA resources and write MTA shaders, and
-check your model next to the map in the viewer or in the real game. It is one Python package with one command,
-`satk`, and one MCP server, also `satk`: both run the same operations and give the same answers.
+collision, shrink textures, check mods for errors and conflicts, and convert maps. New in 0.4.0: asset authoring
+through design, form, composition, detail, surface and finish gates, with rounded form tools, an inventory of
+required parts, close-up previews and checks backed by independent review beside vanilla peers. The
+[AI asset pipeline](docs/en/asset-pipeline.md) explains how to repeat the method with your own agents. It is one
+Python package with one command, `satk`, and one MCP server, also `satk`: both run the same operations and give
+the same answers.
 
 ## Security and privacy
 
@@ -77,6 +78,7 @@ Everything about installing (zip, git, Python package, where `work` lives, Windo
 | `satk anim` | IFP animations: list, edit as JSON, write, merge into `ped.ifp`, check against a skeleton, to and from Blender | [anim.md](docs/en/anim.md) |
 | `satk gxt`, `zone`, `water`, `timecyc` | game text, zones, water, the time cycle, population and radar tiles: read, edit, write as Mod Loader folders | [worldfiles.md](docs/en/worldfiles.md) |
 | `satk limits plan` | the engine limits your game and mods need, with limit adjuster settings | [limits.md](docs/en/limits.md) |
+| `satk pack` | `.saepak` content containers, derived-asset cache files, the texture dedup census | [pack.md](docs/en/pack.md), [saepak.md](docs/en/saepak.md), [dac.md](docs/en/dac.md) |
 | `satk mta`, `shader` | MTA:SA resources: Lua lint with the server's own messages, starter resources, model packs, logs; shaders for world textures | [mta.md](docs/en/mta.md), [shader.md](docs/en/shader.md) |
 | `satk map convert`, `ipl`, `paths` | SA-MP/MTA/IPL map conversion, binary IPL, vehicle and ped paths | [mapconv.md](docs/en/mapconv.md), [paths.md](docs/en/paths.md) |
 | `satk crash`, `re`, `kb` | crash dumps and logs, `gta_sa.exe` addresses to functions, engine knowledge base | [crash.md](docs/en/crash.md), [re.md](docs/en/re.md), [kb.md](docs/en/kb.md) |
@@ -85,7 +87,7 @@ Everything about installing (zip, git, Python package, where `work` lives, Windo
 | `satk ingame` | a mod in the real game on the MTA fork: test spots, behaviour checks against vanilla with frames, hot reload | [ingame.md](docs/en/ingame.md) |
 | `satk sp` | `satk_sp.asi`: camera, screenshots and picking in the single-player game | [spbridge.md](docs/en/spbridge.md) |
 | `satk blender`, `engine` | headless Blender import/render/export to MTA; build of the MTA fork | [blender.md](docs/en/blender.md), [engine.md](docs/en/engine.md) |
-| `satk style`, `asset check` | the stock San Andreas style in numbers per class and detail tier; a model or a texture checked against it | [style.md](docs/en/style.md), [sa-style.md](docs/en/sa-style.md) |
+| `satk style`, `asset check` | San Andreas style guidance and class references; model and texture defects, coverage and strict completion | [style.md](docs/en/style.md), [sa-style.md](docs/en/sa-style.md) |
 | `satk blender session`, `kit`, `blender preview` | new cars, props, buildings and other assets in a live Blender session: templates, blanks, generators, a game-like preview, export | [authoring.md](docs/en/authoring.md), [studio.md](docs/en/studio.md), [kit.md](docs/en/kit.md), [look.md](docs/en/look.md) |
 | `satk asset convert`, `texlib` | a third-party model brought to San Andreas scale, detail and textures; procedural SA-style textures | [convert.md](docs/en/convert.md), [texlib.md](docs/en/texlib.md) |
 | `satk status`, `doctor`, `help`, `mcp` | overview, diagnostics with fixes, help, the MCP server | [mcp.md](docs/en/mcp.md), [ai.md](docs/en/ai.md) |

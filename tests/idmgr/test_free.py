@@ -64,6 +64,11 @@ def test_cli_free_never_returns_a_taken_id(world, run_cli):
     assert v["ids"] == [700] and any(x.startswith("ADDON_VEHICLE") for x in v["warn"])
     o = run_cli(["id", "free", "--kind", "object", "--range", "999-1010", "--count", "2"]).json
     assert o["ids"] == [999, 1002] and o["free_in_range"] == 8 and o["taken_in_range"] == 4
+    # the weapon model block 321-373 is for weapons only
+    o = run_cli(["id", "free", "--kind", "object", "--range", "320-380", "--count", "2"]).json
+    assert o["ids"] and all(not 321 <= i <= 373 for i in o["ids"]), o["ids"]
+    w = run_cli(["id", "free", "--kind", "weapon", "--range", "321-373", "--count", "2"]).json
+    assert w["ids"] and all(321 <= i <= 373 for i in w["ids"]), w
 
 
 def test_cli_free_contiguous_range_mods_and_limits(world, run_cli, tmp_path, builders):

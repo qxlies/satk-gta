@@ -7,6 +7,7 @@ sibling modules.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import time as _time
@@ -99,10 +100,12 @@ def _players(applied: dict[str, Any] | None) -> list[dict[str, Any]]:
     summary_ru="Запустить (обновить) локальный тестовый сервер MTA с satk-agent и satk-testdrive и загрузить мод "
                "(DFF/TXD/COL + строки данных); сообщает, готов ли клиент и как подключиться.",
     examples=("satk ingame start --mod <mod folder>", "satk ingame start --mod premier.dff premier.txd --new",
-              "satk ingame start --mod mycar --kind vehicle --replace model:411", "satk ingame start --clear"))
+              "satk ingame start --mod mycar --kind vehicle --replace model:411", "satk ingame start --clear",
+              "satk ingame start --clear --conf sae_policy=0 fpslimit=0 --windowed --cvar vsync=0 fps_limit=0"))
 def ingame_start(mod: list[str] | None = None, kind: Kind = "auto", replace: str | None = None, new: bool = False,
                  base: str | None = None, name: str | None = None, spot: str = "grove", port: int = 22040,
-                 httpport: int = 22045, clear: bool = False, timeout: float = 90.0, profile: str = "vanilla") -> dict:
+                 httpport: int = 22045, clear: bool = False, timeout: float = 90.0, profile: str = "vanilla",
+                 conf: list[str] | None = None, cvar: list[str] | None = None, windowed: bool = False) -> dict:
     """Build the test resources, start or reuse the server, apply the models in a connected client.
 
     Args:
@@ -118,13 +121,25 @@ def ingame_start(mod: list[str] | None = None, kind: Kind = "auto", replace: str
         clear: forget the previous mod set (vanilla only).
         timeout: seconds to wait for the server and the resources.
         profile: index profile for vanilla names and handling.
+        conf: mtaserver.conf elements of the generated server config, as key=value, several allowed (any key except the
+            loopback safety ones: sae_policy=0, sae_dev_stock_translator=1, fpslimit=0, ...). Read at server start: a
+            running server with other values must be stopped first.
+        cvar: client cvars for coreconfig.xml, as key=value, several allowed; written before the client starts (the
+            original file is backed up once and restored by 'ingame stop' or 'ingame cvar-restore'); refused while
+            gta_sa.exe runs. The bench uses the same mechanism for --preset/--profile/--cvar.
+        windowed: shortcut for --cvar display_windowed=1 display_fullscreen_style=0.
     """
+    from ..viewer.backends import mta_lua
+    from . import cvars as CV
     from . import modset as MS
     from . import resource as R
     from . import session as S
     from . import spots as SP
 
     SP.spot(spot)
+    conf_over = mta_lua.parse_conf(conf)
+    cv_pairs = CV.collect(cvar, windowed)
+    CV.guard(cv_pairs)
     marks = S.log_marks()  # 'ingame logs --since start' reads what is written from here on
     st = {} if clear else S.load_state()
     if mod:
@@ -140,11 +155,13 @@ def ingame_start(mod: list[str] | None = None, kind: Kind = "auto", replace: str
     report_progress(1, 5, "resources")
     res_dir = S.resources_dir()
     logic = R.install_logic(res_dir)
+    R.install_bench(res_dir)  # the server config lists satk-bench: it must exist before the server starts
     content = R.build_content(res_dir, specs, label=label, defaults={"spot": spot, "time": "12:00", "weather": 0})
     report_progress(2, 5, "server")
-    up, w2 = S.ensure_server(port, httpport, timeout)
+    up, w2 = S.ensure_server(port, httpport, timeout, conf_over)
     warn += w2
     reused = bool(up.get("reused"))
+    cv = CV.apply(cv_pairs) if cv_pairs else None
     bridge = S.Bridge()
     started = S.start_resources(bridge, logic_changed=reused and bool(logic["changed"]),
                                 content_changed=reused and bool(content["changed"] or content["removed"]),
@@ -165,6 +182,9 @@ def ingame_start(mod: list[str] | None = None, kind: Kind = "auto", replace: str
         if applied.get("timeout"):
             warn.append("TIMEOUT: the client did not report the new models in time (satk ingame status)")
     nxt = []
+    if cv and joined and cv["changed"]:
+        warn.append("NOT_READY: a client is already connected; the cvars apply at its next start (satk ingame stop, "
+                    "then satk ingame play)")
     if not pre["setup_done"]:
         nxt.append(f"once, as administrator: {scripts['admin_setup']} (undo: {scripts['admin_rollback']})")
     if not joined:
@@ -173,9 +193,16 @@ def ingame_start(mod: list[str] | None = None, kind: Kind = "auto", replace: str
     if kinds:
         nxt += ["satk ingame drive" if "vehicle" in kinds else f"satk ingame spawn --kind {kinds[0]}",
                 f"satk ingame check --suite {kinds[0]}", "satk ingame reload  (after editing the files)"]
+    server = {"up": True, "reused": reused, "pid": up.get("pid"), "connect": f"mtasa://127.0.0.1:{sport}",
+              "resources": started, "template": up.get("template"), "conf": up.get("conf") or None}
+    cvars_out = None
+    if cv_pairs and cv:
+        cvars_out = {"set": cv["cvars"], "backup": cv["backup"],
+                     "changed": [f"{c['key']}: {c['was']} -> {c['now']}" for c in cv["changed"]] or None,
+                     "restore": "satk ingame stop (or satk ingame cvar-restore)"}
+        cvars_out = {k: v for k, v in cvars_out.items() if v is not None}
     return obj(
-        server={"up": True, "reused": reused, "pid": up.get("pid"), "connect": f"mtasa://127.0.0.1:{sport}",
-                "resources": started},
+        server={k: v for k, v in server.items() if v is not None}, cvars=cvars_out,
         rev=content["rev"], label=label, models=_model_rows(specs),
         changed=(content["changed"] + content["removed"] + [f"{R.LOGIC}/{c}" for c in logic["changed"]]) or None,
         client=client, play=S.play_info(sport, scripts), next=nxt, warn=warn or None)
@@ -256,6 +283,11 @@ def ingame_status() -> dict:
             warn.append(f"{e.code}: {e.msg}")
     pre = S.preflight()
     out["preflight"] = pre
+    if srv.get("conf"):
+        out["server"]["conf"] = srv["conf"]
+    from . import cvars as CV
+
+    out["cvars"] = CV.status()
     if not pre["setup_done"]:
         warn.append("NOT_READY: the one-time MTA client setup is missing: satk ingame start writes admin-setup.ps1")
     return obj(warn=warn or None, **out)
@@ -263,14 +295,33 @@ def ingame_status() -> dict:
 
 @op("ingame.stop", mcp=False, group="view",
     summary="Stop the in-game test server (the same server as 'view --target game'); the client a launcher "
-            "started is closed too.",
-    summary_ru="Остановить тестовый сервер (тот же, что у view --target game); запущенный клиент закрывается.",
+            "started is closed too, and the client config changed by --cvar/--windowed/bench is restored from its backup.",
+    summary_ru="Остановить тестовый сервер (тот же, что у view --target game); запущенный клиент закрывается, "
+               "coreconfig.xml, изменённый --cvar/--windowed/бенчем, восстанавливается из бэкапа.",
     examples=("satk ingame stop",))
 def ingame_stop() -> dict:
-    """Shut the loopback server down."""
+    """Shut the loopback server down, close the client satk started, restore the client config."""
     from ..viewer.backends import mta_lua
+    from . import cvars as CV
 
-    return obj(**mta_lua.stop())
+    out = mta_lua.stop()
+    cv = CV.restore_after_stop()
+    if cv is not None:
+        out["cvars"] = cv
+    return obj(**out)
+
+
+@op("ingame.cvar_restore", mcp=False, group="view",
+    summary="Put the client's coreconfig.xml back from the backup that 'ingame start --cvar/--windowed' or a bench with "
+            "--preset/--profile/--cvar took (once per run); refuses while gta_sa.exe runs. 'ingame stop' does it too.",
+    summary_ru="Вернуть coreconfig.xml клиента из бэкапа, сделанного 'ingame start --cvar/--windowed' или бенчем; "
+               "пока идёт gta_sa.exe, отказывает. 'ingame stop' делает то же.",
+    examples=("satk ingame cvar-restore",))
+def ingame_cvar_restore() -> dict:
+    """Restore the original client config and forget the launch-time cvars."""
+    from . import cvars as CV
+
+    return obj(**CV.restore())
 
 
 def _spawn(model: str, kind: str, at: str | None, heading: float | None, camera: str, time: str | None,
@@ -523,20 +574,198 @@ def ingame_suites() -> dict:
                                                 for c in cs])
 
 
+@op("ingame.bench_scenes", mcp=False, group="view",
+    summary="The bench scenes S1-S9 of 'ingame bench' (baseline, flyovers, twilight, collision and ped load, draw-distance "
+            "viewpoints, weapon probe, VA loader): stages, planned seconds and purpose. Static data.",
+    summary_ru="Сцены бенча S1-S9 (базовая, пролёты, сумерки, нагрузка коллизий и педов, точки обзора, оружие, "
+               "загрузчик VA): этапы, время и назначение.",
+    examples=("satk ingame bench-scenes",))
+def ingame_bench_scenes() -> dict:
+    """Static data; no game needed."""
+    from . import bench_scenes as BS
+
+    return table(["scene", "stages", "seconds", "title", "purpose"], BS.rows())
+
+
+def _server_fps_hook(b) -> Any:
+    """``hook(n)`` sets the server's FPS limit (``setFPSLimit``), ``hook(None)`` puts the first old value back."""
+    saved: dict[str, Any] = {}
+
+    def hook(fps: int | None) -> bool:
+        try:
+            if fps is None:
+                if saved.get("old") is None:
+                    return True
+                fps = saved["old"]
+            elif "old" not in saved:
+                v = b.exec("return getFPSLimit and getFPSLimit() or false", "server")
+                old = v[0] if v else None
+                saved["old"] = int(old) if isinstance(old, (int, float)) and not isinstance(old, bool) else None
+            v = b.exec(f"if not setFPSLimit then return false end return setFPSLimit({int(fps)})", "server")
+            return bool(v and v[0] is True)
+        except SatkError:
+            return False
+
+    return hook
+
+
+@op("ingame.bench", mcp=False, group="view", long_running=True,
+    summary="Frame-time and memory bench in the real game (satk-bench): scene S1-S9 (frozen time/weather, fixed or flying "
+            "camera, client cars/peds). --preset/--profile/--cvar relaunch the client with launch-time cvars. "
+            "Writes p50/p95/p99, FPS, VA, streaming to work/out/bench/<run>/<scene>-<label>.json.",
+    summary_ru="Бенч кадров и памяти в настоящей игре (ресурс satk-bench): сцена S1-S9; пресет/профиль/cvar применяются "
+               "перезапуском клиента; p50/p95/p99, FPS, VA, стриминг; результат в work/out/bench/<run>/.",
+    examples=("satk ingame bench --scene S1 --label mta", "satk ingame bench --scene S2 --label sae --preset classic "
+              "--duration 300", "satk ingame bench --scene S7 --label high --preset high",
+              "satk ingame bench --scene S2 --label mta --profile mta --restore-cvars"))
+def ingame_bench(scene: str | None = None, label: str = "run", preset: str | None = None, profile: str | None = None,
+                 duration: float | None = None, warmup: float | None = None, run: str | None = None,
+                 cvar: list[str] | None = None, settle: float = 10.0, restore_cvars: bool = False) -> dict:
+    """Run one scene on the connected client and save the result (needs the real game: 'ingame start' + a joined client).
+
+    The agent cannot reach the client's core console (sae_preset, sae_set), so --preset, --profile and --cvar are
+    **launch-time cvars**: the client satk started ('ingame play') is closed, coreconfig.xml gets the values (backed up
+    once), the client starts again and joins, and the scene runs. A client already launched with the same values is
+    not restarted (one restart per distinct preset/profile/cvar set, about a minute); a bench without these options
+    after one with them restarts the client back to the 'ingame start/play' values. A game satk did not start is
+    never closed (NOT_READY).
+
+    Args:
+        scene: S1..S9 (satk ingame bench-scenes lists them).
+        label: name of this variant in the file name (for example mta, sae, high).
+        preset: engine preset (cvar sae_preset: classic|balanced|high|extreme|custom; sa-engine client only).
+        profile: capacity profile (cvar sae_limits: mta|sae|sae-max).
+        duration: sample seconds of every stage (default per scene: 20; S2 180, S3 300, S4 90).
+        warmup: warm-up seconds of every stage (default 5).
+        run: run id = the folder under work/out/bench (default: the current time); reuse it to keep A and B together.
+        cvar: further launch-time cvars, as name=value, several allowed (written to coreconfig.xml, like sae_set).
+        settle: seconds to wait after a client restart before the first stage (the world and the resources load).
+        restore_cvars: after the scene close the client and restore the original coreconfig.xml (the next bench then
+            needs 'ingame play' again); without it the client keeps the values until 'ingame stop' or 'ingame cvar-restore'.
+    """
+    from ..core import paths as P
+    from . import bench as B
+    from . import bench_scenes as BS
+    from . import cvars as CV
+    from . import session as S
+
+    if not scene:
+        raise SatkError("BAD_PARAMS", "scene is required (S1..S9)", hint="satk ingame bench-scenes",
+                        did_you_mean=BS.scene_ids()[:3])
+    BS.scene(scene)
+    BS.resolve(scene, duration=duration, warmup=warmup)
+    launch = CV.bench_pairs(preset, profile, cvar)
+    run_id = B.slug(run) if run else B.new_run_id()
+    launched = bool(launch or (CV.load_state().get("layers") or {}).get("run"))
+    restart: dict[str, Any] | None = None
+
+    def game(need_client: bool = False):
+        try:
+            return _bridge(need_client=need_client)
+        except SatkError as e:
+            if e.code == "NOT_READY":
+                raise SatkError("NOT_READY", f"ingame bench needs the real game running: {e.msg}",
+                                hint="satk ingame start, then join with the MTA client (satk ingame play)") from None
+            raise
+
+    if launched:
+        restart = CV.relaunch(launch, joined=game().client_joined())
+    b = game(need_client=True)
+    warn: list[str] = []
+    if restart and restart.get("restarted"):
+        rev = S.load_state().get("rev")
+        if rev:
+            S.wait_applied(b, rev, timeout=60.0)
+        if settle > 0:
+            _time.sleep(float(settle))
+        warn.append(f"RESTARTED: the client was relaunched with {restart['cvars']} ({restart['seconds']} s)")
+    report_progress(0, 3, "satk-bench resource")
+    boot = S.ensure_bench(b)
+    out_path = B.result_path(run_id, scene, label)
+    P.ensure_writable(out_path)
+    try:
+        doc = B.run_scene(B.BenchClient(b), b.console, scene=scene, label=label, run=run_id, preset=preset,
+                          profile=profile, duration=duration, warmup=warmup, sets=None,
+                          progress=lambda i, n, msg: report_progress(i + 1, n + 1, msg),
+                          launch=launch if launched else None, server_fps=_server_fps_hook(b))
+    except B.IncompleteRun as e:
+        P.atomic_write(out_path, json.dumps(e.doc, indent=1, ensure_ascii=False) + "\n")
+        err = e.error
+        raise SatkError(err.code, f"{err.msg} (partial result saved)", hint=err.hint,
+                        data={"file": P.jpath(out_path), **(err.data or {})}) from None
+    if restart and restart.get("restarted"):
+        doc["client_restart"] = {"cvars": restart["cvars"], "seconds": restart["seconds"], "settle_s": settle}
+    cvars_out = None
+    if restore_cvars and CV.load_state():
+        CV.close_client()
+        cvars_out = CV.restore()
+    elif launched and CV.load_state():
+        warn.append("CVARS: the client keeps the launch-time cvars until 'satk ingame stop' or 'satk ingame cvar-restore' "
+                    "(or pass --restore-cvars)")
+    doc["warn"] = [*(doc.get("warn") or []), *warn] or None
+    if doc["warn"] is None:
+        del doc["warn"]
+    P.atomic_write(out_path, json.dumps(doc, indent=1, ensure_ascii=False) + "\n")
+    rows = []
+    for st in doc["stages"]:
+        m = B.stage_metrics(st)
+        rows.append([st.get("id"), m["n"], m["fps_avg"], m["p50_ms"], m["p95_ms"], m["p99_ms"], m["max_ms"], m["low1_fps"],
+                     m["va_peak_mib"], m["stream_peak_mib"], m["clock_ratio"]])
+    env = table(["stage", "frames", "fps_avg", "p50_ms", "p95_ms", "p99_ms", "max_ms", "low1_fps", "va_peak_mib",
+                 "stream_peak_mib", "clock_ratio"], rows, warn=doc.get("warn") or [])
+    env.update(file=P.jpath(out_path), run=run_id, scene=doc["scene"], label=label, summary=doc["summary"],
+               installed=boot["installed"] or None, restarted=bool(restart and restart.get("restarted")) or None,
+               cvars=cvars_out, next=f"satk ingame bench-compare <A> {P.jpath(out_path)}")
+    return {k: v for k, v in env.items() if v is not None}
+
+
+@op("ingame.bench_compare", mcp=False, group="view",
+    summary="Compare two bench results (A = reference, B = candidate) per stage: p50 frame time <= +5 %, p99 <= +10 %, peak "
+            "VA under yellow (3 GiB); table with a verdict per rule and an overall pass/FAIL. Reads files only.",
+    summary_ru="Сравнить два результата бенча (A эталон, B кандидат): p50 <= +5 %, p99 <= +10 %, VA ниже жёлтой "
+               "линии 3 ГиБ; таблица вердиктов.",
+    examples=("satk ingame bench-compare 20261007-1200/S2-mta 20261007-1200/S2-sae",))
+def ingame_bench_compare(a: str, b: str, p50_tol: float = 5.0, p99_tol: float = 10.0,
+                         va_yellow_mib: float = 3072.0) -> dict:
+    """Apply the comparison rules to two result files; needs no game.
+
+    Args:
+        a: reference result: a file, or <run>/<scene>-<label> under work/out/bench, or <scene>-<label> of the newest run.
+        b: candidate result (same forms).
+        p50_tol: allowed p50 frame-time growth in percent.
+        p99_tol: allowed p99 frame-time growth in percent.
+        va_yellow_mib: used-VA limit in MiB (3 GiB yellow line).
+    """
+    from ..core import paths as P
+    from . import bench as B
+
+    da, pa = B.load_result(a)
+    db, pb = B.load_result(b)
+    r = B.compare(da, db, p50_tol=float(p50_tol), p99_tol=float(p99_tol), yellow_mib=float(va_yellow_mib))
+    env = table(["stage", "metric", "A", "B", "delta", "limit", "verdict"], r["rows"], warn=r["warn"])
+    env.update(verdict=r["verdict"], failed=r["failed"] or None, A=P.jpath(pa), B=P.jpath(pb),
+               labels=f"{da.get('label')} -> {db.get('label')}")
+    return {k: v for k, v in env.items() if v is not None}
+
+
 @cli_only("it starts the MTA client (the loader writes HKLM/ProgramData); the user runs it", consent=True)
 @op("ingame.play", mcp=False, group="view", long_running=True,
     summary="Start the MTA fork client and join the in-game test server (for the user; needs the one-time "
             "admin-setup.ps1 that 'ingame start' writes).",
     summary_ru="Запустить клиент форка MTA и подключиться к тестовому серверу (для пользователя; нужен "
                "admin-setup.ps1 один раз).",
-    examples=("satk ingame play",))
-def ingame_play(timeout: float = 180.0) -> dict:
+    examples=("satk ingame play", "satk ingame play --windowed --cvar vsync=0 fps_limit=0"))
+def ingame_play(timeout: float = 180.0, cvar: list[str] | None = None, windowed: bool = False) -> dict:
     """Preflight, then the client against mtasa://127.0.0.1:<port>; waits until satk-agent says hello.
 
     Args:
         timeout: seconds to wait for the client to join.
+        cvar: client cvars to write into coreconfig.xml before the start, as key=value, several allowed (backup and
+            restore as in 'ingame start --cvar'); on top of those of 'ingame start'.
+        windowed: shortcut for --cvar display_windowed=1 display_fullscreen_style=0.
     """
     from ..viewer.backends import mta_lua
+    from . import cvars as CV
     from . import session as S
 
     srv = mta_lua.status(probe=False)
@@ -552,4 +781,4 @@ def ingame_play(timeout: float = 180.0) -> dict:
     if pre["game_running"]:
         raise SatkError("NOT_READY", "GTA:SA (or MTA) is already running",
                         hint=f"in the running MTA press F8 and type: connect 127.0.0.1 {port}")
-    return obj(**mta_lua.start_client(timeout=timeout))
+    return obj(**CV.launch_client(CV.collect(cvar, windowed), timeout=timeout))

@@ -5,7 +5,8 @@ session journal ``journal.jsonl``, ``checkpoints/``, ``snaps/`` and ``refs/``. `
 
     {"asset": 1, "name", "kind", "intent": "replace|add", "like": "model:426", "target": "sp|mta|samp",
      "tier": "vanilla|sa_plus", "dims": {"target": [x, y, z], "like": [x, y, z], "source"},
-     "gates": {"G0": "open|done|skipped", ... "G5"}, "decisions": [{"n", "text"}],
+     "gates": {"G0": "open|review|done|skipped", ... "G5"}, "gate_notes": {"G3": "why it was skipped"},
+     "decisions": [{"n", "text"}],
      "checkpoints": [{"n", "tag"}], "last_export": {...}, "last_check": {...},
      "issues": [{"id", "text", "open"}], "session": "<name>"}
 
@@ -37,10 +38,13 @@ GATES = {
     "G4": "UV and textures (style.texture)",
     "G5": "export, asset.check, lint, package",
 }
-GATE_STATES = ("open", "done", "skipped")
+#: ``review``: the builder handed the gate in (a reviewer or the harness closes it); ``done`` needs the gate's
+#: inventory items built (:func:`gate_open_items`); ``skipped`` needs a reason (``why``), listed on the card.
+GATE_STATES = ("open", "review", "done", "skipped")
 #: Asset kinds when the kit catalog (data/kit/kinds.json) is not installed.
 KINDS = ("automobile", "mtruck", "quad", "bike", "bmx", "boat", "plane", "heli", "trailer", "train",
-         "prop", "building", "interior_shell", "interior_prop", "breakable", "animated_object", "weapon", "ped",
+         "prop", "building", "interior_shell", "interior_prop", "breakable", "animated_object", "weapon",
+         "weapon_melee", "ped",
          "pickup", "vehicle_upgrade")
 INTENTS = ("replace", "add")
 TARGETS = ("sp", "mta", "samp")
@@ -136,87 +140,29 @@ def like_info(sid: str, profile: str = "vanilla") -> dict:
                        "AND bmin_x IS NOT NULL", [stem], limit=1)
         if env.get("rows"):
             b = env["rows"][0]
-            out["dims"] = [round(b[3] - b[0], 3), round(b[4] - b[1], 3), round(b[5] - b[2], 3)]
-    return out
-
-
-#: Metrics a session's step stats measure (the rest of a profile stays out of the request): exact names
-#: and prefixes.
-_SESSION_METRICS = frozenset({"geo.tris", "dims.W", "dims.L", "dims.H"})
-_SESSION_PREFIXES = ("shade.", "dff.verts_per_tri", "uv.zero_area", "part.tris[")
-
-
-def _bands(cls_or_sid: str | None, tier: str) -> dict:
-    """Tier bands of the peer set for the session stats, exactly as ``asset.check`` judges them:
-    ``{metric: {"s": [p10, p50, p90, n], "lo", "hi", "status", "cap"?, "parent"?}}`` (``satk.style`` K2)."""
-    if not cls_or_sid:
-        return {}
-    try:
-        from ..style import cache as SK  # lane style (K2); optional
-        from ..style import classes as SC
-        from ..style.profile import resolve_target, tier_band
-
-        c = SK.load("vanilla")
-        tg = resolve_target(str(cls_or_sid), c)
-        key = tg["peer_set"]
-        peer = c.peers[key]["metrics"]
-        chain = SC.fallback_chain(key)
-        parent = c.peers.get(chain[1], {}).get("metrics", {}) if len(chain) > 1 else {}
-    except Exception:  # noqa: BLE001 - no index, no style cache or no profile for this class: no bands
-        return {}
-    out: dict = {}
-    for m in sorted(peer):
-        if m not in _SESSION_METRICS and not m.startswith(_SESSION_PREFIXES):
-            continue
-        st = peer[m]
-        if not isinstance(st, list) or len(st) < 3:
-            continue
-        tb = tier_band(m, st, key, tier)
-        row: dict = {"s": [float(x) for x in st[:4]], "lo": float(tb["lo"]), "hi": float(tb["hi"]),
-                     "status": tb["status"]}
-        if "cap" in tb:
-            row["cap"] = float(tb["cap"])
-        if m in parent:
-            row["parent"] = [float(x) for x in parent[m][:4]]
-        out[m] = row
+            d = [round(b[3] - b[0], 3), round(b[4] - b[1], 3), round(b[5] - b[2], 3)]
+            if str(mf.sec or "").lower() == "peds":
+                d = [d[0], d[2], d[1]]      # the ped bind pose lies along Y (head +Y): a standing ped is Z-up
+            out["dims"] = d
     return out
 
 
 def session_config(p: Path, data: dict) -> dict:
-    """What a session of this project gets in its request: class bands and target dimensions."""
+    """What a session of this project gets in its request: the target dimensions (step stats judge no number
+    against a band, so no class bands are sent)."""
     out: dict = {}
     dims = (data.get("dims") or {}).get("target")
     if isinstance(dims, list) and len(dims) == 3:
         out["target_dims"] = dims
-    bands = _bands(data.get("like") or data.get("class") or _kind_class(data), data.get("tier") or "sa_plus")
-    if bands:
-        out["bands"] = bands
-        out["tier"] = data.get("tier") or "sa_plus"
     return out
 
 
-def _kind_class(data: dict) -> str | None:
-    """The style class of an asset without a like model: its kind and the size bucket of its target size."""
-    try:
-        from ..style import classes as SC
-
-        kind = str(data.get("kind") or "")
-        if not kind:
-            return None
-        try:
-            cls = SC.resolve(kind)
-        except SatkError:
-            cls = next((c for c, v in SC.taxonomy()["classes"].items() if v.get("kind") == kind), None)
-        dims = (data.get("dims") or {}).get("target") or []
-        size = max(float(x) for x in dims) if len(dims) == 3 else None
-        return SC.peer_key(cls, SC.size_bucket(size)) if cls else None
-    except Exception:  # noqa: BLE001 - no style package
-        return None
-
-
 def init(d: str, *, kind: str, intent: str = "add", like: str | None = None, target: str = "sp",
-         tier: str = "sa_plus", dims: list[float] | None = None, force: bool = False) -> dict:
-    """Create ``asset.json`` (G0 opened); ``like`` fills the target dimensions from the vanilla model."""
+         tier: str = "sa_plus", dims: list[float] | None = None, force: bool = False,
+         detail: str | None = "hero") -> dict:
+    """Create ``asset.json`` (G0 opened); ``like`` fills the target dimensions from the vanilla model; ``detail``
+    (simple|standard|hero, ``None``/``"none"``: no inventory) seeds ``design/inventory.json`` from the kind's starter
+    list unless the project already has one."""
     ks = kinds()
     if kind not in ks:
         import difflib
@@ -250,6 +196,8 @@ def init(d: str, *, kind: str, intent: str = "add", like: str | None = None, tar
                 raise
             data["like"] = like
             warn.append(f"{e.code}: like {like}: {e.msg}")
+    if like:
+        _check_like_kind(kind, data.get("like"), warn)
     if dims is not None:
         if len(dims) != 3 or not all(isinstance(x, (int, float)) and x > 0 for x in dims):
             raise SatkError("BAD_PARAMS", "dims must be three positive numbers: width (x), length (y), height (z)")
@@ -263,29 +211,69 @@ def init(d: str, *, kind: str, intent: str = "add", like: str | None = None, tar
     data["issues"] = []
     for sub in ("refs", "snaps", "checkpoints", "out"):
         paths.ensure_writable(p / sub).mkdir(parents=True, exist_ok=True)
+    inv_out = _seed_inventory(p, kind, detail, warn)
+    if inv_out:
+        data["detail"] = inv_out["detail"]
+    elif detail in (None, "", "none"):
+        data["detail"] = "none"         # no inventory: asset.check --strict will not call this asset done
+        warn.append("NO_INVENTORY: --detail none: the asset has no itemised task list, so asset.check --strict "
+                    "never reports it done (re-skins and texture jobs use mod check)")
+
     save(p, data)
     out = {"project": paths.jpath(p), "name": p.name, "kind": kind, "tier": tier, "intent": intent}
     if data.get("like"):
         out["like"] = data["like"]
     if dd.get("target"):
         out["dims"] = dd["target"]
+    if inv_out:
+        out["inventory"] = inv_out
     out["next"] = (f"satk blender session start --project {p.name}; then G0: style profile and refs "
-                   f"(satk ref import <photo> --project {p.name})")
+                   f"(satk ref import <photo> --project {p.name})"
+                   + (f", and make design/inventory.json the real design (satk asset inventory {p.name} --plan)"
+                      if inv_out else ""))
     if warn:
         out["warn"] = warn
     return out
 
 
+def _seed_inventory(p: Path, kind: str, detail: str | None, warn: list[str]) -> dict | None:
+    """``design/inventory.json`` from the starter of ``kind`` (an existing inventory is kept)."""
+    if detail in (None, "", "none"):
+        return None
+    try:
+        from ..inventory import schema as SC
+        from ..inventory import starter as ST
+    except ImportError:
+        return None
+    f = p / SC.FILE
+    if f.is_file():
+        try:
+            inv = SC.load_file(f)
+            return {"file": paths.jpath(f), "detail": inv.get("detail"), "items": len(inv.get("items") or []),
+                    "kept": True}
+        except SatkError as e:
+            warn.append(f"{e.code}: {e.msg}")
+            return None
+    try:
+        inv = ST.instantiate(kind, detail)
+    except SatkError as e:
+        warn.append(f"{e.code}: no starter inventory: {e.msg}")
+        return None
+    SC.save(p, inv)
+    return {"file": paths.jpath(f), "detail": detail, "items": len(inv["items"])}
+
+
 def record(d: str, rec: dict) -> dict:
     """Record decisions, gate states, issues and the last check/export in ``asset.json``.
 
-    ``rec`` keys: ``decision`` (text), ``gate`` + ``state`` (open|done|skipped), ``issue`` (text),
-    ``close`` (issue id), ``check`` / ``export`` (a short result object), ``checkpoint`` ({n, tag}),
-    ``dims`` ([x, y, z] target), ``step`` (journal step of a decision).
+    ``rec`` keys: ``decision`` (text), ``gate`` + ``state`` (open|review|done|skipped) + ``why`` (the reason of a
+    skip), ``issue`` (text), ``close`` (issue id), ``check`` / ``export`` (a short result object), ``checkpoint``
+    ({n, tag}), ``dims`` ([x, y, z] target), ``step`` (journal step of a decision). ``done`` of G1-G5 is refused
+    while the gate's required inventory items are not built (``asset.inventory --stage``).
     """
     if not isinstance(rec, dict) or not rec:
         raise SatkError("BAD_PARAMS", "record: give an object such as {\"decision\": \"...\"}")
-    known = {"decision", "gate", "state", "issue", "close", "check", "export", "checkpoint", "dims", "step"}
+    known = {"decision", "gate", "state", "why", "issue", "close", "check", "export", "checkpoint", "dims", "step"}
     extra = set(rec) - known
     if extra:
         raise SatkError("BAD_PARAMS", f"record: unknown key(s) {sorted(extra)}", data={"keys": sorted(known)})
@@ -304,6 +292,25 @@ def record(d: str, rec: dict) -> dict:
         st = rec.get("state", "done")
         if st not in GATE_STATES:
             raise SatkError("BAD_PARAMS", f"state must be one of {', '.join(GATE_STATES)}")
+        notes = data.setdefault("gate_notes", {})
+        if st == "skipped":
+            why = rec.get("why")
+            if not isinstance(why, str) or len(why.strip()) < 8:
+                raise SatkError("BAD_PARAMS", f"skipping {g} needs a reason: {{\"gate\": \"{g}\", \"state\": "
+                                              "\"skipped\", \"why\": \"<what makes this gate not apply>\"}")
+            notes[g] = why.strip()[:_TEXT_MAX]
+        elif st == "done" and g != "G0":
+            left = gate_open_items(p, g)
+            if left:
+                raise SatkError("BAD_PARAMS", f"{g} is not done: {len(left)} required inventory item(s) are not "
+                                              f"built: {'; '.join(left[:6])}",
+                                hint=f"build and tag them (satk asset inventory {p.name} --stage {g}); a reviewer "
+                                     "closes a gate handed in with state review")
+            notes.pop(g, None)
+        else:
+            notes.pop(g, None)
+        if not notes:
+            data.pop("gate_notes", None)
         data.setdefault("gates", {})[g] = st
         done.append(f"{g}={st}")
     if "issue" in rec:
@@ -345,6 +352,55 @@ def record(d: str, rec: dict) -> dict:
     return {"project": paths.jpath(p), "recorded": done}
 
 
+def gate_open_items(p: Path, gate: str) -> list[str]:
+    """Required inventory items of the gates up to ``gate`` (G5: all) that are not built, as ``"I05 Rim: missing"``
+    (empty: none, or the project has no inventory). The report measures the running session or the newest
+    checkpoint; when it cannot run, that is the one row."""
+    if not (p / "design" / "inventory.json").is_file():
+        return []
+    try:
+        from ..inventory.api import report
+    except ImportError:
+        return []
+    order = ("G1", "G2", "G3", "G4")
+    upto = order if gate == "G5" else order[: order.index(gate) + 1] if gate in order else order
+    try:
+        rep = report(p, strict=True)
+    except SatkError as e:
+        return [f"the inventory report could not run ({e.code}: {e.msg})"[:200]]
+    out = [f"{r['id']} {r.get('name', '')}: {r['status']}" for r in rep.get("items") or []
+           if r.get("required") and r.get("stage") in upto and r.get("status") != "built"]
+    if gate == "G5" and rep.get("problems"):
+        out += [f"inventory: {x}"[:160] for x in rep["problems"][:3]]
+    return out
+
+
+def _check_like_kind(kind: str, like: str | None, warn: list[str]) -> None:
+    """The ``--like`` model must be of the kind's family (a pickup truck is not the collectible kind ``pickup``)."""
+    if not like:
+        return
+    try:
+        from ..kit.kinds import get
+        from ..look import lineup as LU
+        from ..look import regions as RG
+
+        row = LU.model_row(str(like), "vanilla")
+        lk = RG.kind_of_row(row)
+    except Exception:  # noqa: BLE001 - no index or no catalog: nothing to compare
+        return
+    if not lk or lk == kind:
+        return
+    try:
+        ga, gb = get(kind).get("group"), get(lk).get("group")
+    except SatkError:
+        return
+    if ga != gb or (kind != lk and {kind, lk} & {"pickup", "vehicle_upgrade"}):
+        raise SatkError("BAD_PARAMS", f"--like {like} is a {lk} ({gb}), not a {kind} ({ga}): the kind decides the "
+                                      "inventory, regions and checks",
+                        hint=f"satk asset init <name> --kind {lk} --like {like}, or a --like model of kind {kind}")
+    warn.append(f"KIND: --like {like} is a {lk}; the asset is a {kind} (same family, kept)")
+
+
 def _short(v: Any, n: int = 80) -> str:
     s = v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, separators=(",", ":"))
     return s if len(s) <= n else s[: n - 3] + "..."
@@ -367,6 +423,20 @@ def journal_summary(p: Path) -> dict:
     return out
 
 
+def _inventory_line(p: Path) -> str | None:
+    """``"hero, 58 items (52 required)"`` of the project's inventory (no measuring)."""
+    f = p / "design" / "inventory.json"
+    if not f.is_file():
+        return None
+    try:
+        inv = json.loads(f.read_text(encoding="utf-8-sig"))
+        items = [i for i in inv.get("items") or [] if isinstance(i, dict)]
+    except (OSError, ValueError, AttributeError):
+        return "unreadable: satk inventory validate " + p.name
+    req = sum(1 for i in items if i.get("required", True) is not False)
+    return f"{inv.get('detail')}, {len(items)} items ({req} required): satk asset inventory {p.name}"
+
+
 def _newest(folder: Path, pattern: str) -> Path | None:
     try:
         files = sorted(folder.glob(pattern), key=lambda f: f.name)
@@ -387,13 +457,18 @@ def status(d: str, *, session: dict | None = None) -> dict:
     if data.get("like"):
         card["like"] = data["like"]
     card["target"] = data.get("target")
-    card["gates"] = " ".join(f"{g}{'+' if gates.get(g) == 'done' else ('~' if gates.get(g) == 'skipped' else '-')}"
-                             for g in GATES)
+    marks = {"done": "+", "skipped": "~", "review": "?"}
+    card["gates"] = " ".join(f"{g}{marks.get(gates.get(g), '-')}" for g in GATES)
+    if data.get("gate_notes"):
+        card["skipped"] = {g: _short(t, 60) for g, t in data["gate_notes"].items()}
     if nxt:
         card["next_gate"] = f"{nxt}: {GATES[nxt]}"
     dims = data.get("dims") or {}
     if dims.get("target"):
         card["dims"] = dims["target"]
+    inv = _inventory_line(p)
+    if inv:
+        card["inventory"] = inv
     js = journal_summary(p)
     if js:
         card["journal"] = js
@@ -421,7 +496,7 @@ def status(d: str, *, session: dict | None = None) -> dict:
     if session is None or not session.get("up"):
         card["resume"] = f"satk blender session start --project {p.name}"
     # stay inside the budget: drop the least important fields first
-    for key in ("issues_more", "last_export", "decisions", "snapshot", "last_check", "issues", "journal"):
+    for key in ("issues_more", "last_export", "decisions", "snapshot", "last_check", "issues", "journal", "inventory"):
         if len(json.dumps(card, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) <= MAX_CARD:
             break
         card.pop(key, None)

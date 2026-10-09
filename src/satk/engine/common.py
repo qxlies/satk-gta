@@ -31,6 +31,10 @@ __all__ = [
     "EXPECTED_BASE",
     "Layout",
     "layout",
+    "fork_id_of",
+    "fork_profile",
+    "same_path",
+    "git_raw",
     "find_msbuild",
     "find_premake",
     "find_rc",
@@ -69,12 +73,37 @@ _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 @dataclass(frozen=True)
 class Layout:
-    """All engine paths, derived from ``[paths] engine`` (= ``<workspace>/engine/mtasa``)."""
+    """All engine paths, derived from ``[paths] engine`` (= ``<workspace>/engine/mtasa``).
+
+    ``fork_id`` is empty for the configured fork. A second checkout of the fork (``--fork PATH``,
+    usually a worktree under ``work/wt``) shares ``root`` (premake wrapper, ``deps``, shims) and
+    ``build_dir`` with it but has its own logs, build state and lock, keyed by ``fork_id``.
+    """
 
     fork: Path
     root: Path
     donor: Path
     build_dir: Path  # work/engine/build (logs, state, rc-test output)
+    fork_id: str = ""
+
+    @property
+    def is_default(self) -> bool:
+        return not self.fork_id
+
+    @property
+    def meta(self) -> Path:
+        """Registry entry written by ``engine worktree create`` (profile, branch, base)."""
+        return self.build_dir.parent / "forks" / f"{self.fork_id}.json"
+
+    @property
+    def lock_name(self) -> str:
+        """Name of the build lock (``exclusive``): one per fork, so two forks may build side by side."""
+        return "build" if self.is_default else f"build-{self.fork_id}"
+
+    @property
+    def tmp_id(self) -> str:
+        """``paths.tmp`` id of the build (TEMP/TMP of premake and MSBuild)."""
+        return "engine-build" if self.is_default else f"engine-build-{self.fork_id}"
 
     @property
     def shims(self) -> Path:
@@ -126,24 +155,74 @@ class Layout:
 
     @property
     def logs(self) -> Path:
-        return self.build_dir / "logs"
+        return self.build_dir / "logs" if self.is_default else self.build_dir / "logs" / self.fork_id
 
     @property
     def state(self) -> Path:
-        return self.build_dir / "state.json"
+        return self.build_dir / ("state.json" if self.is_default else f"state.{self.fork_id}.json")
 
 
-def layout() -> Layout:
-    """Current engine layout from the configuration (no directories are created)."""
+def _norm(p: str | os.PathLike) -> str:
+    return os.path.normcase(os.path.abspath(os.fspath(p))).rstrip("\\/")
+
+
+def same_path(a: str | os.PathLike, b: str | os.PathLike) -> bool:
+    """True when two spellings name the same directory (case, slashes, trailing separator)."""
+    return _norm(a) == _norm(b)
+
+
+_SAFE_ID = re.compile(r"[^a-z0-9_.-]+")
+
+
+def fork_id_of(path: str | os.PathLike, wt_root: str | os.PathLike | None = None) -> str:
+    """Stable id of a second fork checkout, used in log folders, state and lock names.
+
+    A checkout directly under ``work/wt`` is named by its folder (``work/wt/sae2-srv`` -> ``sae2-srv``);
+    any other path gets a short hash of the full path appended, so two folders with one name never
+    share logs or build state.
+    """
+    p = Path(os.path.abspath(os.fspath(path)))
+    name = _SAFE_ID.sub("-", p.name.lower()).strip("-.") or "fork"
+    if wt_root is not None and same_path(p.parent, wt_root):
+        return name
+    return f"{name}-{hashlib.sha1(_norm(p).encode('utf-8')).hexdigest()[:6]}"  # noqa: S324 - naming only
+
+
+def layout(fork: str | os.PathLike | None = None) -> Layout:
+    """Current engine layout from the configuration (no directories are created).
+
+    ``fork`` selects another checkout of the same fork (``--fork PATH``); ``None`` or the configured
+    path gives the default layout, unchanged. The path is not required to exist here.
+    """
     c = cfg()
-    fork = Path(os.path.abspath(c.paths.engine))
+    base = Path(os.path.abspath(c.paths.engine))
     src = c.paths.get("src") or (Path(c.paths.workspace) / "src")
-    return Layout(
-        fork=fork,
-        root=fork.parent,
+    work_dir = Path(os.path.abspath(c.paths.work))
+    default = Layout(
+        fork=base,
+        root=base.parent,
         donor=Path(os.path.abspath(src)) / "mtasa-neon",
-        build_dir=Path(os.path.abspath(c.paths.work)) / "engine" / "build",
+        build_dir=work_dir / "engine" / "build",
     )
+    if fork is None or str(fork).strip() == "":
+        return default
+    other = Path(os.path.abspath(os.fspath(fork)))
+    if same_path(other, base):
+        return default
+    return Layout(fork=other, root=default.root, donor=default.donor, build_dir=default.build_dir,
+                  fork_id=fork_id_of(other, work_dir / "wt"))
+
+
+def fork_profile(L: Layout) -> str | None:
+    """Sparse profile recorded by ``engine worktree create`` for a second fork (``None``: a full checkout,
+    including the configured fork)."""
+    if L.is_default:
+        return None
+    try:
+        data = read_json(L.meta, {}) or {}
+    except SatkError:
+        return None
+    return data.get("profile") if isinstance(data, dict) else None
 
 
 def file_url(p: Path) -> str:
@@ -373,6 +452,24 @@ def git(*args: str, cwd: Path | None = None, check: bool = True, timeout: float 
     return out
 
 
+def git_raw(*args: str, cwd: Path, input: bytes | None = None, check: bool = True,  # noqa: A002
+            timeout: float = 600) -> bytes:
+    """``git <args>`` with bytes on stdin and bytes back; always ``GIT_NO_LAZY_FETCH=1`` (never reaches a remote)."""
+    g = find_git()
+    if g is None:
+        raise SatkError("DEPENDENCY", "git not found on PATH", hint="install Git for Windows")
+    try:
+        p = subprocess.run([str(g), *args], cwd=str(cwd), capture_output=True, timeout=timeout, input=input,
+                           env=_git_env(True), creationflags=_NO_WINDOW)
+    except subprocess.TimeoutExpired:
+        raise SatkError("TIMEOUT", f"git {' '.join(args[:3])} timed out after {timeout:.0f}s") from None
+    if check and p.returncode != 0:
+        err = p.stderr.decode("utf-8", errors="replace").strip()
+        raise SatkError("EXTERNAL_TOOL", f"git {' '.join(args)} failed ({p.returncode}): {err[-800:]}",
+                        data={"cwd": jpath(cwd)})
+    return p.stdout
+
+
 def donor_git(*args: str, check: bool = True) -> str:
     """Read-only git in the donor ``src\\mtasa-neon``: no optional locks, no lazy fetch."""
     return git("--no-optional-locks", *args, cwd=layout().donor, check=check, no_lazy=True)
@@ -413,16 +510,18 @@ def disk_free_gb(path: Path) -> float:
     return round(shutil.disk_usage(p).free / 1e9, 1)
 
 
-def build_env(extra: dict | None = None) -> dict:
+def build_env(extra: dict | None = None, L: Layout | None = None) -> dict:
     """Environment for premake/MSBuild: TEMP/TMP on D: (R17), no MSBuild node reuse,
-    ``DXSDK_DIR`` = ``engine\\deps\\DXFiles\\`` (premake bakes it into the projects)."""
+    ``DXSDK_DIR`` = ``engine\\deps\\DXFiles\\`` (premake bakes it into the projects).
+
+    ``L`` (a second fork) gives the build its own TEMP/TMP folder; without it nothing changes."""
     env = os.environ.copy()
-    t = str(tmp("engine-build"))
+    t = str(tmp("engine-build" if L is None else L.tmp_id))
     env["TEMP"] = t
     env["TMP"] = t
     env["MSBUILDDISABLENODEREUSE"] = "1"
     env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
-    env["DXSDK_DIR"] = str(layout().dxfiles) + "\\"
+    env["DXSDK_DIR"] = str((layout() if L is None else L).dxfiles) + "\\"
     if extra:
         env.update({k: str(v) for k, v in extra.items()})
     return env

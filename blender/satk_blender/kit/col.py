@@ -6,7 +6,10 @@
 """``kit.col``: the editable collision of a kit model in Blender (the DragonFF fallback of ``col.gen``).
 
 * vehicles: a closed shadow mesh (convex hull of the undamaged body, decimated to the vanilla face count,
-  150-350 for a sedan) next to the sphere skeleton of the template;
+  150-350 for a sedan) next to the sphere skeleton of the template, and the contact faces ``<name>_colmesh``: a strip
+  of 8-14 triangles just under the top of the body from tail to nose (surface CAR 63, GLASS 45 over the windscreen),
+  what vanilla cars carry next to their spheres (8-12 faces, 12-16 vertices). ``kit.export`` merges them into the
+  ``col.gen`` collision, which has none;
 * world models: a hull, box or decimated mesh with the surface id and the face light (day/night nibbles
   from the mean prelight, never 0 = ambient only).
 
@@ -55,7 +58,10 @@ def face_light(o, coeffs=((0.0809, 2.385), (0.0889, 0.8793))) -> tuple[int, int]
 def _hull(me) -> object:
     bm = bmesh.new()
     try:
-        bm.from_mesh(me)
+        # the points only: faces of the source that lie on the hull would stay and overlap it
+        for v in me.vertices:
+            bm.verts.new(v.co)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=0.002)
         res = bmesh.ops.convex_hull(bm, input=bm.verts[:], use_existing_faces=False)
         junk = set(res.get("geom_interior", [])) | set(res.get("geom_unused", []))
         bmesh.ops.delete(bm, geom=[g for g in junk if isinstance(g, bmesh.types.BMVert)], context="VERTS")
@@ -99,8 +105,69 @@ def _put(o, me) -> None:
         bpy.data.meshes.remove(old)
 
 
+def _col_material(name: str, surface: int):
+    mat = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    mat.dff.col_mat_index = int(surface)
+    mat["satk_role"] = "col"
+    return mat
+
+
+def contact_faces(me, model: str, stations: int = 7):
+    """A new mesh: the contact strip under the top of ``me`` (root space). ``stations`` cross lines from tail to
+    nose, two vertices each 2 cm under the top surface; glass under a segment's middle gives surface GLASS."""
+    import numpy as np
+
+    n = len(me.vertices)
+    if n < 8:
+        return None
+    co = np.empty(n * 3)
+    me.vertices.foreach_get("co", co)
+    P = co.reshape(n, 3)
+    lo, hi = P.min(axis=0), P.max(axis=0)
+    L, W = float(hi[1] - lo[1]), float(hi[0] - lo[0])
+    win = L / (2.0 * stations)
+    ys = np.linspace(lo[1] + 0.05 * L, hi[1] - 0.05 * L, stations)
+    rows = []
+    for y in ys:
+        sel = P[(np.abs(P[:, 1] - y) < win) & (np.abs(P[:, 0]) < 0.3 * W)]
+        if not len(sel):
+            continue
+        top = float(sel[:, 2].max())
+        band = P[(np.abs(P[:, 1] - y) < win) & (P[:, 2] > top - 0.12)]
+        w = min(0.45 * W, 0.8 * float(np.abs(band[:, 0]).max())) if len(band) else 0.3 * W
+        rows.append((float(y), max(w, 0.1), top - 0.02))
+    if len(rows) < 2:
+        return None
+    centres = np.array([p.center for p in me.polygons]) if len(me.polygons) else np.zeros((0, 3))
+    mats = [m for m in me.materials]
+    verts, faces, surf = [], [], []
+    for y, w, z in rows:
+        verts += [(-w, y, z), (w, y, z)]
+    for i in range(len(rows) - 1):
+        a, b, c, d = 2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2
+        faces += [(a, b, c), (a, c, d)]
+        ym = (rows[i][0] + rows[i + 1][0]) / 2.0
+        glass = False
+        if len(centres):
+            m = (np.abs(centres[:, 1] - ym) < win) & (np.abs(centres[:, 0]) < 0.3 * W)
+            if m.any():
+                k = int(np.flatnonzero(m)[np.argmax(centres[m][:, 2])])
+                mi = me.polygons[k].material_index
+                mat = mats[mi] if mi < len(mats) else None
+                glass = mat is not None and str(mat.get("satk_role", "")) == "glass"
+        surf += [45 if glass else 63] * 2
+    out = bpy.data.meshes.new(f"{model}_colmesh")
+    out.from_pydata(verts, [], faces)
+    out.materials.append(_col_material(f"{model}.col_car", 63))
+    out.materials.append(_col_material(f"{model}.col_glass", 45))
+    for poly, s_ in zip(out.polygons, surf):
+        poly.material_index = 1 if s_ == 45 else 0
+    out.update()
+    return out
+
+
 def col_method(ctx, p: dict) -> dict:
-    """Collision in Blender: a closed shadow mesh for vehicles, hull/box/mesh with face light for world models."""
+    """Collision in Blender: vehicles get a closed shadow mesh and contact faces under the top (contact=false skips them); world models a hull/box/mesh with face light."""
     coll = U.clump(p.get("model"))
     name = str(coll.get("satk_name"))
     group = str(coll.get("satk_group") or "vehicle")
@@ -125,6 +192,16 @@ def col_method(ctx, p: dict) -> dict:
         _put(sh, hull)
         out.update(shadow_faces=len(hull.polygons))
         out["changed"] = [sh.name]
+        if p.get("contact", True):
+            me2 = merged_mesh(src, base, f"{name}_contact_src")
+            me2.transform(base.matrix_world)
+            cf = contact_faces(me2, name, int(U.num(p, "contact_stations", 7, "kit.col", 3, 16)))
+            bpy.data.meshes.remove(me2)
+            if cf is not None:
+                cm = _slot(c, f"{name}_colmesh", "COL", "col")
+                _put(cm, cf)
+                out.update(contact_faces=len(cf.polygons))
+                out["changed"].append(cm.name)
     else:
         mode = str(p.get("mode") or "hull").lower()
         if mode not in ("hull", "box", "mesh"):

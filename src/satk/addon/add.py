@@ -174,8 +174,12 @@ def _taken(gd: GameData, profile: str, kind: str, warn: list[str]):
 
 def _pick_id(id_: str, kind: str, taken: dict[int, str], max_id: int, warn: list[str]) -> int:
     from ..idmgr.free import free_ids
-    from ..idmgr.ranges import DEFAULT_RANGE, VANILLA_VEHICLES
+    from ..idmgr.ranges import DEFAULT_RANGE, VANILLA_VEHICLES, iter_range, kind_reserved
 
+    taken = dict(taken)
+    for a, b, why in kind_reserved(kind):
+        for i in iter_range(a, b):
+            taken.setdefault(i, why)
     if str(id_).strip().lower() in ("", "auto"):
         ids, _total = free_ids(taken, [(DEFAULT_RANGE[kind][0], max_id)], 1)
         if not ids:
@@ -239,6 +243,31 @@ def _check_names(gd: GameData, name: str, files: list[str], index_names: dict[st
         if f in idx:
             raise SatkError("EXISTS", f"{f} exists in {idx[f]}: the two files would replace each other",
                             hint="pick another --name")
+
+
+def _check_addon_names(name: str, own: str) -> None:
+    """A model name another add-on folder (``<work>/out/addon/<name>``, not installed yet) already defines."""
+    import os
+
+    from ..core.paths import cfg
+
+    root = Path(os.path.abspath(cfg().paths.work)) / "out" / "addon"
+    if not root.is_dir():
+        return
+    for d in sorted(root.iterdir()):
+        if not d.is_dir() or d.name.lower() == own.lower():
+            continue
+        for ide in d.rglob("*.ide"):
+            try:
+                text = ide.read_text(encoding="latin-1")
+            except OSError:
+                continue
+            for line in text.splitlines():
+                bits = [b.strip() for b in line.split(",")]
+                if len(bits) > 2 and bits[0].lstrip("-").isdigit() and bits[1].lower() == name:
+                    raise SatkError("EXISTS", f"model name {name!r} is defined by the add-on {d.name} "
+                                              f"({ide.name}): the two would replace each other",
+                                    hint="pick another --lod-name (or --name)")
 
 
 def _gxt_key(gd: GameData, name: str, warn: list[str]) -> str:
@@ -654,6 +683,7 @@ def add(kind: str, *, dff: str | None, txd: str | None, col: str | None, like: s
         lod_txd_name = lod_nm if lod_txd_bytes is not None else txd_name
         lod_files = [f"{lod_nm}.dff"] + ([f"{lod_nm}.txd"] if lod_txd_bytes is not None else [])
         _check_names(gd, lod_nm, lod_files, index_names, db)
+        _check_addon_names(lod_nm, nm)
         _check_dff(lod_bytes, lod_txd_names if lod_txd_names is not None else txd_names, kind, gd, warn)
         lod_id = _pick_id("auto" if str(id_).strip().lower() in ("", "auto") else str(mid + 1), kind,
                           {**taken, mid: "this add-on"}, max_id, warn)

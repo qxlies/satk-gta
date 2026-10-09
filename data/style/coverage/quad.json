@@ -1,0 +1,72 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "quad",
+ "ref": "style_vehicle",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (1; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "glass",
+   "what": "windows: glass with alpha below 255 (windscreen part, doors or body)",
+   "how": {
+    "glass": true
+   },
+   "fix": "glass panes on the generic glass region of vehiclegeneric256 with alpha 128 (windscreen_ok, door and body windows)",
+   "vanilla": "1/1"
+  },
+  {
+   "id": "wheels",
+   "what": "wheel geometry",
+   "how": {
+    "frame_geom": "^wheel"
+   },
+   "fix": "build the wheel (tyre + rim) as the atomic 'wheel' under a wheel dummy; the game copies it to the others",
+   "vanilla": "1/1"
+  },
+  {
+   "id": "exhaust",
+   "what": "an exhaust at the exhaust dummy",
+   "how": {
+    "frame_near": {
+     "frame": "exhaust",
+     "radius": 0.25
+    }
+   },
+   "fix": "build the exhaust ending at the exhaust dummy",
+   "vanilla": "1/1"
+  },
+  {
+   "id": "suspension",
+   "what": "suspension or axle parts",
+   "how": {
+    "frames": "^(suspension|transmission|rear_axle|steering|misc_)"
+   },
+   "fix": "build the suspension/axle parts the game moves",
+   "vanilla": "1/1"
+  },
+  {
+   "id": "handlebars",
+   "what": "handlebars (quad)",
+   "how": {
+    "parts": "^handlebars$"
+   },
+   "fix": "handlebars with grips",
+   "vanilla": "1/1"
+  },
+  {
+   "id": "seat",
+   "what": "a seat under ped_frontseat",
+   "how": {
+    "seat": true
+   },
+   "fix": "a seat where the rider pose expects it",
+   "vanilla": "1/1"
+  }
+ ]
+}

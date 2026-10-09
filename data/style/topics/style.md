@@ -1,66 +1,69 @@
-# SA style: the rules for any new asset (vanilla or sa_plus)
+# SA style: the look, the hard rules, and vanilla as reference
 
-Measured on the clean 1.0 US copy, not recalled. Bands are p10 / p50 / p90 over a named peer set. Read this
-topic plus ONE class topic (`style_vehicle`, `style_world`, `style_ped_weapon`) before modelling; add
-`style_shading` / `style_texture` when you reach that step. Exact numbers for your class: `style.profile <class>
---tier <tier>` (or `--like model:<id>`).
+The San Andreas look is DESCRIBED here; numbers from the stock game are reference, never targets, gates or
+warnings. Read this topic, `style_construction` (how vanilla builds a model) and ONE class topic
+(`style_vehicle`, `style_world`, `style_ped_weapon`); `style_references` when the asset depicts a real object;
+`style_shading` / `style_texture` when you reach that step.
+
+## The look
+- Shape: soft, rounded, "pillowy", simplified. Every surface a little crowned, corners turned in two or three
+  smooth steps, glasshouses leaning in, lower bodies bulging like a barrel. Never a hard box, never a sharp
+  modern crease except where a material or a panel changes.
+- One coherent whole: a welded shell carries the body, panels are cut from it, arches have liners, bumpers wrap
+  into the arches, details sit in recesses or touch the skin, lines run across the cuts.
+- Proportions: chunky and planted; cars about 1.1-1.2x the real car and relatively wider; the donor's lines
+  kept, its millimetres not. Non-vehicles measured against the 1.84 m ped.
+- Shading: soft normals, hard only on seams (material/UV borders) and named creases. Map models: no normals, a
+  dark baked prelight with occlusion.
+- Textures: small (about 128 px), soft and slightly blurry, photo-like, desaturated, light painted in. Car paint
+  is a clean key colour; the engine adds the dirt. Wear only where use leaves it.
+- Detail: free. Richer than vanilla (real interior, engine bay, underbody, deeper lamps) is welcome when it is
+  built in the same language. Model what reads at game distance, paint what is flat or fine.
+
+## Hard rules (the engine needs them)
+Frame names/parents/order, every `ug_*` frame of a replaced car, dummy sides; paint keys (60,255,0 /
+255,0,175) on `vehiclegrunge256`, lamp keys only on `vehiclelights128`, glass alpha 128, UV2 where
+`xvehicleenv128` is used; wheel mesh diameter = IDE `wheel_scale`; normals on dynamically lit models, prelight
+on map models; valid COL3 + shadow for vehicles; names (model/TXD/frame <= 23, 21 with COL, texture <= 31);
+TXD power of two, DXT1/DXT3, never DXT5, one mip level for vehicles/peds/weapons; <= 65,535 vertices per
+geometry; map HD with collision draw <= 299; ped skin (32 bones, <= 4 weights); ids and capacity of the target.
 
 ## Tiers
-- `sa_plus` (DEFAULT for new assets): the same visual language, higher budgets only where silhouette and
-  curvature live (chassis 2,000-3,000 tris, interior 250-450, wheels 16-24 sides, arches 12-16 segments, own
-  textures one size step up). These numbers are a PROPOSAL until validated with the user.
-- `vanilla`: every metric inside the measured class band; for replacements that must blend into traffic.
-- Never changes between tiers: shared textures and colour keys, paint on the dirt texture, the shading rule,
-  photo-like textures, formats (DXT1/DXT3, one mip level for vehicles/peds/weapons, never DXT5), scale, frames,
-  LOD, collision and shadow budgets, draw distance, prelight rules, data lines.
+- `sa_plus` (DEFAULT for new assets): the same visual language at a free detail level; own textures one size
+  step larger. No triangle numbers.
+- `vanilla`: about the detail of the stock peers, for a replacement that must blend into traffic or a street.
 - Record the tier and why in `asset.json` (`asset.init ... --tier`).
 
 ## Ten rules
-1. Measure, do not recall: `style.profile`, `asset.anatomy <SID>` of the model you replace or resemble.
-2. Model IN Blender through the live session (`blender.session start`, `blender.call`): primitives with explicit
-   segment counts, modifiers, reference planes, stats + snapshot per step. Never type vertex lists or write a
-   private mesh library.
-3. Scale from anchors: vehicle wheel mesh diameter = IDE `wheel_scale` (0.70 m on most cars) and the class ratios
-   follow from it; SA cars are about 1.1-1.2x the real car. Other assets: the ped is 1.84 m.
-4. Silhouette first: triangles where the outline turns (arches, bumper corners, lamp surrounds, roof edges,
-   cornices); flat areas are a few long triangles; windows, grilles, bolts, brickwork are texture.
-5. Smooth shading: weld, smooth every face, split normals only at material/UV seams and designed creases (cars:
-   smooth < 30 deg, decide 30-60, hard > 60). Peds fully smooth. Map objects have no normals.
-6. Reuse shared textures and keys: paint = key colour (60,255,0) on `vehiclegrunge256` (dirt), lamps = key
-   colours on `vehiclelights128`, glass = `vehiclegeneric256` alpha 128; map models tile district textures.
-7. Textures small (64-256 px), photo-like, dirty, desaturated, shading and grime painted in; never vector fills,
-   never one flat colour per mesh.
-8. Light by class: vehicles/peds/weapons normals, no prelight; map objects dark grey day prelight + darker warm
-   night colours with light pools; collision face light from the prelight (15 by day is the vanilla norm).
-9. Ship every part: `_dam` at 0.8-1.1x the tris of `_ok`, LOD, COL (+ shadow for vehicles), frames in vanilla
-   order and side, names within limits (model 23 chars, 21 with collision), data lines.
-10. Judge against vanilla: `asset.check`, `blender.preview --lineup class` (game look next to two peers), lint
-    preset of the tier; show the lineup sheet to the user at gates G1 and G2 (workflow S25).
+1. Describe, then build: design description, features per photo, spec ratios (`style_references`).
+2. Form first: rounded sections and sweeps in the live session (`mesh.loft` shapes, `mesh.sweep`,
+   `mesh.lathe`, soft `falloff` moves). Never a chamfered cube as a body part, never vertex-by-vertex meshes;
+   the blank is an optional quick start.
+3. Compose one whole: welded shell, panels cut, details touching, arches lined; floating, gapped and buried
+   pieces are defects (`asset.check` form rows).
+4. Scale from anchors: wheel mesh = `wheel_scale`; others the 1.84 m ped.
+5. Detail pass: every inventory item (the kind's starter list + every feature), in the same soft language.
+6. Shade per line (seams hard, corners soft); map models: prelight with occlusion, warm darker nights.
+7. Shared textures and colour keys.
+8. Small, soft, clean textures; car paint never painted.
+9. Fit the function: refit dummies; bike steering axis and rider contacts; ship damage, LOD, COL, data lines.
+10. Judge by eye: lineup with two vanilla peers + the reference board + clay views at every gate; `asset.check`
+    without engine errors and open form/fit defects; its numbers are information. Never add or remove geometry
+    to move a count. Done is not yours to declare: inventory complete, `asset.check --strict` `done: true`,
+    every region sheet reviewed (`done`); every kind's items and regions: `style_kinds`.
 
-## Metric names (one definition each)
-- `veh.hd_tris` = chassis + non-`_dam`/`_vlo` parts + the wheel ONCE; `veh.hi_tris` = wheel once per dummy.
-- `part.tris[<frame>]`, `dam.ok_ratio[<part>]`, `dam.disp_cm`, `dims.*` (`dims.L_rel` = length / wheel diameter).
-- `shade.normal_bend` (area-weighted corner-normal bend, deg), `shade.flat_share`, `shade.hard_by_dihedral`,
-  `shade.hard_at_seam`, `dff.verts_per_tri`.
-- `geo.tris`, `geo.median_dihedral`, `geo.largest_piece_share`, `geo.thirds`, `geo.round_sides[<feature>]`.
-- `uv.zero_area_share`, `uv.texel_px_m`, `uv.span`; `tex.colours`, `tex.lum_mean`, `tex.sat_mean`,
-  `tex.val_mean`, `tex.hf_energy`; `light.prelit_lum_p50`, `light.night_ratio`, `light.night_tint`; `col.*`,
-  `lod.ratio`, `ide.draw`.
-
-## Anti-patterns (seen in agent-built assets)
-- Faceted body: bend 0.81 deg, flat share 0.47 (cars p50: 10.6 deg, 0.144).
-- One flat colour per mesh: 95 % zero-area UVs (cars p50 0.045).
-- Voxel/slab look: 89 loose pieces, largest 6.5 % (chassis p50 0.74).
-- Vector textures: 19-77 colours (car interiors p10 344).
-- Bright interior: value 0.42 behind alpha-128 glass (interiors p50 0.14).
-- Real-world scale: a 4.98 m sedan (sedans p10 5.50 m).
-- Paint on `vehiclegeneric256` only (never gets dirty); `_dam` decimated to 0.45x; hand-typed geometry.
+## Anti-patterns (seen in agent builds)
+Bodies of chamfered cubes; flares, bumpers, rails, pillars standing off the body; template dummies never moved;
+too few details because a count looked "full"; stopping at the first acceptable lineup and declaring the
+model done with items missing and regions never looked at; one smoothing angle for everything; grime painted everywhere;
+neon key colour judged as paint; photos measured with grids and solved cameras; blank profile kept as the car;
+geometry dissolved to move a metric; vector-art textures; bright interiors; real-world scale.
 
 ## Which operations
-`style.profile`, `style.card --md`, `asset.anatomy`, `style.brief_check <brief.md>`, `asset.init`,
-`asset.status`, `blender.session`, `blender.methods`, `blender.call`, `kit.template`, `kit.export`,
-`blender.preview`, `style.texture`, `asset.check`, `asset.lint --preset sa_plus|vanilla --baseline vanilla`,
-`rw.patch --smooth-normals --recalc-bsphere`, `texture.pack --asset-class`, `texture.finish`. All run through
+`asset.anatomy`, `style.profile` (vanilla reference), `style.brief_check <brief.md>`, `ref.import`,
+`ref.board`, `asset.init`, `asset.status`, `blender.session`, `blender.methods`, `blender.call`,
+`kit.template`, `kit.export`, `blender.preview --lineup class`, `style.texture`, `asset.check`, `asset.lint
+--preset sa_plus|vanilla --baseline vanilla`, `texture.finish`, `texture.pack --asset-class`. All run through
 `satk_op`; find them with `satk_ops("<words>")`. Workflow: `satk_help("authoring")`.
 
 Full guide: docs/agent/style/README.md

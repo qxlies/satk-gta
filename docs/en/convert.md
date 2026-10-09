@@ -6,8 +6,8 @@ Package: `satk.convert` (MIT) and `blender/satk_blender/convert` (GPL-3.0-or-lat
 
 ## What it is
 
-`asset convert` imports an author's model, fits the measured scale and triangle budget, bakes its materials
-into small SA textures and builds a [kit](kit.md) package. It returns checks on the exported DFF/TXD and a
+`asset convert` imports an author's model, fits the measured scale, cleans the mesh (no triangle target), bakes
+its materials into small SA textures and builds a [kit](kit.md) package. It returns checks on the exported DFF/TXD and a
 game, clay and wire lineup beside class peers. Inputs are read-only; results stay under `<workspace>/work/`.
 
 ## Quick example
@@ -26,8 +26,8 @@ satk asset convert model.glb --kind prop --dims 1.2,1.2,1.8
 satk asset convert car.fbx --kind vehicle --like model:426 --tier sa_plus
 ```
 
-The response includes `out`, `blend`, `budget.actual`, `budget.in_band`, `shading`, `textures`, `check`,
-`package.files`, `mta` and `preview.files.sheet`. `ok` means the operation finished: inspect the checks and
+The response includes `out`, `blend`, `tris` (a plain number), `limit`, `shading` (class reference, info),
+`textures`, `check`, `package.files`, `mta` and `preview.files.sheet`. `ok` means the operation finished: inspect the checks and
 any `CHECK_FAILED` warnings before using the package. `conversion.json` keeps the complete result.
 
 ## Commands
@@ -68,10 +68,11 @@ stage, or run the complete operation in a new private session. Other session obj
 1. Blender's built-in GLB/glTF, FBX, OBJ and available Collada importers read the source; `.blend` objects
    are appended. Evaluated transforms and axes are normalized, hidden and degenerate geometry is removed,
    and coincident vertices are merged.
-2. [Style](style.md) supplies class/tier bands. Planar dissolve precedes collapse decimation. Material/UV
-   seams delimit the dissolve; spaced seam samples and silhouette extrema constrain collapse. Dense seam
-   chains may be simplified. `stages.json` reports preserved samples and sampled surface deviation; no
-   subdivision is added to reach a minimum budget.
+2. Triangle counts are never a target: a planar dissolve removes redundant edges of flat areas and the
+   source keeps its detail. Only a source above the engine safety cap (`limit.max_tris` = 21,845: 65,535
+   vertices per geometry, 3 per triangle at worst) is collapsed, each role by its share. Material/UV seams
+   delimit the dissolve; spaced seam samples and silhouette extrema constrain the collapse. `stages.json`
+   reports preserved samples and sampled surface deviation; no subdivision is ever added.
 3. The unreduced meshes keep the source materials. Cycles bakes base colour and alpha onto unique UV
    atlases, 128–256 pixels per role. `texture.finish` supplies the SA finish; measured palette, blur and
    grain adjustments are checked after DXT1/DXT3 compression. Alpha is preserved.
@@ -94,7 +95,8 @@ stage, or run the complete operation in a new private session. Other session obj
 - A vehicle conversion is a rigid body in a kit scaffold with generated wheels/VLO. Doors, damage,
   wheel arches and functional lamps need authoring. Source paint is baked as a fixed livery with SA
   sheen; automatic car-colour keys and dirt remapping are not inferred.
-- A uniform high-resolution surface can meet its triangle budget yet miss the shading band. Review
+- A dense source stays dense: simplify it in its own editor or in a studio session when the SA look needs
+  fewer, softer panels. A uniform high-resolution surface can miss the class shading reference; review
   panel density and seams in the saved blend; all measured failures remain visible in the response.
 - `--like` supplies a reference, not replacement registration. New-name Mod Loader files need a later
   `kit export --replace SID` or `--add`; MTA resources load assets but do not spawn vehicles or place a map.

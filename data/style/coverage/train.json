@@ -1,0 +1,53 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "train",
+ "ref": "style_vehicle",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (6; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "glass",
+   "what": "windows: glass with alpha below 255 (windscreen part, doors or body)",
+   "how": {
+    "glass": true
+   },
+   "fix": "glass panes on the generic glass region of vehiclegeneric256 with alpha 128 (windscreen_ok, door and body windows)",
+   "optional": true,
+   "vanilla": "5/6"
+  },
+  {
+   "id": "wheels",
+   "what": "wheel geometry",
+   "how": {
+    "frame_geom": "^wheel"
+   },
+   "fix": "build the wheel (tyre + rim) as the atomic 'wheel' under a wheel dummy; the game copies it to the others",
+   "vanilla": "6/6"
+  },
+  {
+   "id": "bogies",
+   "what": "bogies",
+   "how": {
+    "frames": "^bogie_"
+   },
+   "fix": "build bogie_front / bogie_rear (frames and wheels the game turns)",
+   "vanilla": "6/6"
+  },
+  {
+   "id": "doors",
+   "what": "doors",
+   "how": {
+    "frame_geom": "^door_"
+   },
+   "fix": "cut the doors as door_*_ok",
+   "optional": true,
+   "vanilla": "5/6"
+  }
+ ]
+}

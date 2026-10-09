@@ -6,9 +6,13 @@
 """``kit.wheel``: a vehicle wheel (tyre + rim) revolved around X with the tier's side count.
 
 Diameter = the IDE ``wheel_scale`` (the mesh diameter must match it), sides 12 (vanilla) or 16-24 (sa_plus,
-default 20). Tread UVs on the tread strip of ``vehicletyres128`` (u 0-0.25, one tyre per v quarter),
-sidewalls on the sidewall disk (centre u 0.375, quarter centre in v, DFF UVs), the rim on the own
-``<model>92wheel64`` texture. The outer face points +X (the right wheel); the engine mirrors it for the left.
+default 20). Tyre UVs map ``vehicletyres128`` the way vanilla wheels do (landstal, premier): the texture is four
+tyres of 32 px (one per v quarter), each a tread column (u 0-0.25) and a sidewall column (u 0.25-0.5, a radial
+gradient that ends in a light rim band at the bottom). Every segment around the wheel takes the full column width
+(u alternates segment by segment, mirrored like vanilla); the tread maps its width across the quarter, the
+sidewall its radius (rim band at the rim, dark at the shoulder). Sampling the columns as a disk (the old mapping)
+averaged the light band into the rubber: the tyre rendered beige. The rim takes the own ``<model>92wheel64``
+texture. The outer face points +X (the right wheel); the engine mirrors it for the left.
 """
 
 from __future__ import annotations
@@ -30,22 +34,32 @@ PROFILE = ((1.0, 0.64), (1.0, 0.86), (0.86, 0.97), (0.62, 1.0), (-0.62, 1.0), (-
            (-1.0, 0.64))
 _TREAD_BANDS = (2, 3, 4)     # bands between profile points 2-3, 3-4, 4-5
 _RIM_INSET = 0.25            # the rim face sits this share of half the width inside the outer sidewall
-_SIDE_R = 0.12               # sidewall disk radius in UV units
+
+
+#: The tread and sidewall columns of a vehicletyres128 quarter (u, as vanilla: a texel inside each edge).
+_TREAD_U = (0.004, 0.243)
+_SIDE_U = (0.253, 0.495)
+_V_PAD = 0.006               # keep inside the 32 px quarter (no bleeding into the next tyre)
+
+
+def _quarter_v(q: int, f: float) -> float:
+    """Blender v of the share ``f`` (0 = top row, 1 = bottom row) of tyre quarter ``q`` (DFF v runs down)."""
+    v_dff = 0.25 * q + _V_PAD + (0.25 - 2 * _V_PAD) * max(0.0, min(1.0, f))
+    return 1.0 - v_dff
 
 
 def _tread_uv(k: int, step: int, sides: int, q: int) -> tuple[float, float]:
-    x = PROFILE[k][0]
-    u = 0.125 + 0.125 * max(-1.0, min(1.0, x / PROFILE[2][0]))
-    v = 0.25 * q + 0.25 * step / sides
-    return u, 1.0 - v
+    """Tread: the segment spans the column width (u by the step's parity), the tread width spans the quarter."""
+    x0 = PROFILE[2][0]
+    f = (x0 - PROFILE[k][0]) / (2 * x0)
+    return _TREAD_U[step % 2], _quarter_v(q, f)
 
 
 def _side_uv(k: int, step: int, sides: int, q: int) -> tuple[float, float]:
-    r0 = PROFILE[0][1]
-    rho = (PROFILE[k][1] - r0) / (1.0 - r0)
-    a = 2 * math.pi * step / sides
-    ru = 0.3 * _SIDE_R + 0.7 * _SIDE_R * rho
-    return 0.375 + ru * math.cos(a), 1.0 - (0.25 * q + 0.125 + ru * math.sin(a))
+    """Sidewall: the segment spans the column width, the radius runs from the shoulder (top) to the rim band."""
+    r0, r1 = PROFILE[0][1], PROFILE[2][1]
+    rho = (PROFILE[k][1] - r0) / (r1 - r0)
+    return _SIDE_U[step % 2], _quarter_v(q, 1.0 - rho)
 
 
 def build_wheel(name: str, *, radius: float, width: float, sides: int, mats: dict, quarter: int = 1):

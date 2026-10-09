@@ -1,0 +1,86 @@
+{
+  "format": "sae-container",
+  "version": {"major": 1, "minor": 0},
+  "title": "sa-engine record container (.saenet transport traces, .saerec session records)",
+  "byte_order": "little",
+  "types": {
+    "u8": 1, "u16": 2, "u32": 4, "u64": 8, "i64": 8,
+    "note": "bytes[n] is n raw bytes; fourcc is 4 ASCII bytes. All integers are little-endian. Every offset is relative to the start of the structure it names."
+  },
+  "magic": "89 53 41 45 43 0d 0a 1a",
+  "kinds": {
+    "SNET": {"extension": ".saenet", "meaning": "transport trace"},
+    "SREC": {"extension": ".saerec", "meaning": "session record"}
+  },
+  "header": {
+    "size": 64,
+    "crc": {"algorithm": "crc32 (zlib.crc32, CRC-32/ISO-HDLC)", "field": "header_crc32", "covers": {"offset": 0, "length": 60}},
+    "fields": [
+      {"name": "magic", "offset": 0, "type": "bytes[8]"},
+      {"name": "ver_major", "offset": 8, "type": "u16"},
+      {"name": "ver_minor", "offset": 10, "type": "u16"},
+      {"name": "kind", "offset": 12, "type": "fourcc"},
+      {"name": "header_size", "offset": 16, "type": "u32"},
+      {"name": "flags", "offset": 20, "type": "u32"},
+      {"name": "index_offset", "offset": 24, "type": "u64", "note": "0 = the file was not finalized (no chunk table)"},
+      {"name": "chunk_count", "offset": 32, "type": "u32", "note": "valid only when finalized"},
+      {"name": "dt_s_us", "offset": 36, "type": "u32", "note": "server tick period in microseconds, 0 = unknown"},
+      {"name": "t_first_us", "offset": 40, "type": "i64", "note": "-1 = unknown"},
+      {"name": "t_last_us", "offset": 48, "type": "i64", "note": "-1 = unknown"},
+      {"name": "session_id", "offset": 56, "type": "u32", "note": "0 = unknown"},
+      {"name": "header_crc32", "offset": 60, "type": "u32"}
+    ]
+  },
+  "flags": {
+    "FINALIZED": {"bit": 0, "meaning": "the chunk table is present and index_offset, chunk_count and the time range are valid"},
+    "COMPRESSED": {"bit": 1, "meaning": "at least one chunk has codec other than 0"},
+    "SORTED": {"bit": 2, "meaning": "chunk time ranges are in non-decreasing order"},
+    "MERGED": {"bit": 3, "meaning": "records of several nodes; every record carries 'node'"},
+    "reserved": "bits 4..31 are written as 0; a reader ignores unknown bits of the same major version"
+  },
+  "codecs": {
+    "0": {"name": "none"},
+    "1": {"name": "zlib", "meaning": "RFC 1950 stream (zlib header, deflate)"},
+    "2": {"name": "zstd", "meaning": "reserved; a version 1 reader may report UNSUPPORTED"}
+  },
+  "chunk_header": {
+    "size": 40,
+    "alignment": 8,
+    "fields": [
+      {"name": "type", "offset": 0, "type": "fourcc"},
+      {"name": "codec", "offset": 4, "type": "u8"},
+      {"name": "cflags", "offset": 5, "type": "u8", "note": "bit 0 = CRITICAL"},
+      {"name": "reserved", "offset": 6, "type": "u16", "note": "0"},
+      {"name": "stored_size", "offset": 8, "type": "u32", "note": "payload bytes as stored (after compression), without padding"},
+      {"name": "raw_size", "offset": 12, "type": "u32", "note": "payload bytes after decompression (= stored_size for codec 0)"},
+      {"name": "t_first_us", "offset": 16, "type": "i64", "note": "-1 = none"},
+      {"name": "t_last_us", "offset": 24, "type": "i64", "note": "-1 = none"},
+      {"name": "rec_count", "offset": 32, "type": "u32", "note": "records in the payload; 0 for chunks that hold no records"},
+      {"name": "crc32", "offset": 36, "type": "u32", "note": "crc32 of the stored payload bytes"}
+    ],
+    "layout": "chunk header (40 bytes), payload (stored_size bytes), zero padding up to the next multiple of 8 bytes from the start of the chunk"
+  },
+  "chunk_types": {
+    "META": {"critical": true, "payload": "one UTF-8 JSON object: the 'hdr' record of the sae-obs/1 stream", "count": "exactly one, first"},
+    "OBSJ": {"critical": true, "payload": "UTF-8 JSON Lines: sae-obs/1 records (not hdr), one per line, '\\n' terminated", "count": "zero or more"},
+    "BLOB": {"critical": false, "payload": "u16 name length, UTF-8 name, then opaque bytes", "count": "zero or more"},
+    "SAEX": {"critical": true, "payload": "the chunk table (see 'table'); never listed in the table itself", "count": "at most one, last"}
+  },
+  "reserved_chunk_types": ["NETB"],
+  "table": {
+    "location": "header.index_offset",
+    "magic": "SAEX",
+    "layout": "magic fourcc, entry_count u32, entry_size u32 (48), reserved u32 (0), then entry_count entries, then table_crc32 u32 over everything from the magic to the last entry, then end_magic fourcc 'XEAS'",
+    "entry": {
+      "size": 48,
+      "fields": [
+        {"name": "offset", "offset": 0, "type": "u64", "note": "file offset of the chunk header"},
+        {"name": "chunk_header", "offset": 8, "type": "bytes[40]", "note": "a copy of the chunk header"}
+      ]
+    }
+  },
+  "limits": {
+    "max_raw_size": 268435456,
+    "note": "A reader refuses chunks whose raw_size exceeds its limit (default 256 MiB) and never decompresses beyond raw_size."
+  }
+}

@@ -42,6 +42,13 @@ def _patch(data: bytes, off: int, fmt: str, *vals) -> bytes:
     return bytes(buf)
 
 
+def _second_extension(dff: bytes) -> bytes:
+    """The clump with a second clump-level Extension holding the collision (the old embed_col bug)."""
+    t, size, lib = struct.unpack_from("<III", dff, 0)
+    body = dff[12:12 + size] + B.chunk(0x03, B.chunk(0x253F2FA, B.col3("gm_box", boxes=B.BOX)))
+    return struct.pack("<III", t, len(body), lib) + body
+
+
 # rule id -> function(mod, tmp_path) -> (target, lint kwargs); the mod is written afterwards
 def _case(m: Mod, tmp: Path, rule: str, cfg) -> tuple[str | None, dict]:  # noqa: C901 - one branch per rule
     f = m.files
@@ -91,6 +98,8 @@ def _case(m: Mod, tmp: Path, rule: str, cfg) -> tuple[str | None, dict]:  # noqa
         f["gm_box.dff"] = B.dff(pos=B.QUAD[:3] + [(9000.0, 0.0, 0.0)], night=True)
     elif rule == "dff.bsphere":
         f["gm_box.dff"] = B.dff(pos=B.QUAD[:3] + [(3.0, 3.0, 3.0)], night=True)
+    elif rule == "dff.clump_ext_dup":
+        f["gm_box.dff"] = _second_extension(B.dff(night=True))
     elif rule == "dff.tris_budget":
         kw["config"] = cfg({rule: {"params": {"budget": {"map": 1}}}})
     elif rule == "dff.materials_budget":
@@ -310,6 +319,16 @@ def test_rule_catches_its_synthetic_bad_file(rule: str, mod: Mod, tmp_path: Path
     sev = Rules.load(config=kw.get("config"))[rule].sev
     assert {f.sev for f in hits} == {sev}
     assert all("{" not in f.msg for f in hits), hits     # every template field was filled
+
+
+def test_one_clump_extension_is_clean_and_the_collision_is_named(mod: Mod):
+    """A normal DFF (one Extension per clump) is quiet; the broken one names where the collision went."""
+    mod.files["gm_box.dff"] = B.dff(night=True)
+    rep = lint(str(mod.write()), use_index=False, only=["dff.clump_ext_dup"])
+    assert rep.findings == [] and rep.checked["dff.clump_ext_dup"] == 1
+    mod.files["gm_box.dff"] = _second_extension(B.dff(night=True))
+    rep = lint(str(mod.write()), use_index=False, only=["dff.clump_ext_dup"])
+    assert [f.sev for f in rep.findings] == ["error"] and "collision in Extension 2" in rep.findings[0].msg
 
 
 def test_game_root_lints_only_what_the_game_loads(tmp_path: Path):

@@ -33,7 +33,7 @@ from ..core import paths
 from ..core.errors import SatkError
 from . import kinds as K
 
-__all__ = ["run", "embed_col", "rename_col", "diff_dff", "out_dir", "modadd_kind", "MODADD_KIND", "TXD_CLASS",
+__all__ = ["run", "embed_col", "clump_extensions", "embedded_col", "merge_contact_faces", "rename_col", "diff_dff", "out_dir", "modadd_kind", "MODADD_KIND", "TXD_CLASS",
            "pack_own_textures", "COL_MODES"]
 
 _COLPLG, _EXT, _CLUMP = 0x253F2FA, 0x03, 0x10
@@ -43,15 +43,15 @@ MODADD_KIND = {"vehicle": "vehicle", "ped": "ped", "weapon": "weapon", "world": 
 
 def modadd_kind(kind: str) -> str:
     """``mod.add`` kind of a kit kind: tuning parts and pickups are objects."""
-    if kind in ("ped", "weapon"):
-        return kind
+    if kind in ("ped", "weapon", "weapon_melee"):
+        return "weapon" if kind == "weapon_melee" else kind
     if kind in ("vehicle_upgrade", "pickup"):
         return "object"
     return MODADD_KIND.get(K.get(kind)["group"], "object")
 #: kit kind -> ``texture.pack`` asset class.
 TXD_CLASS = {"vehicle": "vehicle", "ped": "ped", "weapon": "weapon", "world": "map"}
 #: ``asset.check`` verdicts copied into the export summary (blocking, advisory and out-of-band rows).
-CHECK_SHOWN = frozenset({"error", "warn", "low", "high"})
+CHECK_SHOWN = frozenset({"error", "defect", "warn", "missing", "low", "high"})
 
 
 def out_dir(name: str, out: str | None = None) -> Path:
@@ -98,32 +98,95 @@ def _chunk(t: int, payload: bytes, lib: int) -> bytes:
 
 
 def embed_col(dff: bytes, col: bytes) -> bytes:
-    """``dff`` with its clump's collision plug-in (0x253F2FA) replaced by ``col`` (or added)."""
+    """``dff`` with exactly ONE clump Extension chunk that carries the collision plug-in (0x253F2FA) = ``col``.
+
+    DragonFF writes one Extension per collision plus a trailing empty one; the engine reads only the first clump
+    Extension, so a second one (or a COL in the second) leaves the vehicle without collision and invisible in game.
+    Every clump-level Extension is merged: their other plug-ins are kept in order, every old COL plug-in is dropped
+    and ``col`` is appended once; the Extension is the last child of the clump."""
     if len(dff) < 12:
         raise SatkError("BAD_PARAMS", "not a DFF")
     t, size, lib = struct.unpack_from("<III", dff, 0)
     if t != _CLUMP:
         raise SatkError("BAD_PARAMS", "the DFF does not start with a clump")
     end = 12 + size
+    if end > len(dff):
+        raise SatkError("BAD_PARAMS", "the clump chunk is longer than the file")
     kids = []
     off = 12
     while off + 12 <= end:
         ct, cs, cl = struct.unpack_from("<III", dff, off)
+        if off + 12 + cs > end:
+            raise SatkError("BAD_PARAMS", f"a clump child at {off} runs past the clump")
         kids.append((ct, dff[off + 12:off + 12 + cs], cl))
         off += 12 + cs
-    ext_i = next((i for i, k in enumerate(kids) if k[0] == _EXT), None)
     plugins = []
-    if ext_i is not None:
-        payload = kids[ext_i][1]
+    ext_lib = None
+    for ct, payload, cl in kids:
+        if ct != _EXT:
+            continue
+        ext_lib = cl if ext_lib is None else ext_lib
         o = 0
         while o + 12 <= len(payload):
             pt, ps, pl = struct.unpack_from("<III", payload, o)
             plugins.append((pt, payload[o + 12:o + 12 + ps], pl))
             o += 12 + ps
     plugins = [p for p in plugins if p[0] != _COLPLG] + [(_COLPLG, bytes(col), lib)]
-    ext = _chunk(_EXT, b"".join(_chunk(*p) for p in plugins), kids[ext_i][2] if ext_i is not None else lib)
-    body = b"".join(_chunk(*k) for i, k in enumerate(kids) if i != ext_i) + ext
+    ext = _chunk(_EXT, b"".join(_chunk(*p) for p in plugins), ext_lib if ext_lib is not None else lib)
+    body = b"".join(_chunk(*k) for k in kids if k[0] != _EXT) + ext
     return _chunk(_CLUMP, body, lib) + bytes(dff[end:])
+
+
+def clump_extensions(dff: bytes) -> list[list[int]]:
+    """The clump-level Extension chunks of a DFF: one row ``[offset, size, plug-in count, COL plug-ins]`` each
+    (a game-ready vehicle has exactly one, with one COL)."""
+    t, size, _lib = struct.unpack_from("<III", dff, 0)
+    if t != _CLUMP:
+        raise SatkError("BAD_PARAMS", "the DFF does not start with a clump")
+    rows = []
+    off, end = 12, 12 + size
+    while off + 12 <= end:
+        ct, cs, _cl = struct.unpack_from("<III", dff, off)
+        if ct == _EXT:
+            n = cols = 0
+            o = off + 12
+            while o + 12 <= off + 12 + cs:
+                pt, ps, _pl = struct.unpack_from("<III", dff, o)
+                n += 1
+                cols += pt == _COLPLG
+                o += 12 + ps
+            rows.append([off, cs, n, cols])
+        off += 12 + cs
+    return rows
+
+
+def embedded_col(dff: bytes) -> bytes | None:
+    """The bytes of the first embedded COL model of a DFF (``None`` without one)."""
+    from ..formats.dff import find_embedded_col
+
+    r = find_embedded_col(dff)
+    return bytes(dff[r[0]:r[0] + r[1]]) if r else None
+
+
+def merge_contact_faces(gen: bytes, kit: bytes) -> tuple[bytes, int]:
+    """``gen`` (a generated vehicle COL: spheres + shadow) with the contact faces of ``kit`` (the Blender collision of
+    ``kit.col``: roof, bonnet, boot and glass faces) when ``gen`` has none; returns ``(col, faces added)``. Vanilla
+    vehicles carry 8-12 such faces next to their spheres (surfaces CAR 63 and GLASS 45)."""
+    from ..rw import col as RC
+
+    try:
+        g = RC.decode_model(gen)
+        k = RC.decode_model(kit)
+    except RC.ColError:
+        return gen, 0
+    if g.faces or not k.faces or g.version < 2 or k.version < 2:
+        return gen, 0
+    g.vertices = list(k.vertices)
+    g.faces = list(k.faces)
+    RC.face_groups(g)
+    RC.compute_bounds(g)
+    g.flags = RC.canonical_flags(g)
+    return RC.encode_model(g), len(g.faces)
 
 
 def rename_col(col: bytes, name: str) -> bytes:
@@ -169,6 +232,9 @@ def diff_dff(dff: bytes, plan: dict | None, exported: dict) -> list[list]:
                 par_bad += 1
         rows.append(["parents", 0, par_bad, "ok" if par_bad == 0 else "diff"])
     rows.append(["atomics", exported.get("atomics"), info.atomics, "ok" if exported.get("atomics") == info.atomics else "diff"])
+    exts = clump_extensions(dff)
+    if exts and (len(exts) != 1 or any(x[3] > 1 for x in exts)):
+        rows.append(["clump extensions", "1 (COL inside)", f"{len(exts)}, COL {[x[3] for x in exts]}", "diff"])
     r = find_embedded_col(dff)
     if exported.get("col", {}).get("embedded") or r:
         from ..formats.col import iter_col
@@ -331,13 +397,27 @@ def _check(dff: Path, like: str | None, tier: str, warn: list[str]) -> dict:
     except SatkError as e:
         warn.append(f"{e.code}: asset.check: {e.msg}")
         return {}
-    keep = {k: r[k] for k in ("verdict", "counts", "out_of_band") if k in r}
+    keep = {k: r[k] for k in ("verdict", "counts", "sections", "defects", "out_of_band") if k in r}
     rows = r.get("rows") or []
     # asset.check rows: [check, part, value, p10, p50, p90, verdict, hint, ref]
     bad = [row for row in rows if isinstance(row, list) and len(row) > 6 and row[6] in CHECK_SHOWN]
     keep["rows"] = bad[:8]
     keep["total"] = len(rows)
     return keep
+
+
+def _blend_project(blend: str | None) -> Path | None:
+    """The asset project a ``.blend`` lives in (``<project>/checkpoints/x.blend``, ``<project>/x.blend``)."""
+    if not blend:
+        return None
+    cur = Path(blend).absolute().parent
+    for _ in range(3):
+        if (cur / "asset.json").is_file():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return None
 
 
 def run(*, model: str | None = None, session: str | None = None, blend: str | None = None,
@@ -361,6 +441,11 @@ def run(*, model: str | None = None, session: str | None = None, blend: str | No
                      timeout=timeout, stats="none").get("result") or {})
     kname = str(info.get("model") or model or "")
     kind = str(info.get("kind") or "prop")
+    if kind == "ped":
+        raise SatkError("UNSUPPORTED", "kit export cannot write a skinned ped yet (no Skin/HAnim writer): the game "
+                                       "crashes on an unskinned ped",
+                        hint="a new ped is a re-skin of a vanilla ped: satk help creation, section Ped re-skin (texture work on the "
+                             "like model's TXD, then satk mod check)")
     tier = str(info.get("tier") or "sa_plus")
     group = K.get(kind)["group"]
     rep: dict | None = None
@@ -382,13 +467,22 @@ def run(*, model: str | None = None, session: str | None = None, blend: str | No
     dff = dff_path.read_bytes()
     col_info: dict[str, Any] = {"by": "kit" if man.get("col", {}).get("objects") else "none"}
     col_file: bytes | None = None
+    vehicle = group == "vehicle" and kind != "vehicle_upgrade"
+    kit_col = embedded_col(dff) if vehicle else None        # what DragonFF embedded from the Blender collision
     if col in ("auto", "gen") or col in COL_MODES:
         cdata, col_info = _colgen(dff_path, kind, group, stem, stage, warn, shape=man.get("shape"), col=col)
         if cdata is not None:
-            if group == "vehicle" and kind != "vehicle_upgrade":
-                dff = embed_col(dff, rename_col(_first_col(cdata), f"{stem}_col"))
+            if vehicle:
+                gen = rename_col(_first_col(cdata), f"{stem}_col")
+                if kit_col:
+                    gen, n = merge_contact_faces(gen, kit_col)
+                    if n:
+                        col_info["contact_faces"] = n
+                dff = embed_col(dff, gen)
             else:
                 col_file = rename_col(cdata, stem) if len(cdata) else None
+    if vehicle and kit_col and len(clump_extensions(dff)) != 1:
+        dff = embed_col(dff, kit_col)                       # one clump Extension, the COL inside it
     if col_file is None and man["files"].get("col_kit") and group != "vehicle":
         col_file = Path(man["files"]["col_kit"]).read_bytes()
         col_info.setdefault("by", "kit")
@@ -406,7 +500,9 @@ def run(*, model: str | None = None, session: str | None = None, blend: str | No
         lod_name = lp.stem
         shutil.copyfile(lp, pkg / lp.name)
         files["lod_dff"] = paths.jpath(pkg / lp.name)
-    txd = _txd(man.get("textures") or [], stage, stem, group, pkg, warn)
+    # the TXD class follows the kind (peds and weapons are in the character group)
+    txd_group = "weapon" if kind in ("weapon", "weapon_melee") else "ped" if kind == "ped" else group
+    txd = _txd(man.get("textures") or [], stage, stem, txd_group, pkg, warn)
     files["txd"] = txd["file"]
     plan = None
     if man.get("plan") and Path(man["plan"]).is_file():
@@ -448,6 +544,16 @@ def run(*, model: str | None = None, session: str | None = None, blend: str | No
             package["replaces"] = rep["sid"]
         else:
             warn.append(f"INFO: {stem} is a new name: --add makes an add-on (mod.add), --replace SID a replacement")
+    from ..inventory.sidecar import export_sidecar  # contract K6: item tags travel beside the DFF
+
+    if (side := export_sidecar([pkg, lint_dir], stem, session=session, blend=blend, model=kname or None,
+                               project=_blend_project(blend) if session is None else None, warn=warn,
+                               lod=lod_name, dff=pkg / f"{stem}.dff")):
+        try:                                          # listed when it carries an inventory (else: the marker only)
+            if (json.loads(Path(side).read_text(encoding="utf-8")) or {}).get("inventory"):
+                files["inventory"] = side
+        except (OSError, ValueError):
+            files["inventory"] = side
     res: dict[str, Any] = {"model": kname, "kind": kind, "tier": tier, "stem": stem, "out": paths.jpath(d),
                            "files": files, "package": package, "txd": {k: v for k, v in txd.items() if k != "file"},
                            "col": col_info, "bsphere": man.get("bsphere"), "frames": len(man.get("frames") or []),

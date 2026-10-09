@@ -1,0 +1,254 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "building",
+ "summary": "building with a LOD: one main shell per volume meeting the ground, a roof with an overhang or parapet, an entrance with depth; standard adds ledges, recessed windows, gutters; hero adds roof clutter, signage, lamps and finished back facades. The LOD, collision and draw distance are the finish gate's.",
+ "regions": {
+  "overall": {
+   "summary": "the whole building, 3/4 views from the street",
+   "views": []
+  },
+  "facades": {
+   "summary": "each facade straight on",
+   "views": [
+    "facade_north",
+    "facade_east",
+    "facade_south",
+    "facade_west"
+   ]
+  },
+  "roof": {
+   "summary": "roof from above and the eaves",
+   "views": [
+    "roof"
+   ]
+  },
+  "entrance": {
+   "summary": "entrance, steps, porch close up",
+   "views": [
+    "entrance"
+   ]
+  },
+  "base": {
+   "summary": "where the walls meet the ground",
+   "views": [
+    "entrance"
+   ]
+  },
+  "details": {
+   "summary": "close-ups of the small parts",
+   "views": [
+    "facade_north",
+    "facade_east",
+    "facade_south",
+    "facade_west"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "main_shell",
+   "name": "Main massing",
+   "region": "overall",
+   "category": "shell",
+   "construction": "one closed shell per volume, walls meeting the ground (no gap), storeys at about 3 m",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "roof",
+   "name": "Roof",
+   "region": "roof",
+   "category": "shell",
+   "construction": "roof slab with an overhang or a parapet, or a pitched roof with eaves",
+   "attaches_to": "main_shell",
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "base",
+   "name": "Plinth or foundation band",
+   "region": "base",
+   "category": "structure",
+   "construction": "band where the walls meet the ground, slightly proud",
+   "attaches_to": "main_shell",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "entrance",
+   "name": "Entrance",
+   "region": "entrance",
+   "category": "opening",
+   "construction": "door recess with a frame, a step or a porch",
+   "attaches_to": "main_shell",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "windows",
+   "name": "Window bays",
+   "region": "facades",
+   "category": "decal",
+   "construction": "tiling facade texture with the windows aligned to the storeys (recessed frames at standard)",
+   "attaches_to": "main_shell",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "facade_textures",
+   "name": "Facade textures",
+   "region": "facades",
+   "category": "decal",
+   "construction": "tiling 128/256 textures on every facade, prelight baked (dark under eaves, at the base)",
+   "attaches_to": "main_shell",
+   "stage": "G4",
+   "detail": "simple"
+  },
+  {
+   "key": "ledges_cornices",
+   "name": "Ledges and cornices",
+   "region": "facades",
+   "category": "trim",
+   "construction": "string courses and a cornice as extruded bands",
+   "attaches_to": "main_shell",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "window_recesses",
+   "name": "Window recesses",
+   "region": "facades",
+   "category": "opening",
+   "construction": "windows inset so the facade has depth (inset + extrude in)",
+   "attaches_to": "main_shell",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "roof_edge",
+   "name": "Parapet coping or fascia",
+   "region": "roof",
+   "category": "trim",
+   "construction": "coping on the parapet or a fascia on the eaves",
+   "attaches_to": "roof",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "gutters",
+   "name": "Gutters and downpipes",
+   "region": "facades",
+   "category": "fixture",
+   "construction": "gutters along the eaves, downpipes swept to the ground",
+   "attaches_to": [
+    "roof",
+    "main_shell"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "porch_canopy",
+   "name": "Porch or canopy",
+   "region": "entrance",
+   "category": "structure",
+   "construction": "canopy or porch roof over the entrance on posts or brackets",
+   "attaches_to": [
+    "main_shell",
+    "entrance"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "back_facades",
+   "name": "Back and side facades",
+   "region": "facades",
+   "category": "shell",
+   "construction": "rear and side walls finished like the front: doors, vents, windows",
+   "attaches_to": "main_shell",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "roof_clutter",
+   "name": "Roof clutter",
+   "region": "roof",
+   "category": "clutter",
+   "construction": "AC units, vents, a water tank, antennas, a dish, an access hatch",
+   "attaches_to": "roof",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "signage",
+   "name": "Signage",
+   "region": "facades",
+   "category": "sign",
+   "construction": "shop sign, house number, wall signs",
+   "attaches_to": "main_shell",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "wall_lamps",
+   "name": "Wall lamps",
+   "region": "entrance",
+   "category": "lamp",
+   "construction": "lamps by the entrance (2dfx lights)",
+   "attaches_to": "main_shell",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "pipes_cables",
+   "name": "Pipes, cables and meters",
+   "region": "details",
+   "category": "fixture",
+   "construction": "pipes, conduits, a meter box on the walls",
+   "attaches_to": "main_shell",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "balconies",
+   "name": "Balconies and railings",
+   "region": "facades",
+   "category": "structure",
+   "construction": "balconies with railings",
+   "attaches_to": "main_shell",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "awnings",
+   "name": "Awnings",
+   "region": "facades",
+   "category": "structure",
+   "construction": "awnings over windows or shop fronts",
+   "attaches_to": "main_shell",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "fences",
+   "name": "Fences and steps",
+   "region": "base",
+   "category": "structure",
+   "construction": "fences, walls, steps and ramps on the plot",
+   "attaches_to": "base",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/building.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

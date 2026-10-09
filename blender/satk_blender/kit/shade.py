@@ -7,9 +7,15 @@
 
 1. weld by distance (glass and double-sided faces are skipped);
 2. ``use_smooth`` on every face;
-3. sharp edges at material borders, UV seams and creases by the class dihedral rule (cars: smooth below
-   30 deg, by design 30-60 deg - an edge the agent marked sharp stays sharp - hard above 60 deg; bumpers and
-   wheels fully smooth; peds smooth; firearms harder);
+3. hard edges by the vanilla rule (``mode=seams``, the default): an edge is hard where the look changes or where the
+   author drew a line, never because a corner is steep. Hard: material borders, UV seams that fold more than
+   ``seam_angle`` (default 20 deg), named creases (edges the agent marked sharp with ``mesh.mark``, Blender edge
+   creases, the edge attribute ``satk_crease``) and real fold-backs above ``hard`` (default 110 deg). Everything
+   else is smooth, also 60-90 deg corners (vanilla keeps 22-45 % of them smooth and builds big turns from 2-3 soft
+   steps); edges in the attribute ``satk_soft`` stay smooth even on a UV seam. Bumpers and wheels: only material
+   borders. ``mode=angle`` is the old dihedral rule (smooth below ``smooth``, hard above ``hard``, marked edges in
+   between). Edges this step made hard are recorded (``satk_auto_sharp``) so a re-run starts from the author's own
+   marks;
 4. normals last: a Weighted Normal modifier (keep sharp) at the end of the stack, DragonFF split normals on;
 5. re-read: the object is exported alone with DragonFF, the DFF is decoded and measured with the canonical
    metrics (K1, ``satk.style.metrics``); the step fails when the normals did not change a faceted mesh.
@@ -30,7 +36,7 @@ from satk.core.errors import SatkError
 
 from . import util as U
 
-__all__ = ["RULES", "shade_object", "dff_shade_metrics", "mesh_k1"]
+__all__ = ["RULES", "shade_object", "dff_shade_metrics", "mesh_k1", "match_seams"]
 
 #: Dihedral rule per class (degrees): below ``smooth`` always smooth, above ``hard`` always sharp, between
 #: them an edge is sharp only when the agent marked it (``design``).
@@ -40,24 +46,38 @@ RULES = {
     "weapon": {"smooth": 20.0, "hard": 40.0, "seams": True, "materials": True},
     "world": {"smooth": 30.0, "hard": 50.0, "seams": True, "materials": True},
 }
+#: The vanilla (``seams``) rule per class: ``hard`` = fold-back above which an edge is always hard, ``seam_angle`` =
+#: the fold a UV seam needs to be hard (a seam across a flat or gently curved panel stays smooth).
+SEAM_RULES = {
+    "vehicle": {"hard": 110.0, "seam_angle": 20.0, "seams": True, "materials": True},
+    "ped": {"hard": 180.0, "seam_angle": 180.0, "seams": False, "materials": False},
+    "weapon": {"hard": 75.0, "seam_angle": 15.0, "seams": True, "materials": True},
+    "world": {"hard": 80.0, "seam_angle": 20.0, "seams": True, "materials": True},
+}
+MODES = ("seams", "angle")
+_AUTO = "satk_auto_sharp"
 #: Parts that are fully smooth (only material borders and seams stay hard).
 _SMOOTH_PARTS = ("bump_", "wheel", "tyre", "tire")
 _NO_WELD_ROLES = ("glass", "map_alpha", "gunflash")
 _K1_KEYS = ("shade.normal_bend", "shade.flat_share", "shade.hard_edge_share", "dff.verts_per_tri", "geo.tris")
 
 
-def _rule(o, cls: str | None) -> dict:
-    if cls and cls in RULES:
-        r = dict(RULES[cls])
+def _rule(o, cls: str | None, mode: str = "seams") -> dict:
+    table = SEAM_RULES if mode == "seams" else RULES
+    if cls and cls in table:
+        r = dict(table[cls])
     else:
         coll = next((c for c in o.users_collection if c.get("satk_group")), None)
         grp = str(coll.get("satk_group")) if coll is not None else "vehicle"
         kind = str(coll.get("satk_kit")) if coll is not None else ""
-        r = dict(RULES["ped" if kind == "ped" else "weapon" if kind == "weapon" else
-                       grp if grp in RULES else "vehicle"])
+        r = dict(table["ped" if kind == "ped" else "weapon" if kind in ("weapon", "weapon_melee") else
+                       grp if grp in table else "vehicle"])
     part = str(o.get("satk_part") or o.name).lower()
     if any(part.startswith(p) for p in _SMOOTH_PARTS):
-        r["smooth"] = r["hard"] = 89.0
+        if mode == "seams":
+            r["hard"], r["seam_angle"] = 180.0, 180.0
+        else:
+            r["smooth"] = r["hard"] = 89.0
     return r
 
 
@@ -114,18 +134,47 @@ def _remove_auto_smooth(o, warn: list[str]) -> None:
             warn.append(f"INFO: {o.name}: removed the 'Smooth by Angle' modifier (sa_shade marks sharp edges itself)")
 
 
+def _edge_flags(me, name: str) -> set:
+    """Indices of the edges whose boolean (or float > 0) edge attribute ``name`` is set."""
+    a = me.attributes.get(name)
+    if a is None or a.domain != "EDGE":
+        return set()
+    return {i for i, d in enumerate(a.data) if d.value}
+
+
+def _crease_edges(me) -> set:
+    """Edges with a Blender edge crease above 0 (``crease_edge``) or the ``satk_crease`` attribute."""
+    out = _edge_flags(me, "satk_crease")
+    a = me.attributes.get("crease_edge")
+    if a is not None and a.domain == "EDGE":
+        out |= {i for i, d in enumerate(a.data) if d.value > 0.0}
+    return out
+
+
+def _store_auto(me, auto: set) -> None:
+    a = me.attributes.get(_AUTO)
+    if a is None:
+        a = me.attributes.new(_AUTO, "BOOLEAN", "EDGE")
+    a.data.foreach_set("value", [i in auto for i in range(len(me.edges))])
+
+
 def shade_object(o, *, cls: str | None = None, weld: float = 0.0005, weighted: bool = True,
                  smooth: float | None = None, hard: float | None = None, seams: bool | None = None,
-                 materials: bool | None = None, warn: list[str] | None = None) -> dict:
+                 materials: bool | None = None, warn: list[str] | None = None, mode: str = "seams",
+                 seam_angle: float | None = None) -> dict:
     """Steps 1-4 on ``o`` (its base mesh; modifiers stay live). Returns counts."""
     warn = warn if warn is not None else []
     if o.type != "MESH":
         raise SatkError("BAD_PARAMS", f"kit.shade: {o.name} is not a mesh")
-    rule = _rule(o, cls)
+    if mode not in MODES:
+        raise SatkError("BAD_PARAMS", f"kit.shade: mode {mode!r}", hint="seams (vanilla rule) | angle")
+    rule = _rule(o, cls, mode)
     if smooth is not None:
         rule["smooth"] = float(smooth)
     if hard is not None:
         rule["hard"] = float(hard)
+    if seam_angle is not None:
+        rule["seam_angle"] = float(seam_angle)
     if seams is not None:
         rule["seams"] = bool(seams)
     if materials is not None:
@@ -133,6 +182,11 @@ def shade_object(o, *, cls: str | None = None, weld: float = 0.0005, weighted: b
     me = o.data
     if not len(me.polygons):
         return {"object": o.name, "skipped": "empty mesh"}
+    # the author's own marks: sharp edges this step did not make (a previous run recorded its own)
+    auto_before = _edge_flags(me, _AUTO)
+    marked = {tuple(sorted(e.vertices)) for e in me.edges if e.use_edge_sharp and e.index not in auto_before}
+    creased = {tuple(sorted(me.edges[i].vertices)) for i in _crease_edges(me)}
+    soft = {tuple(sorted(me.edges[i].vertices)) for i in _edge_flags(me, "satk_soft")}
     bm = bmesh.new()
     try:
         bm.from_mesh(me)
@@ -157,30 +211,49 @@ def shade_object(o, *, cls: str | None = None, weld: float = 0.0005, weighted: b
             f.smooth = True
         # 3. sharp edges by the rule
         seam_edges = _uv_seam_edges(bm) if rule["seams"] else set()
-        lo, hi = math.radians(rule["smooth"]), math.radians(rule["hard"])
-        n_sharp = n_design = 0
+        hi = math.radians(rule["hard"])
+        lo = math.radians(rule.get("smooth", 30.0))
+        seam_lim = math.radians(rule.get("seam_angle", 0.0))
+        n_sharp = n_design = n_seam = 0
+        auto: set = set()
         for e in bm.edges:
             if len(e.link_faces) != 2:
                 e.smooth = True
                 continue
             f1, f2 = e.link_faces
             ang = f1.normal.angle(f2.normal, 0.0)
-            sharp = False
+            key = tuple(sorted(v.index for v in e.verts))
+            sharp = by_rule = False
             if rule["materials"] and f1.material_index != f2.material_index:
-                sharp = True
-            elif e.index in seam_edges:
-                sharp = True
-            elif ang > hi:
-                sharp = True
-            elif ang >= lo and not e.smooth:  # the agent's design mark in the 30-60 band
-                sharp = True
-                n_design += 1
+                sharp = by_rule = True
+            elif mode == "seams":
+                if key in marked or key in creased:            # a named crease: the author's line
+                    sharp = ang > math.radians(1.0)
+                    n_design += sharp
+                elif key in soft:
+                    sharp = False
+                elif e.index in seam_edges and ang >= seam_lim:
+                    sharp = by_rule = True
+                    n_seam += 1
+                elif ang > hi:
+                    sharp = by_rule = True
+            else:
+                if e.index in seam_edges:
+                    sharp = by_rule = True
+                elif ang > hi:
+                    sharp = by_rule = True
+                elif ang >= lo and key in marked:  # the agent's design mark in the 30-60 band
+                    sharp = True
+                    n_design += 1
             e.smooth = not sharp
             n_sharp += sharp
+            if sharp and by_rule:
+                auto.add(key)
         bm.to_mesh(me)
     finally:
         bm.free()
     me.update()
+    _store_auto(me, {e.index for e in me.edges if tuple(sorted(e.vertices)) in auto})
     # 4. normals last
     _remove_auto_smooth(o, warn)
     wn = o.modifiers.get("satk_wn")
@@ -197,8 +270,146 @@ def shade_object(o, *, cls: str | None = None, weld: float = 0.0005, weighted: b
     elif wn is not None:
         o.modifiers.remove(wn)
     o.dff.export_split_normals = True
-    return {"object": o.name, "welded": welded, "sharp": n_sharp, "design": n_design,
-            "rule": [rule["smooth"], rule["hard"]]}
+    out = {"object": o.name, "welded": welded, "sharp": n_sharp, "design": n_design, "mode": mode,
+           "rule": ([rule["hard"], rule["seam_angle"]] if mode == "seams" else [rule["smooth"], rule["hard"]])}
+    if n_seam:
+        out["seam_hard"] = n_seam
+    return out
+
+
+#: Two parts meet at a seam when their border vertices lie this close (m).
+SEAM_DIST = 0.001
+#: Normals on the two sides of a seam closer than this (degrees) are one surface (a panel cut); wider = a crease
+#: (kit.shade passes the class's hard fold angle, 110 for vehicles: a cut along a 90 deg body corner stays soft).
+SEAM_MATCH_DEG = 110.0
+
+
+def match_seams(objs, *, dist: float = SEAM_DIST, max_deg: float = SEAM_MATCH_DEG) -> dict:
+    """Shade the cuts between parts as one surface (a bonnet, a door or a boot cut out of the shell).
+
+    A part's border vertex averages only its own faces, so along every panel line the two sides tilt apart and the
+    panels read as faceted lids. Here the border corners of every object that coincide (``dist``) with border
+    corners of another object take the mean of the normals on both sides that lie within ``max_deg`` of their own
+    (a real crease stays hard). The evaluated normals (Weighted Normal included) are baked into custom normals and
+    the ``satk_wn`` modifier is removed on the objects that changed (re-run kit.shade after editing them).
+    Objects with other modifiers are left alone. Returns ``{"objects", "corners", "skipped"}``.
+    """
+    import numpy as np
+    from mathutils import Vector
+    from mathutils.kdtree import KDTree
+
+    dg = bpy.context.evaluated_depsgraph_get()
+    data = []
+    skipped = []
+    for o in objs:
+        if o.type != "MESH" or not len(o.data.polygons):
+            continue
+        if any(m.type != "WEIGHTED_NORMAL" for m in o.modifiers):
+            skipped.append(o.name)
+            continue
+        ev = o.evaluated_get(dg)
+        me = ev.to_mesh()
+        try:
+            mw = o.matrix_world
+            r3 = mw.to_3x3()
+            nrm_m = r3.inverted_safe().transposed()
+            cn = [(nrm_m @ Vector(c.vector)).normalized() for c in me.corner_normals]
+            pos = [mw @ v.co for v in me.vertices]
+            border = set()
+            ecount: dict = {}
+            for poly in me.polygons:
+                for ek in poly.edge_keys:
+                    ecount[ek] = ecount.get(ek, 0) + 1
+            for (a, b), n in ecount.items():
+                if n == 1:
+                    border.add(a)
+                    border.add(b)
+            loops_of: dict = {}
+            for l in me.loops:
+                loops_of.setdefault(l.vertex_index, []).append(l.index)
+            data.append({"o": o, "cn": cn, "pos": pos, "loops_of": loops_of, "border": border, "nl": len(me.loops)})
+        finally:
+            ev.to_mesh_clear()
+    if len(data) < 2:
+        return {"objects": 0, "corners": 0, "skipped": skipped}
+    pts = [(k, v) for k, d in enumerate(data) for v in d["loops_of"]]
+    kd = KDTree(len(pts))
+    for i, (k, v) in enumerate(pts):
+        kd.insert(data[k]["pos"][v], i)
+    kd.balance()
+    lim = math.radians(max_deg)
+    new: dict = {}
+    done: set = set()
+    for k, d in enumerate(data):
+        for v in d["border"]:
+            if (k, v) in done:
+                continue
+            group = [pts[j] for _co, j, _dd in kd.find_range(d["pos"][v], dist)]
+            if len({kk for kk, _vv in group}) < 2:
+                continue  # an open border of one part only
+            done.update(group)
+            normals = [(kk, li, data[kk]["cn"][li]) for kk, vv in group for li in data[kk]["loops_of"][vv]]
+            # union-find: a corner joins the closest corner of every other part within the limit, and the corners of
+            # its own fan; each group takes its mean (both sides of a cut get the same normal, own creases stay)
+            parent = list(range(len(normals)))
+
+            def root(i: int) -> int:
+                while parent[i] != i:
+                    parent[i] = parent[parent[i]]
+                    i = parent[i]
+                return i
+
+            for i, (ka, _la, na) in enumerate(normals):
+                best: dict = {}
+                for j, (kb, _lb, nb) in enumerate(normals):
+                    if j == i:
+                        continue
+                    a = na.angle(nb, math.pi)
+                    if kb == ka:
+                        if a < 1e-3:
+                            parent[root(j)] = root(i)
+                    elif a < lim and a < best.get(kb, (math.pi, -1))[0]:
+                        best[kb] = (a, j)
+                for _a, j in best.values():
+                    parent[root(j)] = root(i)
+            comp: dict = {}
+            for i in range(len(normals)):
+                comp.setdefault(root(i), []).append(i)
+            for members in comp.values():
+                if len({normals[i][0] for i in members}) < 2:
+                    continue
+                acc = Vector((0.0, 0.0, 0.0))
+                for i in members:
+                    acc += normals[i][2]
+                if acc.length < 1e-6:
+                    continue
+                m = acc.normalized()
+                for i in members:
+                    kk, li, n = normals[i]
+                    if (m - n).length > 1e-5:
+                        new.setdefault(kk, {})[li] = m
+    changed = 0
+    corners = 0
+    for k, repl in new.items():
+        d = data[k]
+        o = d["o"]
+        if len(o.data.loops) != d["nl"]:
+            skipped.append(o.name)
+            continue
+        inv = o.matrix_world.to_3x3().transposed()     # world -> object for a rotation (and uniform scale)
+        out = []
+        for li, n in enumerate(d["cn"]):
+            w = repl.get(li, n)
+            out.append(tuple((inv @ w).normalized()))
+        wn = o.modifiers.get("satk_wn")
+        if wn is not None:
+            o.modifiers.remove(wn)
+        o.data.normals_split_custom_set(out)
+        o.data["satk_normals"] = "seams"
+        o.dff.export_split_normals = True
+        changed += 1
+        corners += len(repl)
+    return {"objects": changed, "corners": corners, "skipped": skipped}
 
 
 def _export_one(o, path: str) -> None:

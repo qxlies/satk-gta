@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sae-bench.schema.json",
+  "title": "sa-engine bench result (sae-bench/1)",
+  "description": "One bench result: a scene run (or a trace summary) as a list of stages. The one schema of 'satk ingame bench' (converted from satk-bench/1 by obs.convert) and of the later trace and fan-out bench packages. A stage holds the frame statistics block shared with the stats record of the JSONL stream. Readers ignore members they do not know unless they run in strict mode.",
+  "type": "object",
+  "required": ["schema", "run", "scene", "label", "source", "stages", "summary"],
+  "properties": {
+    "schema": {"const": "sae-bench/1"},
+    "run": {"type": "string", "minLength": 1, "maxLength": 96},
+    "scene": {"type": "string", "minLength": 1, "maxLength": 64},
+    "title": {"type": "string", "maxLength": 200},
+    "label": {"type": "string", "minLength": 1, "maxLength": 96},
+    "started": {"type": "string", "description": "ISO 8601 local or UTC time of the start; informational."},
+    "source": {
+      "type": "object",
+      "required": ["tool"],
+      "description": "What produced the file.",
+      "properties": {
+        "tool": {"type": "string", "minLength": 1, "maxLength": 64, "description": "ingame-bench, obs-trace, obs-bench, ..."},
+        "version": {"type": "string", "maxLength": 64},
+        "converted_from": {"type": "string", "pattern": "^[a-z][a-z0-9-]*/[1-9][0-9]*$", "description": "Schema id of the file this one was converted from."}
+      }
+    },
+    "request": {"type": "object", "additionalProperties": true, "description": "What was asked for (preset, profile, duration, console lines): producer-defined."},
+    "env": {
+      "type": "object",
+      "description": "What was measured: the build and its settings.",
+      "properties": {
+        "role": {"enum": ["client", "server", "bot", "cluster"]},
+        "sae": {"type": "boolean", "description": "True for an sa-engine build, false for stock MTA."},
+        "build": {"type": "string", "maxLength": 128},
+        "version": {"type": ["integer", "string"], "description": "Version of the in-game runner."},
+        "preset": {"type": "string", "maxLength": 64},
+        "profile": {"type": "string", "maxLength": 64},
+        "sim": {"enum": ["classic", "fixed"]},
+        "pulse": {"enum": ["standard", "alt"]},
+        "features": {"type": "object", "additionalProperties": {"type": "boolean"}, "description": "Which engine functions the runner found."},
+        "screen": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer", "minimum": 1}},
+        "settings": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "key": {
+      "type": "object",
+      "description": "Timeline window of the whole run, when known.",
+      "properties": {
+        "first": {"allOf": [{"$ref": "sae-obs-common.schema.json#/$defs/key"}, {"$ref": "sae-obs-common.schema.json#/$defs/key_required"}]},
+        "last": {"allOf": [{"$ref": "sae-obs-common.schema.json#/$defs/key"}, {"$ref": "sae-obs-common.schema.json#/$defs/key_required"}]}
+      }
+    },
+    "stages": {"type": "array", "items": {"$ref": "#/$defs/stage"}},
+    "summary": {"$ref": "#/$defs/summary"},
+    "planned_stages": {"type": "integer", "minimum": 0},
+    "incomplete": {"type": "boolean", "description": "True when the run stopped before the last stage."},
+    "error": {
+      "type": "object",
+      "required": ["code"],
+      "properties": {"code": {"type": "string", "maxLength": 32}, "msg": {"type": "string"}}
+    },
+    "warn": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "stat_name": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)*$", "maxLength": 96},
+    "last_max": {
+      "type": "object",
+      "properties": {
+        "last": {"type": "number"},
+        "max": {"type": "number"},
+        "min": {"type": "number"}
+      },
+      "description": "A counter or gauge over a stage: the last value, the maximum (and the minimum)."
+    },
+    "last_max_map": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/stat_name"},
+      "additionalProperties": {"$ref": "#/$defs/last_max"}
+    },
+    "key_full": {"allOf": [{"$ref": "sae-obs-common.schema.json#/$defs/key"}, {"$ref": "sae-obs-common.schema.json#/$defs/key_required"}]},
+    "summary": {
+      "type": "object",
+      "description": "Numbers of the whole run: the stages pooled.",
+      "properties": {
+        "stages": {"type": "integer", "minimum": 0},
+        "frames": {"type": "integer", "minimum": 0},
+        "fps_avg": {"type": "number", "minimum": 0},
+        "p50_ms": {"$ref": "sae-obs-common.schema.json#/$defs/ms"},
+        "p95_ms": {"$ref": "sae-obs-common.schema.json#/$defs/ms"},
+        "p99_ms": {"$ref": "sae-obs-common.schema.json#/$defs/ms"},
+        "max_ms": {"$ref": "sae-obs-common.schema.json#/$defs/ms"},
+        "low1_fps": {"type": "number", "minimum": 0},
+        "pooled": {"type": "boolean", "description": "True when several stages were pooled (percentiles are approximate)."},
+        "va_peak_mib": {"$ref": "sae-obs-common.schema.json#/$defs/mib"},
+        "va_growth_mib": {"type": "number"},
+        "stream_peak_mib": {"$ref": "sae-obs-common.schema.json#/$defs/mib"},
+        "clock_ratio_min": {"type": "number", "minimum": 0},
+        "clock_ratio_max": {"type": "number", "minimum": 0},
+        "shots_per_s": {"type": "number", "minimum": 0},
+        "ticks_per_frame": {"type": "number", "minimum": 0},
+        "dropped_ms": {"$ref": "sae-obs-common.schema.json#/$defs/ms"}
+      }
+    },
+    "stage": {
+      "type": "object",
+      "required": ["id", "frames"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 64},
+        "index": {"type": "integer", "minimum": 1},
+        "title": {"type": "string", "maxLength": 200},
+        "warmup_s": {"$ref": "sae-obs-common.schema.json#/$defs/ms"},
+        "sample_s": {"$ref": "sae-obs-common.schema.json#/$defs/ms"},
+        "key": {
+          "type": "object",
+          "description": "Timeline window of the sample.",
+          "properties": {"start": {"$ref": "#/$defs/key_full"}, "end": {"$ref": "#/$defs/key_full"}}
+        },
+        "frames": {"$ref": "sae-obs-common.schema.json#/$defs/frame_stats"},
+        "ticks": {
+          "type": "object",
+          "description": "Simulation ticks in the sample (fixed mode).",
+          "properties": {
+            "n": {"type": "integer", "minimum": 0},
+            "per_frame_avg": {"type": "number", "minimum": 0},
+            "max_per_frame": {"type": "integer", "minimum": 0},
+            "tick_ms": {"$ref": "sae-obs-common.schema.json#/$defs/ms_stats"},
+            "dropped_ms": {"$ref": "sae-obs-common.schema.json#/$defs/ms"}
+          }
+        },
+        "fences": {"$ref": "sae-obs-common.schema.json#/$defs/ms_stats_map"},
+        "gpu": {"$ref": "sae-obs-common.schema.json#/$defs/ms_stats_map"},
+        "series": {
+          "type": "object",
+          "required": ["cols", "rows"],
+          "description": "A time series sampled about once a second. cols[0] is t_s (seconds since the start of the sample); the other columns are named by the producer.",
+          "properties": {
+            "cols": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$"}},
+            "rows": {"type": "array", "items": {"type": "array", "items": {"type": ["number", "null"]}}}
+          }
+        },
+        "va": {
+          "type": "object",
+          "properties": {
+            "start_mib": {"$ref": "sae-obs-common.schema.json#/$defs/mib"},
+            "end_mib": {"$ref": "sae-obs-common.schema.json#/$defs/mib"},
+            "peak_mib": {"$ref": "sae-obs-common.schema.json#/$defs/mib"},
+            "growth_mib": {"type": "number"}
+          }
+        },
+        "stream": {
+          "type": "object",
+          "properties": {
+            "start_mib": {"$ref": "sae-obs-common.schema.json#/$defs/mib"},
+            "end_mib": {"$ref": "sae-obs-common.schema.json#/$defs/mib"},
+            "peak_mib": {"$ref": "sae-obs-common.schema.json#/$defs/mib"}
+          }
+        },
+        "clock": {
+          "type": "object",
+          "properties": {
+            "ratio": {"type": "number", "minimum": 0, "description": "Game milliseconds per real millisecond."},
+            "frame_counter": {"type": "number", "minimum": 0},
+            "frame_counter_hz": {"type": "number", "minimum": 0},
+            "game_ms": {"type": "number", "minimum": 0},
+            "tick_count_ms": {"type": "number", "minimum": 0, "description": "Real milliseconds over the sample (getTickCount delta)."},
+            "timer_mode": {"enum": ["real", "stock", "off"]}
+          }
+        },
+        "ctr": {"$ref": "#/$defs/last_max_map"},
+        "gauge": {"$ref": "#/$defs/last_max_map"},
+        "snap_start": {"$ref": "sae-obs-common.schema.json#/$defs/snapshot"},
+        "snap_end": {"$ref": "sae-obs-common.schema.json#/$defs/snapshot"},
+        "counts": {"type": "object", "additionalProperties": true},
+        "probe": {"type": "object", "additionalProperties": true},
+        "camera": {"type": "object", "additionalProperties": true},
+        "fps_limit": {"type": "array"},
+        "console": {"type": "array"},
+        "raw": {"type": "object", "additionalProperties": true, "description": "Producer tables kept verbatim by a converter (lossless round trip)."},
+        "ext": {"type": "object", "additionalProperties": true, "description": "Stage members a converter did not map."},
+        "warn": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

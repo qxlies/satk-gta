@@ -39,6 +39,7 @@ from .common import (
     donor_git,
     file_url,
     find_premake,
+    fork_profile,
     git,
     layout,
     read_json,
@@ -568,6 +569,9 @@ def verify_installed(L: Layout | None = None) -> list[dict]:
         "net-arm64": L.bin / "server" / "arm64" / "net.dll",
         "netc": L.bin / "MTA" / "netc.dll",
     }
+    if fork_profile(L) == "server":  # a sparse server checkout: only the x64 server module is expected
+        checks = {}
+        verbatim = {"net-x64": verbatim["net-x64"]}
     for dep_id, p in checks.items():
         out.append({"id": dep_id, "path": jpath(p), "status": "ok" if p.is_file() else "missing"})
     for dep_id, p in verbatim.items():

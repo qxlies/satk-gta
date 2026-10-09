@@ -1,0 +1,92 @@
+# Icon set "sae-v1": the Engine tab of the sa-engine client (preset row, server-limit badge, status dots).
+# The style prompt is fixed; {subject} and {accent} are filled per icon. Do not edit the prompt text
+# without bumping prompt_id (provenance rows quote it).
+
+[spec]
+name = "sae_v1"
+out = "sae-v1"
+model = "google/gemini-3.1-flash-image-preview"
+aspect = "1:1"
+size = "1K"
+candidates = 3
+key_color = "#FF00FF"
+badge_color = "#1F2428"
+ring_color = "#3A4148"
+emblem_color = "#E8EAED"
+prompt_id = "sae-v1-style-1"
+style_prompt = "Flat minimalist user-interface icon for a PC game settings menu. A single centered emblem inside a rounded-square badge with 12 percent corner radius filling 80 percent of the canvas. Badge fill dark slate #1F2428 with a thin inner border #3A4148. The emblem is {subject}, drawn with thick clean strokes and flat fills in off-white #E8EAED plus one accent color {accent}. No text, no letters, no numbers, no logos, no brand marks, no people, no weapons, no vehicles, no photorealism, no drop shadow outside the badge. Everything outside the badge is a perfectly flat solid pure magenta #FF00FF background with no texture, noise or vignette. Crisp edges, readable at 32x32 pixels."
+
+# kind = "hills": the placeholder draws `hills` layered hills and a dashed sight line of relative length `sight`
+# (0..1); `skyline` adds a tiny city at the far edge. kind = "lock": a padlock.
+
+[[icon]]
+id = "preset_classic"
+name = "classic"
+kind = "hills"
+hills = 1
+sight = 0.25
+skyline = false
+accent = "#9AA0A6"
+sizes = [64, 128]
+subject = "a single low rounded hill with a short dashed sight line that ends close to the viewer"
+
+[[icon]]
+id = "preset_balanced"
+name = "balanced"
+kind = "hills"
+hills = 2
+sight = 0.5
+skyline = false
+accent = "#34A853"
+sizes = [64, 128]
+subject = "two layered hill silhouettes, the far one smaller, with a medium-length dashed sight line"
+
+[[icon]]
+id = "preset_high"
+name = "high"
+kind = "hills"
+hills = 3
+sight = 0.75
+skyline = false
+accent = "#4285F4"
+sizes = [64, 128]
+subject = "three layered hill silhouettes receding into the distance with a long dashed sight line to the horizon"
+
+[[icon]]
+id = "preset_extreme"
+name = "extreme"
+kind = "hills"
+hills = 4
+sight = 1.0
+skyline = true
+accent = "#FB8C00"
+sizes = [64, 128]
+subject = "four layered mountain silhouettes receding to a distant horizon with a tiny city skyline at the far edge and a very long sight line"
+
+[[icon]]
+id = "lock"
+name = "lock"
+kind = "lock"
+accent = "#FBBC04"
+sizes = [24, 48]
+subject = "a closed padlock"
+
+# Status dots are never generated: flat circles drawn with Pillow, a 1 px ring in a darker shade.
+
+[[status]]
+id = "status_ok"
+name = "ok"
+color = "#34A853"
+size = 12
+
+[[status]]
+id = "status_warn"
+name = "warn"
+color = "#FBBC04"
+size = 12
+
+[[status]]
+id = "status_error"
+name = "error"
+color = "#EA4335"
+size = 12

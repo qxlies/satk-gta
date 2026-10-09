@@ -1,0 +1,167 @@
+{
+ "kind": "bike",
+ "version": 1,
+ "summary": "Close-up review regions of a motorbike or scooter.",
+ "leak": {
+  "cull": false,
+  "gap": false,
+  "inside": true,
+  "floor_exclude": [
+   "wheel*"
+  ],
+  "floor_pct": 1.0,
+  "slit": false,
+  "inside_regions": [
+   "front",
+   "rear",
+   "left",
+   "right",
+   "cockpit",
+   "engine"
+  ],
+  "inside_depth": 0.4
+ },
+ "regions": [
+  {
+   "name": "front",
+   "summary": "front: lamp, forks, mudguard, fairing nose",
+   "box": {
+    "y": [
+     0.55,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 0,
+     "el": 8
+    },
+    {
+     "az": 35,
+     "el": 18
+    }
+   ]
+  },
+  {
+   "name": "rear",
+   "summary": "rear: tail lamp, plate, seat end, exhaust",
+   "box": {
+    "y": [
+     0.0,
+     0.45
+    ]
+   },
+   "cameras": [
+    {
+     "az": 180,
+     "el": 8
+    },
+    {
+     "az": 145,
+     "el": 18
+    }
+   ]
+  },
+  {
+   "name": "left",
+   "summary": "left side: profile, frame, engine, exhaust",
+   "cameras": [
+    {
+     "az": -90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": -90,
+     "el": 20
+    }
+   ]
+  },
+  {
+   "name": "right",
+   "summary": "right side: profile, frame, engine",
+   "cameras": [
+    {
+     "az": 90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": 90,
+     "el": 20
+    }
+   ]
+  },
+  {
+   "name": "cockpit",
+   "summary": "rider view: handlebars, grips, dash, tank top",
+   "box": {
+    "y": [
+     0.45,
+     0.9
+    ],
+    "z": [
+     0.5,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 180,
+     "el": 32
+    },
+    {
+     "az": -45,
+     "el": 30
+    }
+   ]
+  },
+  {
+   "name": "engine",
+   "summary": "engine and drivetrain: block, exhaust, chain or shaft, footrests",
+   "box": {
+    "y": [
+     0.2,
+     0.72
+    ],
+    "z": [
+     0.0,
+     0.62
+    ]
+   },
+   "cameras": [
+    {
+     "az": -90,
+     "el": 6
+    },
+    {
+     "az": 90,
+     "el": 6
+    },
+    {
+     "az": -60,
+     "el": 20
+    }
+   ]
+  },
+  {
+   "name": "wheels",
+   "summary": "both wheels: rim, tyre, fork or swingarm, mudguard, brake",
+   "frames": [
+    "wheel_front",
+    "wheel_rear"
+   ],
+   "radius_h": 0.42,
+   "cameras": [
+    {
+     "az": -90,
+     "el": 6
+    },
+    {
+     "az": 90,
+     "el": 6
+    }
+   ]
+  }
+ ]
+}

@@ -44,7 +44,7 @@ To install the mod, copy `<work>/out/mods/bistro_demo/` into `<game folder>/modl
 | `satk texture pack DIR [--name X] [--file F] [--format auto] [--mips N] [--quality normal] [--no-pot] [--max-size N]` | — | the images of a folder (`.png`; with Pillow also `.bmp .tga .jpg .dds …`) → `<work>/out/mods/<X>/<F or X>.txd`; the texture name is the file name |
 | `satk texture replace TXD TEX=IMG... [--name X] [--file F] [--format auto] [--mips N] [--add] [...]` | — | a copy of the TXD with the listed textures replaced (`--add` appends new ones), everything else byte for byte; the file name defaults to the source name (`bistro.txd`), the folder to the TXD name |
 | `satk texture pack DIR --asset-class vehicle\|ped\|weapon\|map\|lod [--out MODDIR]` | — | formats and mip levels as in the vanilla game for that class (table below); `--out` writes `<MODDIR>/<file>` into any writable folder (a Mod Loader mod) without a README |
-| `satk texture finish IMG [--preset photo_like\|interior\|wheel\|wall] [--mask AO.png] [--edge EDGE.png] [--role R] [--out DIR]` | — | the SA look without photographs: `<stem>-<preset>.png`, its DXT1 preview `…-dxt.png`, a stats table (value, saturation, contrast, colours) and the vanilla band of the role; the result is pulled into the inner part of that band |
+| `satk texture finish IMG [--preset photo_like\|interior\|wheel\|wall] [--mask AO.png] [--edge EDGE.png] [--role R] [--grime 0..1] [--wear 0..1] [--grain 0..1] [--soft PX] [--supersample 1\|2\|4\|8] [--photo 0..1] [--out DIR]` | — | the soft SA look without photographs: `<stem>-<preset>.png`, its DXT1 preview `…-dxt.png`, a stats table (value, saturation, contrast, colours) and the vanilla band of the role; the result is pulled into the inner part of that band. Vehicle roles stay clean (grime and wear 0) unless asked. `--photo` adds the quiet variation of a photo instead of the noise (soft tonal drift, mottling and grain, a slight hue drift, light from above; no grime; the painted structure stays) |
 | `satk texture new NAME [--size W H] [--color #rrggbb] [--color2 C --gradient u\|v] [--rect u0:v0:u1:v1=#hex ...] [--alpha N] [--out DIR]` | — | a base image of any size (each side a multiple of 4): a colour, an optional gradient and rectangles in UV space (`v` up, the rectangles `uv.fit` and `kit.uv_region` use) → `<work>/out/texmod/new/<NAME>.png`, so no Pillow script is needed |
 
 Parameters:
@@ -93,7 +93,15 @@ max(r, g, b), `colours` = exact RGB colours of the DXT1 preview):
 
 A flat 128×128 fill finished with `--preset interior` lands inside the band (value 0.13, 650 colours after DXT1).
 
-`texture finish` takes three more inputs and one more guarantee:
+`texture finish` takes more inputs and one more guarantee:
+
+- **Clean and soft by default.** `--grime` (darker blotches, heavier at the bottom) and `--wear` (edge wear from
+  `--edge`) default to 0 for the vehicle roles `interior wheel decal body`: car paint is a flat key colour and the
+  engine's dirt level does the dirt, so own vehicle textures carry none. Map roles keep the preset's grime (0.20 for
+  `wall`) and a wear of 0.35. `--grain` is the share of fine grain in the noise (lower is softer); `--soft` is the
+  blur of the final soft filter in output pixels (default 0.5: slightly out of focus at native size, like SA).
+- **Paint big, finish small:** `--supersample 4` takes an image painted at 4 times the texture size (512 px for a
+  128 px texture) as it is; the noise and masks work at that size and the soft filter downsizes it.
 
 - `--mask AO.png` darkens by ambient occlusion (white = open); `--edge EDGE.png` is the worn-edge mask (white = edge;
   `kit.bake` writes `<object>_ao.png` and `<object>_edge.png`): edges turn lighter and greyer, like chipped paint.
@@ -129,10 +137,10 @@ A flat 128×128 fill finished with `--preset interior` lands inside the band (va
   8 = compressed; rasterType 4. New textures get filter 6 (trilinear) and wrap addressing. When replacing, the
   name (as the TXD spells it), the mask, the filter and the addressing are taken from the old texture; if mips
   appear, a filter without mip filtering is raised (1 → 3, 2 → 6), otherwise the game does not use them.
-- **Finish** works at 4× the size: it desaturates towards the preset, multiplies a lognormal noise field (soft
-  tileable blotches at two scales plus grain at the output resolution, so the grain survives the box filter)
-  whose strength is fitted so the luminance contrast meets the preset, darkens by the AO mask and by grime, scales
-  the mean value to the preset, lightens the worn edges and box-filters back. The noise seed is the image content
+- **Finish** works at 4× the size (or at the size of a `--supersample` painting): it desaturates towards the
+  preset, multiplies a lognormal noise field (soft tileable blotches at two scales plus a faint grain) whose strength
+  is fitted so the luminance contrast meets the preset, darkens by the AO mask and by the optional grime, scales the
+  mean value to the preset, lightens the optional worn edges, blurs by `--soft` and box-filters back. The noise seed is the image content
   plus the preset and the masks, so the same input gives the same PNG. When `satk.style` provides `style.texture`,
   its answer replaces the built-in band, and its role distribution drives the band landing.
 - **Determinism:** the same input gives the same TXD bytes and the same README (it holds the paths and sha256 of

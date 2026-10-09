@@ -1,4 +1,4 @@
-"""asset.check row fixes of lane a2-kit: optional parts, edge rows by default, the band named in every message."""
+"""asset.check rows: optional parts, sections, reference rows that never judge, what the default output shows."""
 
 from __future__ import annotations
 
@@ -62,39 +62,43 @@ def test_check_subject_tells_a_replacement_from_a_new_model(fake_cache, tmp_path
     assert [x[6] for x in _rows(r["rows"], "struct.part_missing")] == ["warn"]
 
 
-def test_metric_hints_name_the_tier_band_for_every_verdict(fake_cache):
-    m = {"veh.hd_tris": 2500.0}
-    cols = {}
+def test_reference_rows_are_information_in_every_tier(fake_cache):
+    """Vanilla numbers are reference: the row is 'info' in the reference section, whatever the value or tier."""
     for tier in ("vanilla", "sa_plus"):
-        rows = CK.metric_rows(m, fake_cache, "car", tier, all_rows=True)
-        cols[tier] = _rows(rows, "veh.hd_tris")[0]
-    for tier, row in cols.items():
-        assert f"the {tier} band" in row[7], row
-    assert cols["sa_plus"][7].endswith("(proposal)") and cols["vanilla"][7].endswith("(vanilla)")
-    if cols["vanilla"][6] == "ok":
-        assert cols["vanilla"][7].startswith("inside ")
+        for value in (2500.0, 10.0, 48.0):
+            row = _rows(CK.metric_rows({"veh.hd_tris": value}, fake_cache, "car", tier), "veh.hd_tris")[0]
+            assert row[6] == "info" and row[9] == "reference" and "reference, not a target" in row[7], row
+            assert "vanilla p10..p90" in row[7] and len(row) == len(CK.COLS)
 
 
 def _fake_check(rows: list[list]):
     def fn(subj, cache, **kw):
         counts: dict[str, int] = {}
+        sections: dict[str, dict] = {}
         for r in rows:
             counts[r[6]] = counts.get(r[6], 0) + 1
+            sections.setdefault(r[9], {})[r[6]] = sections.get(r[9], {}).get(r[6], 0) + 1
         return {"target": "x.dff", "class": "prop", "peer_set": "prop", "how": "test", "tier": "sa_plus", "like": None,
-                "rows": rows, "counts": counts, "out_of_band": 0, "verdict": "review", "metrics": {}, "notes": []}
+                "rows": rows, "counts": counts, "sections": sections, "defects": counts.get("defect", 0),
+                "verdict": "review", "metrics": {}, "notes": []}
     return fn
 
 
-def test_default_output_shows_edge_rows_and_hides_ok_and_info(fake_cache, tmp_path, monkeypatch):
-    rows = [["geom.prelit", "box", 1, None, None, None, "warn", "h", "r"],
-            ["geo.tris", "", 540, 10, 84, 324, "edge", "near the edge", "r"],
-            ["dims.size", "", 1.0, 0.5, 1.0, 2.0, "ok", "inside", "r"],
-            ["col.check", "", 1, None, None, None, "info", "h", "r"]]
+def test_default_output_shows_findings_and_hides_information(fake_cache, tmp_path, monkeypatch):
+    rows = [["geom.prelit", "box", 1, None, None, None, "warn", "h", "r", "engine"],
+            ["form.floating", "chassis", 12.0, None, None, None, "defect", "h", "r", "form"],
+            ["cov.plates", "", "missing", None, None, None, "missing", "h", "r", "coverage"],
+            ["cov.glass", "", "present", None, None, None, "present", "h", "r", "coverage"],
+            ["geo.tris", "", 540, 10, 84, 324, "info", "above vanilla p10..p90", "r", "reference"],
+            ["col.check", "", 1, None, None, None, "info", "h", "r", "engine"]]
     monkeypatch.setattr(CK, "check_subject", _fake_check(rows))
     p = tmp_path / "x.dff"
     p.write_bytes(prop_dff(1.0))
     spec = get_op("asset.check")
     default = spec.call({"target": str(p)})
-    assert [r[0] for r in default["rows"]] == ["geom.prelit", "geo.tris"]
+    assert [r[0] for r in default["rows"]] == ["geom.prelit", "form.floating", "cov.plates"]
+    assert default["cols"][-1] == "section" and default["defects"] == 1 and default["sections"]["form"] == {"defect": 1}
     full = spec.call({"target": str(p), "full": True})
-    assert [r[0] for r in full["rows"]] == ["geom.prelit", "geo.tris", "dims.size", "col.check"]
+    assert [r[0] for r in full["rows"]] == [r[0] for r in rows]
+    md = spec.call({"target": str(p), "md": True})["text"]
+    assert "## form" in md and "## coverage" in md and "never targets" in md

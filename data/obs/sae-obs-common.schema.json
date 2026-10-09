@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sae-obs-common.schema.json",
+  "title": "sa-engine observability: shared definitions of sae-obs/1 and sae-bench/1",
+  "description": "Definitions used by the stream record schema and the bench schema: the timeline key, units, statistics blocks, engine snapshots. Version 1.0 of the specification (docs/en/obs-spec.md).",
+  "$defs": {
+    "u32": {"type": "integer", "minimum": 0, "maximum": 4294967295,
+            "description": "Unsigned 32-bit value. 4294967295 (0xFFFFFFFF) is the 'not applicable' value in key fields."},
+    "ms": {"type": "number", "minimum": 0, "description": "Milliseconds, non-negative."},
+    "mib": {"type": "number", "minimum": 0, "description": "Mebibytes, non-negative."},
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$", "maxLength": 96,
+             "description": "A dotted lower-case name of a counter, gauge, event, pass or owner (sim.dropped_ms, va.dxt, sae.clock.rebase)."},
+    "fence": {"type": "string", "pattern": "^F[0-7][a-z]?$", "description": "A fence name: F0..F7, with an optional lower-case sub-fence letter (F3b, F6a)."},
+    "node": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,64}$", "description": "A node id: client-1, server, bot-017."},
+    "key": {
+      "type": "object",
+      "description": "The timeline key. t_us is session time in microseconds in the server clock domain (local clock when not connected); tick is the server tick T = floor(t_us / dt_s_us); sub is the client simulation sub-tick k; frame is the client frame counter. 4294967295 in tick, sub or frame means 'not applicable' (no tick grid, classic mode, a record of a process without frames).",
+      "properties": {
+        "t_us": {"type": "integer", "minimum": 0, "maximum": 9223372036854775807},
+        "tick": {"$ref": "#/$defs/u32"},
+        "sub": {"$ref": "#/$defs/u32"},
+        "frame": {"$ref": "#/$defs/u32"},
+        "tsrc": {"enum": ["server", "est", "est_unlocked", "local"],
+                 "description": "Where t_us comes from: server (a server-side record), est (client estimate, clock locked), est_unlocked (client estimate before the lock), local (not connected, local QPC)."}
+      }
+    },
+    "key_required": {"required": ["t_us", "tick", "sub", "frame"]},
+    "number_map": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/name"},
+      "additionalProperties": {"type": "number"}
+    },
+    "ms_map": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/name"},
+      "additionalProperties": {"$ref": "#/$defs/ms"}
+    },
+    "mib_map": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/name"},
+      "additionalProperties": {"$ref": "#/$defs/mib"}
+    },
+    "fence_ms": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/fence"},
+      "additionalProperties": {"$ref": "#/$defs/ms"},
+      "description": "Milliseconds spent in the callbacks of each fence during the frame (or the tick)."
+    },
+    "ms_stats": {
+      "type": "object",
+      "description": "A short statistics block of a duration series, in milliseconds.",
+      "required": ["n"],
+      "properties": {
+        "n": {"type": "integer", "minimum": 0},
+        "avg_ms": {"$ref": "#/$defs/ms"},
+        "p50_ms": {"$ref": "#/$defs/ms"},
+        "p95_ms": {"$ref": "#/$defs/ms"},
+        "p99_ms": {"$ref": "#/$defs/ms"},
+        "max_ms": {"$ref": "#/$defs/ms"},
+        "sum_ms": {"$ref": "#/$defs/ms"}
+      }
+    },
+    "ms_stats_map": {
+      "type": "object",
+      "propertyNames": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.]*$"},
+      "additionalProperties": {"$ref": "#/$defs/ms_stats"}
+    },
+    "frame_stats": {
+      "type": "object",
+      "description": "Frame-time statistics. The same block is the 'frames' member of a stats record (the v1 getEngineStats numbers) and of a bench stage (the satk-bench/1 numbers): n frames, avg/p50/p95/p99/p999/max frame time, FPS, 1 % low (FPS of the mean of the slowest 1 % of frames), q = the 0th..100th percentile.",
+      "required": ["n"],
+      "properties": {
+        "n": {"type": "integer", "minimum": 0},
+        "sum_ms": {"$ref": "#/$defs/ms"},
+        "wall_ms": {"$ref": "#/$defs/ms"},
+        "avg_ms": {"$ref": "#/$defs/ms"},
+        "p50_ms": {"$ref": "#/$defs/ms"},
+        "p95_ms": {"$ref": "#/$defs/ms"},
+        "p99_ms": {"$ref": "#/$defs/ms"},
+        "p999_ms": {"$ref": "#/$defs/ms"},
+        "max_ms": {"$ref": "#/$defs/ms"},
+        "fps_avg": {"type": "number", "minimum": 0},
+        "fps_wall": {"type": "number", "minimum": 0},
+        "low1_fps": {"type": "number", "minimum": 0},
+        "integer_share": {"type": "number", "minimum": 0, "maximum": 1},
+        "q": {"type": "array", "minItems": 101, "maxItems": 101, "items": {"$ref": "#/$defs/ms"}}
+      }
+    },
+    "game": {
+      "type": "object",
+      "description": "The game clock as the engine reports it (not session time).",
+      "properties": {
+        "time_ms": {"type": "number", "minimum": 0, "description": "SA's own millisecond clock (gameTimeMs)."},
+        "timer_mode": {"enum": ["real", "stock", "off"]},
+        "frame_counter": {"type": "number", "minimum": 0},
+        "frame_counter_hz": {"type": "number", "minimum": 0},
+        "clock_ratio": {"type": "number", "minimum": 0, "description": "Game milliseconds per real millisecond over the window."}
+      }
+    },
+    "mem": {
+      "type": "object",
+      "properties": {
+        "va_used_mib": {"$ref": "#/$defs/mib"},
+        "va_largest_free_mib": {"$ref": "#/$defs/mib"},
+        "private_mib": {"$ref": "#/$defs/mib"},
+        "working_set_mib": {"$ref": "#/$defs/mib"},
+        "va_guard": {"enum": ["ok", "yellow", "red", "critical"]},
+        "cef_loaded": {"type": "boolean"}
+      }
+    },
+    "stream": {
+      "type": "object",
+      "properties": {
+        "used_mib": {"$ref": "#/$defs/mib"},
+        "budget_mib": {"$ref": "#/$defs/mib"},
+        "peak_mib": {"$ref": "#/$defs/mib"}
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "description": "An engine snapshot: what getEngineStats() reports besides the frame statistics. Used by stats records and by the start/end snapshots of a bench stage.",
+      "properties": {
+        "game": {"$ref": "#/$defs/game"},
+        "mem": {"$ref": "#/$defs/mem"},
+        "stream": {"$ref": "#/$defs/stream"},
+        "va_owner_mib": {"$ref": "#/$defs/mib_map"},
+        "gpu_ms": {"$ref": "#/$defs/ms_map"},
+        "ctr": {"$ref": "#/$defs/number_map"},
+        "gauge": {"$ref": "#/$defs/number_map"}
+      }
+    },
+    "open_object": {"type": "object", "additionalProperties": true}
+  }
+}

@@ -1,0 +1,52 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "procedural",
+ "ref": "style_world",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (27; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "prelight",
+   "what": "prelit vertex colours (the baked day light of map models)",
+   "how": {
+    "flags": "prelit"
+   },
+   "fix": "bake the prelight (kit.bake / blender prelight)",
+   "vanilla": "27/27"
+  },
+  {
+   "id": "night",
+   "what": "night vertex colours",
+   "how": {
+    "flags": "night"
+   },
+   "fix": "bake the night colours (extra vertex colours)",
+   "optional": true,
+   "vanilla": "20/27"
+  },
+  {
+   "id": "collision",
+   "what": "a collision model",
+   "how": {
+    "flags": "collision"
+   },
+   "fix": "generate the collision (kit.col, satk col gen)",
+   "vanilla": "27/27"
+  },
+  {
+   "id": "textured",
+   "what": "every material textured",
+   "how": {
+    "flags": "textured"
+   },
+   "fix": "give every material a texture from the model's TXD",
+   "vanilla": "27/27"
+  }
+ ]
+}

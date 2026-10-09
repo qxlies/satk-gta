@@ -90,7 +90,9 @@ def test_slice_car_and_prop_to_g2_then_replay(work):
         return r
 
     t0 = time.perf_counter()
-    init = get_op("asset.init").call({"dir": PROJECT, "kind": "automobile", "intent": "add", "dims": TARGET})
+    # the session mechanics only: no inventory (a project with one closes a gate only with its items built)
+    init = get_op("asset.init").call({"dir": PROJECT, "kind": "automobile", "intent": "add", "dims": TARGET,
+                                      "detail": "none"})
     assert init["dims"] == TARGET and init["tier"] == "sa_plus"
     st = L.start(None, project=PROJECT, owner_pid=os.getpid(), idle=600)
     assert st["up"] and st["name"] == PROJECT and st["project"].endswith(f"assets/{PROJECT}")

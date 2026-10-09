@@ -1,0 +1,260 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "train",
+ "summary": "train car or locomotive: a body shell on an underframe with two bogies, couplers and lamps; roof and underframe equipment at standard, cab and bogie detail at hero.",
+ "regions": {
+  "overall": {
+   "summary": "the whole car, 3/4 views and side",
+   "views": []
+  },
+  "front": {
+   "summary": "front end, lamps, coupler",
+   "views": [
+    "front"
+   ]
+  },
+  "rear": {
+   "summary": "rear end, coupler",
+   "views": [
+    "rear"
+   ]
+  },
+  "sides": {
+   "summary": "sides, doors, windows, handrails",
+   "views": [
+    "left",
+    "right"
+   ]
+  },
+  "roof": {
+   "summary": "roof equipment",
+   "views": [
+    "roof"
+   ]
+  },
+  "bogies": {
+   "summary": "bogies, wheels, springs, brakes",
+   "views": [
+    "bogies"
+   ]
+  },
+  "underside": {
+   "summary": "underframe equipment",
+   "views": [
+    "bogies"
+   ]
+  },
+  "cab": {
+   "summary": "cab windows and interior",
+   "views": [
+    "front"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "body",
+   "name": "Body shell",
+   "region": "overall",
+   "category": "shell",
+   "construction": "lofted or extruded welded body with a shaped front",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "chassis"
+  },
+  {
+   "key": "wheel",
+   "name": "Wheel (cloned to the dummies)",
+   "region": "bogies",
+   "category": "wheel",
+   "construction": "mesh.lathe flanged wheel",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "wheel"
+  },
+  {
+   "key": "underframe",
+   "name": "Underframe",
+   "region": "underside",
+   "category": "structure",
+   "construction": "sole bars and the floor under the body",
+   "attaches_to": "body",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "bogies",
+   "name": "Bogies",
+   "region": "bogies",
+   "category": "running_gear",
+   "construction": "bogie frames with axle boxes (bogie frames)",
+   "attaches_to": "underframe",
+   "stage": "G2",
+   "detail": "simple",
+   "count": 2,
+   "frame": [
+    "bogie_front",
+    "bogie_rear"
+   ]
+  },
+  {
+   "key": "couplers",
+   "name": "Couplers",
+   "region": "front",
+   "category": "structure",
+   "construction": "coupler heads at both ends",
+   "attaches_to": "underframe",
+   "stage": "G2",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "windows",
+   "name": "Windows",
+   "region": "sides",
+   "category": "glass",
+   "construction": "glass in the body openings (cab included)",
+   "attaches_to": "body",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "headlights",
+   "name": "Headlights",
+   "region": "front",
+   "category": "lamp",
+   "construction": "lenses set into the front",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "taillights",
+   "name": "Taillights",
+   "region": "rear",
+   "category": "lamp",
+   "construction": "red lenses at the rear",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "doors",
+   "name": "Doors",
+   "region": "sides",
+   "category": "panel",
+   "construction": "door leaves cut from the body (door frames)",
+   "attaches_to": "body",
+   "stage": "G2",
+   "detail": "standard",
+   "frame": [
+    "door_lf_ok",
+    "door_rf_ok"
+   ],
+   "required": false
+  },
+  {
+   "key": "roof_equipment",
+   "name": "Roof equipment",
+   "region": "roof",
+   "category": "clutter",
+   "construction": "vents, horns, AC units or tanks on the roof",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "underframe_equipment",
+   "name": "Underframe equipment",
+   "region": "underside",
+   "category": "underbody",
+   "construction": "tanks, boxes and pipes between the bogies",
+   "attaches_to": "underframe",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "handrails_steps",
+   "name": "Handrails and steps",
+   "region": "sides",
+   "category": "structure",
+   "construction": "swept rails and step plates",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "standard",
+   "count": 2
+  },
+  {
+   "key": "cab_interior",
+   "name": "Cab desk and seat",
+   "region": "cab",
+   "category": "interior",
+   "construction": "driver's desk and seat seen through the windows",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "buffers_hoses",
+   "name": "Buffers and hoses",
+   "region": "front",
+   "category": "fixture",
+   "construction": "buffers and air hoses at the ends",
+   "attaches_to": [
+    "underframe",
+    "couplers"
+   ],
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "bogie_detail",
+   "name": "Bogie springs and brakes",
+   "region": "bogies",
+   "category": "running_gear",
+   "construction": "springs, dampers, brake blocks",
+   "attaches_to": "bogies",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "wipers_mirrors",
+   "name": "Wipers and mirrors",
+   "region": "cab",
+   "category": "trim",
+   "construction": "wipers on the cab windows",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "pantograph",
+   "name": "Pantograph",
+   "region": "roof",
+   "category": "mechanism",
+   "construction": "folding frame on the roof",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "markings",
+   "name": "Numbers and markings",
+   "region": "sides",
+   "category": "decal",
+   "construction": "texture on own faces",
+   "attaches_to": "body",
+   "stage": "G4",
+   "detail": "hero"
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/train.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

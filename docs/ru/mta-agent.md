@@ -43,7 +43,7 @@ satk view stop --target game
 
 | Команда | MCP | Что делает |
 |---|---|---|
-| `python -m satk.viewer.backends.mta_lua up [--client] [--timeout S]` | — | приватный сервер в `work\mta\server` (порты свободные, только `127.0.0.1`), ждёт `ping` ресурса, пишет `work\run\endpoints\game.json` и `work\run\sessions\game.json`; `--client` — ещё и клиент |
+| `python -m satk.viewer.backends.mta_lua up [--client] [--timeout S] [--conf ключ=значение ...] [--cvar ключ=значение ...] [--windowed]` | — | приватный сервер в `work\mta\server` (порты свободные, только `127.0.0.1`), ждёт `ping` ресурса, пишет `work\run\endpoints\game.json` и `work\run\sessions\game.json`; `--client` — ещё и клиент; `--conf`, `--cvar`, `--windowed`: см. «Настройки теста» в [ingame.md](ingame.md) |
 | `python -m satk.viewer.backends.mta_lua client [--force]` | — | клиент форка `mtasa://127.0.0.1:<port>`; без `--force` сначала `preflight`; при диалоге ошибки Windows процесс снимается, текст диалога попадает в ошибку |
 | `python -m satk.viewer.backends.mta_lua preflight` | — | только чтение: ключ реестра `HKLM\…\Multi Theft Auto: San Andreas All`, `%ProgramData%\MTA San Andreas All`, не запущен ли уже `gta_sa.exe` |
 | `python -m satk.viewer.backends.mta_lua status` / `down` | — | состояние / `quit` ресурсу, закрыть клиент, убрать файлы обнаружения |
@@ -68,7 +68,7 @@ satk view stop --target game
 `function.shutdown`. `lua.exec` — исполнение кода по замыслу: только локальная разработка.
 
 **Сервер.** `MTA Server64.exe` и `x64\*.dll` копируются из `engine\mtasa\Bin\server` в `work\mta\server` (повторно —
-только изменённые), конфиг `satk-agent.conf` строится из `mtaserver.conf` форка, ресурс копируется из
+только изменённые), конфиг `satk-agent.conf` строится из `mtaserver.conf` исходников форка (копия в `Bin/server` — только если исходного нет), ресурс копируется из
 `mta-resources/satk-agent`. Старт с `--child-process` и событием готовности; готовность — ответ на `ping` (около
 1,1 с на эталонной машине). Логи — `work\mta\server\mods\deathmatch\logs\satk-agent*.log`.
 

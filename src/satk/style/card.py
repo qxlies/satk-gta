@@ -1,10 +1,9 @@
-"""``style.card``: generated style cards - Markdown tables for the guides and JSON lint presets.
+"""``style.card``: generated style cards - Markdown tables of vanilla reference numbers and JSON lint presets.
 
-* :func:`card_md` - one class (or peer set) and tier as a Markdown table: every number sits in a row named
-  by its canonical metric, with the unit, p10/p50/p90 of the peer set, the tier band and the definition;
-* :func:`lint_preset` - a ``satk asset lint --config`` file (``{"rules": {...}}``) whose budgets and shading
-  thresholds come from the profiles of the tier (lint classes map, lod, cars, peds, weap, upgrade, pickup,
-  interior_prop, interior_shell).
+* :func:`card_md` - one class (or peer set) as a Markdown table: every number sits in a row named by its
+  canonical metric, with the unit, p10/p50/p90 of the peer set and the definition. Reference, never targets;
+* :func:`lint_preset` - a ``satk asset lint --config`` file (``{"rules": {...}}``) with the shading hints of the
+  profiles; the triangle and material budget rules are switched to ``info`` (counts are never graded).
 
 Both read only the style cache and ``data/style``; regenerate them after the cache changes.
 """
@@ -13,7 +12,7 @@ from __future__ import annotations
 
 from . import cache as K
 from . import classes as C
-from .profile import _check_tier, describe, fence, metric_list, tier_band, tiers
+from .profile import _check_tier, describe, fence, metric_list, tiers
 from .registry import lookup
 
 __all__ = ["card_md", "lint_preset", "LINT_CLASSES"]
@@ -24,14 +23,6 @@ LINT_CLASSES = {
     "pickup": ["pickup"], "interior_prop": ["interior_prop"], "interior_shell": ["interior_shell"],
     "map": ["prop", "building", "terrain", "vegetation", "overlay", "time_object"],
 }
-#: Lint ``veh.hd_tris`` budget keys -> vehicle classes.
-_VEH_TYPES = {"default": "car", "bike": "bike", "mtruck": "mtruck", "plane": "plane", "train": "train",
-              "heli": "heli", "boat": "boat", "bmx": "bmx", "quad": "quad", "trailer": "trailer"}
-#: Lint ``veh.part_tris`` part keys -> frames.
-_PARTS = {"chassis": "chassis", "chassis_vlo": "chassis_vlo", "wheel": "wheel", "door": "door_lf_ok",
-          "bump": "bump_front_ok", "bonnet": "bonnet_ok", "boot": "boot_ok", "windscreen": "windscreen_ok"}
-
-
 def _fmt(x) -> str:
     if isinstance(x, float):
         if x == int(x) and abs(x) >= 10:
@@ -48,17 +39,15 @@ def card_md(cls: str, tier: str | None = None, *, profile_name: str = "vanilla",
     d = describe(cls, t, metrics=metrics, profile_name=profile_name)
     tg = d["target"]
     key = tg["peer_set"]
-    status = d["tier_status"]
-    L = [f"### {key} ({d['n']} vanilla models), tier {t} ({status})", "",
+    L = [f"### {key} ({d['n']} vanilla models): reference numbers", "",
          f"Peer set `{key}`: {C.taxonomy()['classes'][C.split_peer(key)[0]]['what']}. Percentiles p10/p50/p90 "
-         "over one value per model (numpy linear). Band = the tier band"
-         + (" (proposal until validated in game)." if status == "proposal" else " (p10..p90)."), "",
-         "| metric | unit | p10 | p50 | p90 | band | definition |", "|---|---|---|---|---|---|---|"]
-    for m, p10, p50, p90, _n, lo, hi in d["rows"]:
+         "over one value per model (numpy linear). These numbers describe vanilla; they are never targets.", "",
+         "| metric | unit | p10 | p50 | p90 | definition |", "|---|---|---|---|---|---|"]
+    for m, p10, p50, p90, _n, _lo, _hi in d["rows"]:
         reg = lookup(m)
         unit = reg.unit if reg else ""
         defin = (reg.definition.split(". ")[0].rstrip(".") if reg else "")[:110].replace("|", "\\|")
-        L.append(f"| `{m}` | {unit} | {_fmt(p10)} | {_fmt(p50)} | {_fmt(p90)} | {_fmt(lo)}-{_fmt(hi)} | {defin} |")
+        L.append(f"| `{m}` | {unit} | {_fmt(p10)} | {_fmt(p50)} | {_fmt(p90)} | {defin} |")
     if d.get("anchors"):
         a = dict(d["anchors"])
         what = a.pop("what", "")
@@ -68,56 +57,19 @@ def card_md(cls: str, tier: str | None = None, *, profile_name: str = "vanilla",
     if d.get("exemplars"):
         L += ["", "Exemplars (closest to the p50 of the main metric): " + ", ".join(f"`{e}`" for e in d["exemplars"])]
     if d.get("tier_note"):
-        L += ["", f"Tier note: {d['tier_note']}"]
+        L += ["", f"Tier {t}: {d['tier_note']}"]
     if tg.get("fallback"):
         L += ["", "Fallback: " + "; ".join(tg["fallback"])]
     return "\n".join(L) + "\n"
 
 
-def _hi(peer: dict, metric: str, key: str, tier: str) -> float | None:
-    s = peer.get(metric)
-    if not s:
-        return None
-    if tier == "vanilla":
-        return fence(s)[1]
-    tb = tier_band(metric, s, key, tier)
-    if tb["status"] == "proposal":
-        return tb.get("cap", tb["hi"])
-    return fence(s)[1]
-
-
 def lint_preset(tier: str | None = None, *, profile_name: str = "vanilla") -> dict:
-    """A lint config (``{"_comment", "rules"}``) with budgets and shading limits of the tier."""
+    """A lint config (``{"_comment", "rules"}``): shading hints from the profiles; budget rules ``info``."""
     t = _check_tier(tier)
     c = K.load(profile_name)
     peers = c.peers
-    rules: dict = {}
-    budget = {}
-    for lc, keys in LINT_CLASSES.items():
-        vals = [_hi(peers[k]["metrics"], "geo.tris", k, t) for k in keys if k in peers]
-        vals = [v for v in vals if v is not None]
-        if lc == "cars":
-            vals = [_hi(peers["car"]["metrics"], "file.tris", "car", t)] if "car" in peers else vals
-        if vals:
-            budget[lc] = int(round(max(vals), -1))
-    if budget:
-        rules["dff.tris_budget"] = {"params": {"budget": budget}}
-    hb = {}
-    for k, cls in _VEH_TYPES.items():
-        if cls in peers:
-            v = _hi(peers[cls]["metrics"], "veh.hd_tris", cls, t) or _hi(peers[cls]["metrics"], "geo.tris", cls, t)
-            if v:
-                hb[k] = int(round(v, -1))
-    if hb:
-        rules["veh.hd_tris"] = {"params": {"budget": hb}}
-    if "car" in peers:
-        pb = {}
-        for k, frame in _PARTS.items():
-            v = _hi(peers["car"]["metrics"], f"part.tris[{frame}]", "car", t)
-            if v:
-                pb[k] = int(round(v, -1)) if v >= 100 else int(round(v))
-        if pb:
-            rules["veh.part_tris"] = {"params": {"budget": pb}}
+    rules: dict = {rid: {"sev": "info"} for rid in ("dff.tris_budget", "dff.materials_budget", "veh.hd_tris",
+                                                    "veh.part_tris")}
     bend, p10, vpt = {}, {}, {}
     for lc, key in (("cars", "car"), ("peds", "ped"), ("weap", "weapon")):
         s = peers.get(key, {}).get("metrics", {})
@@ -132,10 +84,10 @@ def lint_preset(tier: str | None = None, *, profile_name: str = "vanilla") -> di
         rules["dff.vert_sharing"] = {"params": {"max": vpt}}
     k = tiers()["fence"]
     return {"_comment": f"Generated by 'satk style card --lint-preset --tier {t}' from the style cache of profile "
-                        f"{c.profile!r} ({c.data.get('index_hash', '')[:12]}): limits are the upper fence "
-                        f"(p90 + max({k['k']} x (p90 - p50), {k.get('min_rel', 0)} x p50)) of the vanilla peer set"
-                        + ("" if t == "vanilla" else "; sa_plus budgets are the PROPOSAL caps/bands of tiers.json")
-                        + ". Use: satk asset lint <target> --config <this file>.",
+                        f"{c.profile!r} ({c.data.get('index_hash', '')[:12]}): the shading hints are the lower/upper "
+                        f"fence (p10 - max({k['k']} x (p50 - p10), {k.get('min_rel', 0)} x p50)) of the vanilla peer "
+                        "set; triangle and material counts are reported as info, never graded. "
+                        "Use: satk asset lint <target> --config <this file>.",
             "rules": rules}
 
 

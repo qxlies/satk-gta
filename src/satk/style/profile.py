@@ -1,21 +1,20 @@
-"""Profiles and bands (contract K2): what vanilla looks like in numbers, per peer set and detail tier.
+"""Profiles (contract K2): the vanilla reference numbers of each peer set, never targets.
 
 * :func:`profile` - ``profile(cls_or_sid, tier) -> {metric: {p10, p50, p90, n, peer_set, lo, hi, status}}``;
 * :func:`band` - ``band(metric, cls, tier) -> (lo, hi)`` or ``None``;
 * :func:`describe` - the full answer of ``satk style profile`` (peer set, exemplars, anchors, rows);
 * :func:`judge` - the verdict of one value against its band and fence (``ok``/``edge``/``low``/``high``).
 
-``lo``/``hi`` are the tier band: vanilla = p10..p90 of the peer set; sa_plus = the rule of
-``data/style/tiers.json`` (a PROPOSAL, ``status`` says so) or the vanilla band where the tier changes
-nothing. The fence (``tiers.json`` ``fence.k``) widens the band for verdicts: only values beyond it are
-out of band; bands are advisory.
+``lo``/``hi`` are p10..p90 of the peer set; a tier changes only texture density (``data/style/tiers.json``
+``sa_plus`` rules). No tier has a triangle band: counts are reference. :func:`judge` and :func:`fence` stay for
+tools that describe a spread (``style build --validate``); ``asset.check`` never judges a reference number.
 
 Example::
 
     from satk.style.api import profile, band
     p = profile("car.sedan", "vanilla")
     p["veh.hd_tris"]          # {'p10': 2010, 'p50': 2166, 'p90': 2401, 'n': 24, 'peer_set': 'car.sedan', ...}
-    band("shade.normal_bend", "car")   # (7.28, 15.45)
+    band("shade.normal_bend", "car")   # (7.28, 15.45): reference, not a target
 """
 
 from __future__ import annotations
@@ -254,7 +253,8 @@ def describe(ident: str, tier: str | None = None, *, metrics: list[str] | None =
         row = [m, s[0], s[1], s[2], s[3], _num(b["lo"]), _num(b["hi"])]
         rows.append(row)
     out = {"target": tg, "tier": t, "tier_status": tiers()["tiers"][t]["status"], "n": peer["n"],
-           "percentiles": "p10/p50/p90 over the models of the peer set (numpy linear); lo..hi = tier band",
+           "percentiles": "p10/p50/p90 over the models of the peer set (numpy linear); lo..hi = p10..p90 (sa_plus: "
+                          "wider texel density); vanilla reference, never targets",
            "cols": ["metric", "p10", "p50", "p90", "n", "lo", "hi"], "rows": rows,
            "exemplars": [f"model:{i} {n}" for i, n in peer.get("exemplars", [])]}
     fam = C.family(key)

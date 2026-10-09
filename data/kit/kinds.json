@@ -1778,8 +1778,8 @@
     "file": "<map>.ide",
     "sec": "objs"
    },
-   "like": "model:3464",
-   "like_name": "shabbyhouse03_lvs",
+   "like": "model:3639",
+   "like_name": "GlenPHouse01_LAx",
    "peers": 734,
    "size_m": [
     8.13,
@@ -2156,6 +2156,76 @@
     "ID-bound: fire type, animations"
    ],
    "pipeline": "lit like peds: normals, no prelight; the gunflash atomic is hidden until the shot"
+  },
+  "weapon_melee": {
+   "group": "character",
+   "summary": "hand-held melee or thrown weapon modelled along +Z (knife, bat, katana, club, grenade): the same weap line and weapon.dat entry as a gun, no muzzle flash",
+   "ide": {
+    "file": "default.ide",
+    "sec": "weap"
+   },
+   "like": "model:339",
+   "like_name": "katana",
+   "peers": 20,
+   "examples": [
+    "knifecur",
+    "katana",
+    "bat",
+    "golfclub",
+    "nitestick",
+    "shovel",
+    "poolcue",
+    "grenade"
+   ],
+   "size_m": [
+    0.2,
+    0.72,
+    1.75
+   ],
+   "tris_hd": [
+    60.0,
+    193.0,
+    578.0
+   ],
+   "frames": {
+    "required": [
+     "<model>"
+    ],
+    "common": [],
+    "optional": {}
+   },
+   "slots": [],
+   "material_roles": [
+    "weapon"
+   ],
+   "col": {
+    "where": "<model>.col (pickups use it)",
+    "name": "<model>",
+    "recipe": "one sphere or box"
+   },
+   "lod": {
+    "recipe": "none (draw 30-100)"
+   },
+   "draw": [
+    30.0,
+    50.0,
+    100.0
+   ],
+   "txd": {
+    "class": "weapon",
+    "name": "<model>",
+    "levels": 1,
+    "formats": {
+     "DXT1": "opaque",
+     "DXT3": "alpha"
+    }
+   },
+   "data_lines": [
+    "default.ide weap line",
+    "weapon.dat (per skill)",
+    "ID-bound: fire type, animations"
+   ],
+   "pipeline": "lit like peds: normals, no prelight; the long axis is +Z (blade or head up, grip down)"
   },
   "ped": {
    "group": "character",

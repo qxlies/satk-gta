@@ -48,15 +48,27 @@ def _select_only(o, faces_idx: set[int]) -> None:
         poly.select = poly.index in faces_idx
     for v in o.data.vertices:
         v.select = False
+    for e in o.data.edges:
+        e.select = False
+    keys = set()
     for poly in o.data.polygons:
         if poly.select:
             for vi in poly.vertices:
                 o.data.vertices[vi].select = True
+            keys.update(poly.edge_keys)
+    if keys:
+        for e in o.data.edges:
+            if e.key in keys:
+                e.select = True
 
 
 def _run_edit_op(o, fn) -> None:
-    """Run UV operators in edit mode of ``o`` (made the only selected, active object; restored afterwards)."""
+    """Run UV operators in edit mode of ``o`` (made the only selected, active object; restored afterwards). The
+    edit runs in face select mode: in vertex mode Blender flushes the vertex selection up and a face between
+    selected faces (or next to them) would join the unwrap."""
     vl = bpy.context.view_layer
+    ts = bpy.context.scene.tool_settings
+    prev_mode = tuple(ts.mesh_select_mode)
     prev_active = vl.objects.active
     prev_sel = [x for x in vl.objects if x.select_get()]
     for x in prev_sel:
@@ -64,12 +76,17 @@ def _run_edit_op(o, fn) -> None:
     o.select_set(True)
     vl.objects.active = o
     try:
+        ts.mesh_select_mode = (False, False, True)
         bpy.ops.object.mode_set(mode="EDIT")
         try:
             fn()
         finally:
             bpy.ops.object.mode_set(mode="OBJECT")
     finally:
+        try:
+            ts.mesh_select_mode = prev_mode
+        except (TypeError, ValueError, RuntimeError):
+            pass
         o.select_set(False)
         for x in prev_sel:
             try:

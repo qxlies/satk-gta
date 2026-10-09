@@ -26,7 +26,7 @@ from satk.core.registry import get_op
 
 def test_args_defaults_and_name():
     a = C.normalize_args("game_ready", {"src": "D:/x/My Crate-01.OBJ"})
-    assert a["name"] == "my_crate_01" and a["budget"] == C.GR_BUDGET == 1040
+    assert a["name"] == "my_crate_01" and a["budget"] == C.GR_BUDGET == 0   # no triangle target
     assert (a["origin"], a["uv"], a["bake"], a["prelight"], a["col"]) == ("base", "auto", "auto", "bake", "hull")
     assert a["tex_size"] == 256 and a["lod"] == 0.25 and a["surface"] == 0 and a["objects"] is None
     a = C.normalize_args("game_ready", {"src": "s.blend", "objects": "Statue, Plinth", "name": "Statue"})
@@ -222,6 +222,19 @@ def test_sphere_budget_lod_hull(live_work, tmp_path, gr_sources, run_cli):
 
     c = next(iter_col((out / "ball.col").read_bytes()))
     assert c.name == "ball" and set(c.surfaces) == {51}
+
+
+@pytest.mark.blender
+@pytest.mark.slow
+def test_sphere_keeps_its_triangles(live_work, tmp_path, gr_sources):
+    """No budget given: game-ready keeps every triangle (counts are never a target); only the engine vertex cap
+    could reduce the mesh, and a 4 992-triangle sphere is far below it."""
+    src = gr_sources["sphere"](tmp_path, "keep")
+    r = _game_ready(src=str(src), prelight="none", col="box", lod=0)
+    st = r["stats"]
+    assert st["src_tris"] == 4992 and st["tris"] == 4992 and st["export_verts"] < 65535
+    assert "vertex_cap" not in st
+    assert _checks(r)["dff"] == "ok"
 
 
 _MAKE_BLEND = """

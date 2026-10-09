@@ -152,7 +152,9 @@ def test_convert_high_poly_gltf_prop(sources):
     result = run(str(source), kind="prop", dims=[1.2, 1.2, 1.8], out=str(source.parent / "prop"), name="cvprop")
     stages = json.loads(Path(result["stages"]).read_text(encoding="utf-8"))
     assert stages["import"]["tris"] > 8000
-    assert result["budget"]["in_band"], result["budget"]
+    # no triangle target: the count is a plain number under the engine safety cap
+    assert isinstance(result["tris"], int) and result["tris"] <= result["limit"]["max_tris"], result["limit"]
+    assert "budget" not in result
     assert result["check"].get("counts", {}).get("error", 0) == 0, result["check"]
     assert all(t["verdict"] == "in" for t in result["textures"]), result["textures"]
     assert stages["bake"]["engine"] == "CYCLES"
@@ -175,13 +177,15 @@ def test_convert_procedural_car_body(sources):
     result = run(str(source), kind="vehicle", out=str(source.parent / "vehicle"), name="cvcar")
     stages = json.loads(Path(result["stages"]).read_text(encoding="utf-8"))
     assert stages["import"]["tris"] > 8000
-    assert result["budget"]["in_band"], result["budget"]
+    assert result["tris"] <= result["limit"]["max_tris"], result["limit"]
     assert result["check"].get("counts", {}).get("error", 0) == 0, result["check"]
     assert all(t["verdict"] == "in" for t in result["textures"]), result["textures"]
-    assert result["shading"] and all(b["in_band"] for b in result["shading"].values()), result["shading"]
+    # shading numbers are the class reference (info), never a warning
+    assert set(result["shading"]) == {"shade.normal_bend", "shade.flat_share"}, result["shading"]
+    assert not [w for w in result["warn"] if "shade." in w], result["warn"]
     plan = json.loads(Path(result["plan"]).read_text(encoding="utf-8"))
-    chassis = plan["bands"]["part.tris[chassis]"]
-    assert chassis["lo"] <= stages["assemble"]["body_tris"] <= chassis["hi"]
+    assert "part.tris[chassis]" not in plan["bands"]  # no triangle band reaches the reduction
+    assert stages["assemble"]["body_tris"] <= plan["limit"]["max_tris"]
     assert stages["reduce"]["roles"]["body"]["surface_error"] < 0.03
     assert stages["assemble"]["generators"]["vlo"]["tris"] <= 130
     assert Path(result["preview"]["files"]["sheet"]).is_file()

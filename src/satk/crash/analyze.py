@@ -1,8 +1,8 @@
 """``satk crash analyze``: one short report for a minidump, an MTA crash log or a single-player log.
 
 ``gta_sa.exe`` addresses are symbolized through the sa-re symbol DB (:mod:`satk.re.api`: function +
-offset, gta-reversed ``file:line``, MTA patch sites); other modules stay ``module+off`` (with the
-nearest export when the module file of the same build is on disk). Without a symbol DB the report
+offset, gta-reversed ``file:line``, MTA patch sites); other modules use matching local PDBs, falling
+back to the nearest export when the module file of the same build is on disk. Without a symbol DB the report
 still works, with a ``NOT_READY`` warning. Single-player crash reports in text logs (modloader.log,
 SA-MP, mod_sa, Visual Studio/WER text) are read by :mod:`.sptext`. :mod:`.advise` adds the known
 CrashInfo entry with its solution, suspects and the culprit mod. The human rendering stays within 30
@@ -41,12 +41,12 @@ def hx(v: int | None, width: int = 0) -> str | None:
 
 
 class Symbols:
-    """Names for addresses: sa-re for ``gta_sa.exe``, exports for other modules."""
+    """Names for addresses: sa-re for ``gta_sa.exe``, PDBs/exports for other modules."""
 
     def __init__(self, images: Images):
         self.images = images
         self.db = None
-        self.warn: list[str] = []
+        self.warn = images.warn
         try:
             from ..re.db import open_db
 
@@ -132,8 +132,14 @@ class Symbols:
             if pl:
                 out["mta"] = pl[0].split(" (", 1)[0]
                 out["patches"] = pl
-        elif va is not None:
-            e = self.images.export_name(va)
+        elif module is not None and off is not None:
+            mod = mod or self.images.named_module(module)
+            if mod is not None:
+                out.update(self.images.pdb_symbol(mod, off, ret=ret))
+            if out.get("fn"):
+                return out
+            pe = self.images.pe(mod) if mod is not None else None
+            e = pe.export_at(off) if pe is not None else None
             if e is not None:
                 name, eoff = e
                 out["fn"] = f"{name}+0x{eoff:x}" if eoff else name
@@ -227,6 +233,8 @@ def _crash_line(code: int | None, at: str | None, extra: str = "", tid: int | No
 
 
 def _row(i: int, d: dict, via: str) -> list:
+    if d.get("via") == "pdb":
+        via += "/pdb"
     return [i, d.get("addr"), d.get("at"), d.get("fn"), d.get("src"), d.get("mta"), via]
 
 
@@ -381,7 +389,7 @@ def analyze_dump(dump: Minidump, path: str, *, limit: int, images: Images, threa
     if full:
         env["pools_full"] = full
     shown = {r[1] for r in rows}
-    if mta_frames and rows and rows[0][6] != "mta" and any(hx(fr.va) not in shown for fr in mta_frames[:6]):
+    if mta_frames and rows and rows[0][6].split("/")[0] != "mta" and any(hx(fr.va) not in shown for fr in mta_frames[:6]):
         env["mta_stack"] = [_compact(sym.describe(fr.va, fr.module if fr.va is None else None, fr.off, ret=i > 0))
                             for i, fr in enumerate(mta_frames[:6])]   # MTA's own walk differs from ours
     env["file"] = jpath(path)
@@ -451,16 +459,19 @@ def _pick(n: int, block: int, what: str) -> int:
 
 
 def analyze_sp(crashes: list, path: str, *, limit: int, block: int = 0, game: Path | None = None,
-               profile: str | None = None) -> dict:
+               profile: str | None = None, images: Images | None = None) -> dict:
     """Report for a single-player crash report found by :func:`satk.crash.sptext.parse`."""
+    if images is None:
+        with Images(None) as module_images:
+            return analyze_sp(crashes, path, limit=limit, block=block, game=game, profile=profile, images=module_images)
     from .advise import Facts
     from .culprit import game_dir_of
 
     n = len(crashes)
     idx = 1 if block == 0 else _pick(n, block, "crash report(s)")
     c = crashes[idx - 1]
-    sym = Symbols(Images(None))
-    warns: list[str] = list(sym.warn)
+    sym = Symbols(images)
+    warns: list[str] = []
     module, off = c.module, c.off
     site = sym.describe(c.addr, module if off is not None else None, off)
     rows = []
@@ -501,6 +512,7 @@ def analyze_sp(crashes: list, path: str, *, limit: int, block: int = 0, game: Pa
         game = game_dir_of(Path(path))
     stack = [fr.va for fr in frames[1:] if fr is not None and fr.va is not None]
     _advise(env, Facts(ip=c.addr, module=module, stack=stack, regs=dict(c.regs), game=game, profile=profile), warns)
+    warns += sym.warn
     w = _cap_warn(warns)
     if w:
         env["warn"] = w
@@ -508,19 +520,22 @@ def analyze_sp(crashes: list, path: str, *, limit: int, block: int = 0, game: Pa
 
 
 def analyze_text(text: str, path: str, *, limit: int, block: int = 0, game: Path | None = None,
-                 profile: str | None = None) -> dict:
+                 profile: str | None = None, images: Images | None = None) -> dict:
+    if images is None:
+        with Images(None) as module_images:
+            return analyze_text(text, path, limit=limit, block=block, game=game, profile=profile, images=module_images)
     if not _BLOCK.search(text):
         from .sptext import parse as sp_parse
 
         crashes = sp_parse(text)
         if crashes:
-            return analyze_sp(crashes, path, limit=limit, block=block, game=game, profile=profile)
+            return analyze_sp(crashes, path, limit=limit, block=block, game=game, profile=profile, images=images)
     blocks = parse_log(text)
     n = len(blocks)
     idx = _pick(n, block or -1, "crash block(s)")
     b: LogBlock = blocks[idx - 1]
-    sym = Symbols(Images(None))
-    warns: list[str] = list(sym.warn)
+    sym = Symbols(images)
+    warns: list[str] = []
     module, off = b.module, b.offset
     va = None
     if module is None and b.reason:
@@ -599,6 +614,7 @@ def analyze_text(text: str, path: str, *, limit: int, block: int = 0, game: Path
     ip = va if va is not None else (frames[0].va if frames else None)
     stack = [fr.va for fr in frames[1:] if fr.va is not None]
     _advise(env, Facts(ip=ip, module=module, stack=stack, regs=dict(b.regs), game=game, profile=profile), warns)
+    warns += sym.warn
     w = _cap_warn(warns)
     if w:
         env["warn"] = w
@@ -630,8 +646,11 @@ def analyze_file(path: str, *, limit: int = 10, images: list[str] | None = None,
     if kind == "dump":
         dump: Minidump = obj_  # type: ignore[assignment]
         try:
-            return analyze_dump(dump, path, limit=limit, images=Images(dump, dirs=images), thread=thread,
-                                scan_bytes=scan_kb * 1024, game=g, profile=profile)
+            with Images(dump, dirs=images) as module_images:
+                return analyze_dump(dump, path, limit=limit, images=module_images, thread=thread,
+                                    scan_bytes=scan_kb * 1024, game=g, profile=profile)
         finally:
             dump.close()
-    return analyze_text(obj_, path, limit=limit, block=block, game=g, profile=profile)  # type: ignore[arg-type]
+    with Images(None, dirs=images) as module_images:
+        return analyze_text(obj_, path, limit=limit, block=block, game=g, profile=profile,
+                            images=module_images)  # type: ignore[arg-type]

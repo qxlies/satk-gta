@@ -1,0 +1,42 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "lod",
+ "ref": "style_world",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (4349; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "prelight",
+   "what": "prelit vertex colours (the baked day light of map models)",
+   "how": {
+    "flags": "prelit"
+   },
+   "fix": "bake the prelight (kit.bake / blender prelight)",
+   "vanilla": "4348/4349"
+  },
+  {
+   "id": "night",
+   "what": "night vertex colours",
+   "how": {
+    "flags": "night"
+   },
+   "fix": "bake the night colours (extra vertex colours)",
+   "vanilla": "4345/4349"
+  },
+  {
+   "id": "textured",
+   "what": "every material textured",
+   "how": {
+    "flags": "textured"
+   },
+   "fix": "give every material a texture from the model's TXD",
+   "vanilla": "4255/4349"
+  }
+ ]
+}

@@ -83,7 +83,13 @@ def id_free(kind: Kind | None = None, count: int = 1, range: str | None = None, 
         if over:
             warn.append(f"OVER_LIMIT: range {fmt_spec(over)} goes past 0..{t.max_id} ({t.max_from}); those ids "
                         "need a limit adjuster that raises the model count (--max-id)")
-        ids, total = free_ids(t.ids, ranges, count, contiguous)
+        from .ranges import iter_range, kind_reserved
+
+        taken = dict(t.ids)
+        for a, b, why in kind_reserved(kind):
+            for i in iter_range(a, b):
+                taken.setdefault(i, why)
+        ids, total = free_ids(taken, ranges, count, contiguous)
         n_range = sum(abs(b - a) + 1 for a, b in ranges)
         cap = capacity(kind, t.used)
         env = obj(kind=kind, target=target, ids=ids, blocks=fmt_ranges(ids), count=len(ids),

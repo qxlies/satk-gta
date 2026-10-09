@@ -1,10 +1,13 @@
-# Limits: capacity, names, ids and crash-safe construction
+# Limits: the hard engine rules (capacity, names, ids, formats, crash-safe construction)
 
 <!-- Model-facing, English only. Measured on the clean 1.0 US copy (single player, no limit adjuster) with
      `id free`, `re limits`, `kb fact` and index queries. Rule ids L1-L10 are this file's own. -->
 
-A stock game is nearly full. Before building, know the target platform, whether the asset replaces or adds, and
-which construction mistakes crash the game. The numbers below are facts of the stock game, not style bands.
+These are the rules the engine and the file formats enforce: break one and the asset fails to load, renders
+wrong or crashes the game. They are the only hard numbers in these guides; everything else (triangle counts,
+densities, shading and texture statistics, dimensions) is style judged by eye, with vanilla numbers as reference.
+A stock game is nearly full: before building, know the target platform, whether the asset replaces or adds, and
+which construction mistakes crash the game.
 
 ## Stock capacity (single player, no limit adjuster)
 
@@ -27,7 +30,7 @@ rows per kind against the target.
 ## Rules
 
 - **L1 Pick the target first:** `sp-stock` (Mod Loader, no limit adjuster), `sp-la` (a limit adjuster), `mta`
-  (resource) or `samp-dl`. The target decides the ids, the packaging and the budgets; record it with `asset.init
+  (resource) or `samp-dl`. The target decides the ids, the packaging and the capacity; record it with `asset.init
   --target`.
 - **L2 Replacement or add-on.** On `sp-stock` a new vehicle is impossible (all vehicle slots are used) and only
   two peds, one weapon and 25 objects fit. Replace an existing id, or require a limit adjuster and say so in the
@@ -71,6 +74,11 @@ rows per kind against the target.
 | big buildings | a building with LOD children or with `LODDistMultiplier (1.0) x draw` above 300 loses its collision and is never streamed out: HD models with collision use draw 299 or less | engine (file loader, entity) |
 | collision face light 0 | ambient light only (about 3x darker by day) and cars switch on their headlights; not black | engine (renderer, vehicle) |
 | atomic extension 0x1F | does not matter for vehicles (the engine sets the car pipeline) | engine |
+| vertices per geometry | at most 65,535 (16-bit indices; lint `dff.verts_max`); split a bigger mesh into parts | RenderWare geometry format |
+| texture formats | power-of-two sides; DXT1, DXT3 or 32-bit; never DXT5; exactly one mip level on vehicle, ped and weapon textures | vanilla index, `textures.md` |
+| colour keys | paint 60,255,0 / 255,0,175 on `vehiclegrunge256`; lamp keys only on `vehiclelights128`; UV2 on geometries whose material uses `xvehicleenv128` | engine (vehicle model info), `vehicles.md` |
+| wheel size | the wheel mesh diameter equals the IDE `wheel_scale` | engine (vehicle model info) |
+| collision coordinates | mesh and hull vertices within 256 m of the model origin (compressed COL coordinates) | COL format |
 | wheel radius | the engine uses `wheel_scale / 2` as the physics radius and clones the `wheel` mesh to every wheel dummy | engine (vehicle model info) |
 | lamp keys | work only on `vehiclelights128` (swapped for `vehiclelightson128` when lit) | engine (vehicle model info) |
 

@@ -62,7 +62,8 @@ profile index; `--no-index` turns that off. SID targets always need the index (`
 of the vanilla model from the index.
 
 Severity: `fatal`: the game crashes or cannot read the file; `error`: it loads but wrongly (no collision, garbage
-in a texture, an invisible model); `warn`: it works but breaks a budget or a convention; `info`: advice.
+in a texture, an invisible model); `warn`: it works but breaks a convention (or, in `game`/`strict`, a
+performance budget); `info`: advice.
 `--fail-on error` turns findings of that level and above into a `CHECK_FAILED` error (exit code 1), for scripts
 and CI; the default `never` always returns `ok`.
 
@@ -75,8 +76,8 @@ To check a Mod Loader mod as a whole (ID collisions, files Mod Loader skips, dro
 |---|---|---|
 | `game` (default) | any file; calibrated on vanilla (0 fatal) | generous caps |
 | `strict` | new content, research 22 | vanilla p90 per class; vehicles on `veh.hd_tris` (p90 per type), the whole file only capped |
-| `vanilla` | detail tier `vanilla`: new content that must sit unnoticed next to vanilla | vanilla p98 per class; vanilla maxima per vehicle part |
-| `sa_plus` | detail tier `sa_plus`, the default for new assets (the numbers are a proposal until validated in game) | `vanilla` plus higher budgets where silhouette and curvature live: car `veh.hd_tris` up to 5,000, chassis 3,600, wheel 480, map models 2x the class p90 |
+| `vanilla` | detail tier `vanilla`: new content that must sit unnoticed next to vanilla | triangle and material counts as `info` (vanilla p98 per class, vanilla maxima per vehicle part): reference, never graded |
+| `sa_plus` | detail tier `sa_plus`, the default for new assets: the SA language at a free detail level | no triangle or material budget runs; the engine limits stay (65,535 vertices per geometry, names, frames, TXD, collision) |
 
 Mipmaps are class-aware in every preset: vanilla vehicle, ped and weapon textures have none (0 of 996), so
 `txd.mips_missing` is only `info` for TXDs of those classes; the class of a TXD is the class of the models that use
@@ -95,7 +96,8 @@ it. Your own thresholds go into a `--config my.json` file:
 | `veh.light_key_tex` | lamp key colours only on `vehiclelights128` | lamps that never light |
 | `veh.paint_dirt` | the primary paint on `vehiclegrunge256` | a body that never gets dirty |
 | `veh.upgrade_frames` | the `ug_*` frames of the replaced vanilla model | crash `0x007F0BF7` (tuning part) |
-| `veh.hd_tris`, `veh.part_tris` | triangles of the high-detail model (chassis + parts + the wheel once) and of each part | budgets per tier |
+| `veh.hd_tris`, `veh.part_tris` | triangles of the high-detail model (chassis + parts + the wheel once) and of each part | nothing by itself: a performance hint in `game`/`strict`, `info` in `vanilla`, off in `sa_plus` |
+| `dff.clump_ext_dup` | one Extension chunk per clump (a broken writer appends a second one, with the embedded collision in it) | a vehicle that streams but never appears; lost collision |
 | `veh.dam_ratio` | median `_dam`/`_ok` triangle ratio within vanilla's 0.5-1.4 | decimated damage parts |
 | `dff.flat_shading`, `dff.vert_sharing` | normal bend of cars/peds above the class floor; vertices split per face with flat normals | the faceted look |
 | `ped.skin` | 32 bones, at most 4 weights, bone indices in range | crash `0x007C4781` (skin) |
@@ -150,7 +152,6 @@ rate). 2DFX entries (crash `0x00B4C2DD`) are checked by `satk fx2d check`: see [
   models; the list is in the parameters of `link.dff_missing`.
 - Without an index and without IDEs in the target the link checks are skipped (the linter does not know which
   models exist in the game); `veh.upgrade_frames` and the firearm test of `weap.flash` need the index.
-- The `sa_plus` budgets are a proposal: they are marked so until they are validated next to vanilla in game.
 
 ## Python API (if other packages use it)
 

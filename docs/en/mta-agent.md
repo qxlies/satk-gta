@@ -44,7 +44,7 @@ satk view stop --target game
 
 | Command | MCP | What it does |
 |---|---|---|
-| `python -m satk.viewer.backends.mta_lua up [--client] [--timeout S]` | — | private server in `work\mta\server` (free ports, `127.0.0.1` only), waits for the resource's `ping`, writes `work\run\endpoints\game.json` and `work\run\sessions\game.json`; `--client` also starts the client |
+| `python -m satk.viewer.backends.mta_lua up [--client] [--timeout S] [--conf key=value ...] [--cvar key=value ...] [--windowed]` | — | private server in `work\mta\server` (free ports, `127.0.0.1` only), waits for the resource's `ping`, writes `work\run\endpoints\game.json` and `work\run\sessions\game.json`; `--client` also starts the client; `--conf`, `--cvar`, `--windowed`: see "Test settings" in [ingame.md](ingame.md) |
 | `python -m satk.viewer.backends.mta_lua client [--force]` | — | the fork's client against `mtasa://127.0.0.1:<port>`; without `--force` it runs `preflight` first; on a Windows error dialog the process is killed and the dialog text goes into the error |
 | `python -m satk.viewer.backends.mta_lua preflight` | — | read-only: the registry key `HKLM\…\Multi Theft Auto: San Andreas All`, `%ProgramData%\MTA San Andreas All`, whether `gta_sa.exe` is already running |
 | `python -m satk.viewer.backends.mta_lua status` / `down` | — | state / `quit` to the resource, close the client, remove the discovery files |
@@ -70,7 +70,7 @@ refuses non-loopback addresses and a wrong token (64 hex, `secrets.token_hex`). 
 gets `function.shutdown`. `lua.exec` is remote code execution by design: local development only.
 
 **Server.** `MTA Server64.exe` and `x64\*.dll` are copied from `engine\mtasa\Bin\server` to `work\mta\server` (on
-later runs only changed files), the config `satk-agent.conf` is built from the fork's `mtaserver.conf`, the
+later runs only changed files), the config `satk-agent.conf` is built from the `mtaserver.conf` of the fork's source tree (the copy under `Bin/server` only when the source is missing), the
 resource is copied from `mta-resources/satk-agent`. Start with `--child-process` and a ready event; ready means a
 reply to `ping` (about 1.1 s on the reference PC). Logs: `work\mta\server\mods\deathmatch\logs\satk-agent*.log`.
 

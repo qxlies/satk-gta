@@ -130,6 +130,7 @@ class Mesh:
         self.part: list[str] = []
         self.uv: list[tuple] = []          # per face, one (u, v) per corner
         self.seam: set[tuple[int, int]] = set()
+        self.wall: set[int] = set()        # faces that are walls of a recess or a jamb (not the shell surface)
 
     def v(self, x: float, y: float, z: float) -> int:
         self.verts.append((float(x), float(y), float(z)))
@@ -273,6 +274,7 @@ def _inset(m: Mesh, fids: list[int], depth: float, wall_role: str, *, axis_x: bo
         walls.append(m.f((a, b, new[b], new[a]), wall_role, m.part[fi], uv))
     for fi in fids:
         m.faces[fi] = tuple(new[v] for v in m.faces[fi])
+    m.wall.update(walls)
     return walls
 
 
@@ -282,7 +284,13 @@ def _jambs(m: Mesh, part: str, depth: float, role: str, into: str, *, axis_x: bo
     itself stays where it is. Boundary edges on the mirror plane (x = 0) get no wall."""
     fids = [i for i, p in enumerate(m.part) if p == part]
     region = set(fids)
+    # the direction into the body: the normals of the shell around each boundary vertex (both sides of the cut),
+    # never of the black walls of a recessed window or lamp (they would point the jamb out of the body)
+    bverts = {v for _k, items in _edges_of(m, fids).items() if sum(1 for it in items if it[0] in region) == 1
+              for v in _k}
+    shell = [fi for fi, f in enumerate(m.faces) if fi not in m.wall and any(v in bverts for v in f)]
     nrm = _vertex_normals(m, fids)
+    nrm.update(_vertex_normals(m, shell))
     inner: dict[int, int] = {}
     walls: list[int] = []
     for _key, items in sorted(_edges_of(m, fids).items()):
@@ -299,6 +307,7 @@ def _jambs(m: Mesh, part: str, depth: float, role: str, into: str, *, axis_x: bo
         uvb = m.uv[fi][m.faces[fi].index(b)] if m.uv[fi] else (0.0, 0.0)
         # the shell side keeps the edge a -> b of the opening; the wall goes inwards from it
         walls.append(m.f((b, a, inner[a], inner[b]), role, into, _wall_uv(uva, uvb)))
+    m.wall.update(walls)
     return walls
 
 
@@ -326,14 +335,24 @@ def _planar_uv(m: Mesh, f: tuple, scale: float = 1.0, off=(0.5, 0.5)) -> tuple:
 #: Section rows from the roof centre down the side to the underbody centre (half body, x >= 0). A profile may use
 #: a subset (``rows``): the zone of a cell follows the name of its upper row.
 _ROWS = ("top_c", "top_q", "top_s", "glass_m", "belt", "door_m", "rocker", "sill", "floor_c")
-#: Paint V (Blender, 0 = bottom of the image) of the rows on ``vehiclegrunge256``: up-facing panels map to the clean
-#: upper band, the sides to the grime band that rises from the bottom edge, the underbody to the bottom strip; the
-#: three islands meet at the shoulder and at the sill, which are UV seams.
-_V_TOP = {"top_c": 0.97, "top_q": 0.93, "top_s": 0.88}
-_V_SIDE = {"top_s": 0.62, "glass_m": 0.58, "belt": 0.52, "door_m": 0.32, "rocker": 0.12, "sill": 0.055}
-_V_UNDER = {"sill": 0.04, "floor_c": 0.0}
-_ARCH_P = 2.4        # super-ellipse exponent of the wheel opening (a stadium-like arch)
-_MIN_STATION_M = 0.03
+#: Paint V (Blender, 0 = bottom of the image) of each row on ``vehiclegrunge256``. ONE continuous map: no UV seam
+#: inside the paint (``kit.shade`` keeps the body smooth across it). The roof and the bonnet lie in the clean top band,
+#: the shoulders below it, the sides in the grime band that rises from the bottom edge, the belly in the bottom strip.
+_V_PAINT = {"top_c": 0.97, "top_q": 0.945, "top_s": 0.9, "glass_m": 0.76, "belt": 0.62, "door_m": 0.38,
+            "rocker": 0.16, "sill": 0.07, "floor_s": 0.035, "floor_c": 0.0}
+#: Paint U along the length (rear .. front): the clean left strip of the texture (vanilla up-facing paint lies at
+#: u 0.03-0.23; the top band right of it holds dark drips).
+_U_PAINT = (0.03, 0.23)
+#: Clean paint rectangle (Blender u0, v0, u1, v1) for small painted details (mirror heads).
+_PAINT_DETAIL = (0.05, 0.86, 0.2, 0.96)
+_ARCH_P = 2.0        # super-ellipse exponent of the wheel opening: 2 = a round arch centred on the wheel
+_MIN_STATION_M = 0.012
+#: Shared atlas region of each non-paint role of the body: its faces get planar UVs fitted into the region.
+_ATLAS = {"glass": "generic.glass_core", "chrome": "generic.chrome_strip", "trim": "generic.black",
+          "lens": "lights.amber_bar", "lamp_fr": "lights.front_measured", "lamp_fl": "lights.front_measured",
+          "lamp_rr": "lights.rear_measured", "lamp_rl": "lights.rear_measured"}
+#: Fold (degrees) above which an edge is hard even inside one material (box caps, prism ends).
+_HARD_DEG = 85.0
 
 _CAR_PARTS = (
     {"name": "chassis", "slot": "chassis"},
@@ -370,38 +389,131 @@ def _plan_factor(y: float, y_rear: float, y_front: float, rear_m: float, front_m
 
 
 def _car_stations(body: dict, L: float, y_rear: float, tier: dict, a: dict, ra: float) -> list[dict]:
-    """Stations along the length: key loops (parts, pillars, nose and tail rounding), subdivisions, arch columns."""
+    """Stations along the length: key loops (parts, pillars, nose and tail rounding), subdivisions and the arch
+    columns, spaced by equal angles around each wheel (the opening is a polygon of ``arch_cols - 1`` segments)."""
     st = body["stations"]
     pl = body["plan"]
     key = {0.0, 1.0} | {float(v) for v in st.values()}
     for s in tier["ring"]:                  # rounding rings: distances from the ends as shares of the rounding length
         key.add(_r(1.0 - s * pl["front_m"] / L, 6))
         key.add(_r(s * pl["rear_m"] / L, 6))
-    keys = sorted(key)
+    keys = sorted(k for k in key if 0.0 <= k <= 1.0)
     keys = [t for i, t in enumerate(keys) if i == 0 or (t - keys[i - 1]) * L >= 0.012]
-    pts: list[tuple[float, bool]] = []
+    pts: list[tuple[float, bool, int]] = []                # (t, key, priority: 2 = an arch end, 1 = a key loop)
     for t0, t1 in zip(keys, keys[1:]):
-        pts.append((t0, True))
+        pts.append((t0, True, 1))
         span = (t1 - t0) * L
         n = max(1, int(round(span / float(tier["cell_m"])))) if span >= 0.2 else 1
         for k in range(1, n):
-            pts.append((t0 + (t1 - t0) * k / n, False))
-    pts.append((keys[-1], True))
-    cols = int(tier["arch_cols"])
+            pts.append((t0 + (t1 - t0) * k / n, False, 0))
+    pts.append((keys[-1], True, 1))
+    cols = max(3, int(tier["arch_cols"]))
     for ya in a["axle_y"]:
         for k in range(cols):
-            u = -1.0 + 2.0 * k / (cols - 1)
-            pts.append(((ya + ra * u - y_rear) / L, False))
-    pts.sort(key=lambda p: (p[0], not p[1]))
+            u = -math.cos(math.pi * k / (cols - 1))
+            pts.append(((ya + ra * u - y_rear) / L, False, 2 if k in (0, cols - 1) else 0))
+    pts.sort(key=lambda p: (p[0], -p[2]))
     out: list[dict] = []
-    for t, is_key in pts:
+    for t, is_key, prio in pts:
         if out and (t - out[-1]["t"]) * L < _MIN_STATION_M:
-            if is_key and not out[-1]["key"]:
-                out[-1].update(t=t, key=True)
+            # one station for both: the arch ends keep their place (the opening stays round), keys stay keys
+            if prio > out[-1]["prio"]:
+                out[-1].update(t=t, prio=prio)
+            out[-1]["key"] = out[-1]["key"] or is_key
             continue
-        out.append({"t": t, "key": is_key})
+        out.append({"t": t, "key": is_key, "prio": prio})
     out[0]["t"], out[-1]["t"] = 0.0, 1.0
     return out
+
+
+def _shrink(m: Mesh, fids: list[int], width: float, ring_role: str, *, axis_x: bool = True) -> list[int]:
+    """Inset the region ``fids`` within its own surface: its boundary moves ``width`` inwards and a ring of quads
+    (``ring_role``) fills the band outside it (a bezel). Boundary edges on the mirror plane get no ring."""
+    region = set(fids)
+    nrm = _vertex_normals(m, fids)
+    bnd: list[tuple[int, int, int]] = []
+    for _key, items in sorted(_edges_of(m, fids).items()):
+        inside = [it for it in items if it[0] in region]
+        if len(inside) != 1:
+            continue
+        fi, a, b = inside[0]
+        if axis_x and abs(m.verts[a][0]) < 1e-9 and abs(m.verts[b][0]) < 1e-9:
+            continue
+        bnd.append(inside[0])
+    lefts: dict[int, list[tuple]] = {}
+    for _fi, a, b in bnd:
+        e = _sub(m.verts[b], m.verts[a])
+        le = math.sqrt(_dot(e, e)) or 1.0
+        e = (e[0] / le, e[1] / le, e[2] / le)
+        for v in (a, b):
+            lf = _cross(nrm[v], e)                     # the inside of a counter-clockwise face is left of its edge
+            ll = math.sqrt(_dot(lf, lf)) or 1.0
+            lefts.setdefault(v, []).append((lf[0] / ll, lf[1] / ll, lf[2] / ll))
+    new: dict[int, int] = {}
+    for v, ls in sorted(lefts.items()):
+        d = [sum(lf[k] for lf in ls) for k in range(3)]
+        x, y, z = m.verts[v]
+        if axis_x and abs(x) < 1e-9:
+            d[0] = 0.0
+        ln = math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) or 1.0
+        d = [c / ln for c in d]
+        dist = width / max(0.5, min(_dot(tuple(d), lf) for lf in ls))
+        new[v] = m.v(x + d[0] * dist, y + d[1] * dist, z + d[2] * dist)
+    old_uv = {(fi, v): m.uv[fi][k] for fi in fids for k, v in enumerate(m.faces[fi]) if m.uv[fi]}
+    ring: list[int] = []
+    for fi, a, b in bnd:
+        ua, ub = old_uv.get((fi, a), (0.0, 0.0)), old_uv.get((fi, b), (0.0, 0.0))
+        if ring_role.startswith("paint"):          # a band of the shell: its UVs continue the paint map
+            uv = (ua, ub, (ub[0], ub[1] - 0.004), (ua[0], ua[1] - 0.004))
+        else:
+            uv = _wall_uv(ua, ub)
+        ring.append(m.f((a, b, new[b], new[a]), ring_role, m.part[fi], uv))
+    for fi in fids:
+        m.faces[fi] = tuple(new.get(v, v) for v in m.faces[fi])
+    return ring
+
+
+def _face_toward(m: Mesh, fids, point) -> None:
+    """Wind the faces ``fids`` so that their normals point towards ``point`` (a wheel house faces its wheel)."""
+    for fi in fids:
+        f = m.faces[fi]
+        n = _normal(m, f)
+        mid = tuple(sum(m.verts[v][k] for v in f) / len(f) for k in range(3))
+        if _dot(n, _sub(point, mid)) < 0:
+            m.faces[fi] = tuple(reversed(f))
+            if m.uv[fi]:
+                m.uv[fi] = tuple(reversed(m.uv[fi]))
+
+
+def _rect_uv(m: Mesh, fids, rect) -> None:
+    """Planar UVs (each face along its dominant axis) of ``fids`` fitted into the Blender rectangle ``rect``."""
+    proj = {}
+    for fi in fids:
+        n = _normal(m, m.faces[fi])
+        ax = max(range(3), key=lambda i: abs(n[i]))
+        a, b = ((1, 2), (0, 2), (0, 1))[ax]
+        proj[fi] = [(m.verts[v][a], m.verts[v][b]) for v in m.faces[fi]]
+    if not proj:
+        return
+    us = [p[0] for ps in proj.values() for p in ps]
+    vs = [p[1] for ps in proj.values() for p in ps]
+    u0, v0, u1, v1 = rect
+    mu, mv = (u1 - u0) * 0.08, (v1 - v0) * 0.08
+    su = (u1 - u0 - 2 * mu) / max(max(us) - min(us), 1e-6)
+    sv = (v1 - v0 - 2 * mv) / max(max(vs) - min(vs), 1e-6)
+    for fi, ps in proj.items():
+        m.uv[fi] = tuple((round(u0 + mu + (pu - min(us)) * su, 5), round(v0 + mv + (pv - min(vs)) * sv, 5))
+                         for pu, pv in ps)
+
+
+def _atlas_uvs(m: Mesh, regions: dict[str, str]) -> None:
+    """Faces of the roles in ``regions`` get UVs inside their shared atlas region (``satk.kit.atlas``)."""
+    from . import atlas as A
+
+    for role, reg in sorted(regions.items()):
+        fids = [i for i, r in enumerate(m.role) if r == role]
+        if fids:
+            _rect_uv(m, fids, A.to_blender(A.region(reg)["rect"]))
 
 
 def _car(plan: dict) -> dict:
@@ -411,17 +523,20 @@ def _car(plan: dict) -> dict:
     L, W, H = float(d["L"]), float(d["W"]), float(d["H"])
     hw = W / 2.0
     zg, yR = float(a["ground_z"]), float(a["y_rear"])
+    out_b = float((body.get("detail") or {}).get("bumper_out", 0.0))
+    if out_b:                     # the bumpers stand proud of the shell: the shell is shorter, the car keeps its length
+        yR, L = yR + out_b, L - 2.0 * out_b
     yF = yR + L
     wd = float(a["wheel_d"])
     ra = wd / 2.0 + float(body["wheel_clear"])
     zc = float(a.get("wheel_z", zg + wd / 2.0)) - zg                  # wheel centre above the ground
-    h_crown = zc + ra
     pl = body["plan"]
     top_k, belt_k = body["top"], body["belt"]
     creases = body["crease_t"]
     floor_k = body.get("floor") or [[0.0, 0.30], [0.035, 0.19], [0.965, 0.19], [1.0, 0.31]]
     sill0 = float(body["sill_h"])
     stn = body["stations"]
+    hatch, bed = bool(body.get("hatch")), bool(body.get("bed"))
     deck_h = float(_curve(top_k, float(stn["rear_window_base"]), creases)) * H
     stations = _car_stations(body, L, yR, tier, a, ra)
     n = len(stations)
@@ -429,20 +544,19 @@ def _car(plan: dict) -> dict:
     crown_roof = float(body.get("crown_roof", crown))
     pillow = float(body.get("pillow", 0.0))
     bulge = float(body.get("bulge", 1.01))
-    ring_names = list(body.get("uv_rings") or [])
-    ring_t = sorted(float(stn[nm]) for nm in ring_names if nm in stn)
-    ring_gap = float(body.get("uv_ring_gap", 0.015))
-    all_rings = bool(body.get("uv_all_rings"))
-    row_seam = float(body.get("uv_row_gap", 0.0))
     names = list(body.get("rows") or _ROWS)
     ri = {nm: i for i, nm in enumerate(names)}
-    row_seams = [nm for nm in body.get("uv_row_seams", []) if nm in ri] if row_seam else []
     nrow = len(names)
+    det = body.get("detail", {})
+    wells = bool(det.get("well_depth"))
+    # the liner plane of the wheel houses: inside the tyre's inner face
+    x_in = min(max(0.2, float(a["track"]) / 2.0 - 0.18 * wd - 0.05), hw * 0.9)
 
     # ---- the section of every station: rows of (x, z)
     secs: list[list[tuple[float, float]]] = []
     cab: list[float] = []
     inside: list[bool] = []
+    belts: list[float] = []
     for s in stations:
         t = s["t"]
         y = yR + t * L
@@ -450,7 +564,7 @@ def _car(plan: dict) -> dict:
         h_top = _curve(top_k, t, creases) * H
         c = _clamp((h_top - deck_h) / max(H - deck_h, _EPS), 0.0, 1.0)
         if pillow:                                         # an arch along the length of the bonnet and of the boot
-            for t0, t1 in ((stn["cowl"], stn["hood_end"]), (stn["boot_end"], stn["rear_window_base"])):
+            for t0, t1 in ((stn["cowl"], stn["hood_end"]), (stn.get("boot_end", 0.0), stn["rear_window_base"])):
                 if t0 < t < t1:
                     h_top += pillow * 4.0 * ((t - t0) / (t1 - t0)) * (1.0 - (t - t0) / (t1 - t0))
         belt = min(_curve(belt_k, t, ()) * H, h_top - 0.045)
@@ -458,9 +572,11 @@ def _car(plan: dict) -> dict:
         h_sill = max(sill0, h_floor + 0.05)
         h_rock = h_sill + 0.05
         u = min(((y - ya) / ra for ya in a["axle_y"]), key=abs)
-        zb = h_rock + (h_crown - h_rock) * _arch_g(u)
+        # the opening: an arc around the wheel centre, then straight down to the sill
+        zb = max(h_rock, zc + ra * _arch_g(u)) if abs(u) <= 1.0 else h_rock
         inside.append(abs(u) < 1.0 - 1e-9)
-        cr = _lerp(crown, crown_roof, c)
+        # the crown never pushes the shoulder under the belt (no fold): at most 60 % of the drop to the belt
+        cr = min(_lerp(crown, crown_roof, c), max(0.0, 0.6 * (h_top - belt)))
         xts = hw * _lerp(pl["deck_w"], pl["roof_w"], c)
         xb = hw * pl["belt_w"] / max(bulge, 1.0)               # the widest row (the door bulge) is half the width W
         z_ts = h_top - cr
@@ -472,145 +588,262 @@ def _car(plan: dict) -> dict:
             "belt": (xb * f, belt),
             "door_m": (xb * bulge * f, (belt + zb) / 2.0),
             "rocker": (xb * 0.95 * f, zb),
-            "sill": (xb * 0.84 * f, h_sill),
+            "sill": (min(xb * 0.84 * f, x_in) if wells and abs(u) < 1.0 - 1e-9 else xb * 0.84 * f, h_sill),
             "floor_s": (xb * 0.45 * f, (h_sill + h_floor) / 2.0),
             "floor_c": (0.0, h_sill + 0.03),
         }
         secs.append([(rowd[nm][0], zg + rowd[nm][1]) for nm in names])
         cab.append(c)
+        belts.append(zg + belt)
 
     m = Mesh()
     vid = [[m.v(x, yR + stations[i]["t"] * L, z) for x, z in secs[i]] for i in range(n)]
+    bump_role = str(body.get("bumper_role", "trim"))
+    det = body.get("detail", {})
+    bumper_vol = bool(det.get("bumper_out", 0.0))
+    tailgate_t = float(stn.get("tailgate", -1.0))
+    bed_t = float(stn.get("bed_front", -1.0)) if bed else -1.0
 
     def roles_parts(i: int, up: str) -> tuple[str, str]:
         tc = (stations[i]["t"] + stations[i + 1]["t"]) / 2.0
         c = (cab[i] + cab[i + 1]) / 2.0
-        hood, boot = tc >= stn["cowl"], tc <= stn["rear_window_base"]
-        wind = stn["roof_front"] <= tc <= stn["cowl"]
-        rglass = stn["roof_rear"] <= tc <= stn["rear_window_base"]
-        roof = stn["roof_rear"] <= tc <= stn["roof_front"]
+        hood = tc >= stn["cowl"]
+        wind = stn["roof_front"] <= tc < stn["cowl"]
+        roof = stn["roof_rear"] <= tc < stn["roof_front"]
+        rglass = stn["rear_window_base"] <= tc < stn["roof_rear"]
         door_f = stn["door_f_rear"] <= tc <= stn["cowl"]
         door_r = stn["door_r_rear"] <= tc <= stn["door_r_front"]
         pillar_b = stn["door_r_front"] <= tc <= stn["door_f_rear"]
+        quarter = "quarter_rear" in stn and stn["quarter_rear"] <= tc <= stn["quarter_front"]
+        gate = (hatch or bed) and tc < tailgate_t
         bump_r = tc <= stn["bump_rear_end"]
         bump_f = tc >= stn["bump_front_start"]
-        hb = "bonnet" if hood else "boot" if boot else "chassis"
-        if up == "top_c":
+        if up in ("top_c", "top_q"):
+            if hood:
+                return "paint1", "bonnet"
             if wind:
-                return "glass", "windscreen"
-            if rglass:
-                return "glass", "chassis"
-            return "paint1", "chassis" if roof else hb
-        if up == "top_q":
-            return "paint1", hb
+                return ("glass", "windscreen") if up == "top_c" else ("paint1", "chassis")
+            if roof:
+                return "paint1", "chassis"
+            if rglass:                                 # a hatch's glass spans the tailgate, a sedan's has C pillars
+                return ("glass" if up == "top_c" or hatch else "paint1"), ("boot" if hatch else "chassis")
+            if bed:
+                return "paint1", "boot" if gate else "chassis"
+            return "paint1", "boot"
         if up in ("top_s", "glass_m"):
             if door_f or door_r:
                 return ("glass" if c > 0.25 else "paint1"), ("door_f" if door_f else "door_r")
             if pillar_b:
                 return ("black" if c > 0.25 else "paint1"), "chassis"
-            return "paint1", "chassis"
+            if quarter and c > 0.25:
+                return "glass", "chassis"
+            return "paint1", "boot" if gate else "chassis"
         if up in ("belt", "door_m"):
-            if up == "door_m" and bump_f:
-                return "chrome", "bump_front"
-            if up == "door_m" and bump_r:
-                return "chrome", "bump_rear"
+            if up == "door_m" and (bump_f or bump_r):
+                if bumper_vol:                        # the backing behind the bumper volume
+                    return "black", "chassis"
+                return bump_role, "bump_front" if bump_f else "bump_rear"
             if door_f:
                 return "paint1", "door_f"
             if door_r:
                 return "paint1", "door_r"
-            return "paint1", "chassis"
+            return "paint1", "boot" if gate else "chassis"
         if up == "rocker":
+            if bumper_vol:
+                return ("black" if bump_f or bump_r else "trim"), "chassis"
             return "trim", "bump_front" if bump_f else "bump_rear" if bump_r else "chassis"
+        if bumper_vol:
+            return "black", "chassis"
         return "black", "bump_front" if bump_f else "bump_rear" if bump_r else "chassis"
 
+    u0p, u1p = _U_PAINT
     cell: dict[tuple[int, str], int] = {}
     for i in range(n - 1):
-        ui, uj = stations[i]["t"], stations[i + 1]["t"]
+        ui = u0p + (u1p - u0p) * stations[i]["t"]
+        uj = u0p + (u1p - u0p) * stations[i + 1]["t"]
         for k in range(nrow - 1):
             up, lo = names[k], names[k + 1]
             if up == "rocker" and (inside[i] or inside[i + 1]):
                 continue                                  # the wheel opening: no rocker strip under the arch
-            tab = _V_TOP if up in _V_TOP and lo in _V_TOP else _V_UNDER if up == "sill" else _V_SIDE
-            v0, v1 = tab[up], (tab[lo] if lo in tab else _V_UNDER[lo])
+            v0, v1 = _V_PAINT[up], _V_PAINT[lo]
             role, part = roles_parts(i, up)
-            sh = ring_gap * (i if all_rings else sum(1 for r in ring_t if r <= (ui + uj) / 2.0))   # a UV island per ring
-            vs = row_seam * sum(1 for nm in row_seams if ri[nm] <= k)       # a UV step after the rows in uv_row_seams
             cell[(i, up)] = m.f((vid[i][k], vid[i][k + 1], vid[i + 1][k + 1], vid[i + 1][k]), role, part,
-                                ((ui + sh, v0 + vs), (ui + sh, v1 + vs), (uj + sh, v1 + vs), (uj + sh, v0 + vs)))
-    for i in range(n - 1):
+                                ((ui, v0), (ui, v1), (uj, v1), (uj, v0)))
+    for i in range(n - 1):                                # unwrap seams (the UVs stay continuous across them)
         m.mark_seam(vid[i][ri["sill"]], vid[i + 1][ri["sill"]])
         m.mark_seam(vid[i][ri["top_s"]], vid[i + 1][ri["top_s"]])
 
-    # ---- layered details: recessed glass, lamps and grille, wheel wells, mirrors
-    det = body.get("detail", {})
+    # ---- layered details: recessed glass, an open bed, lamps and grille, wheel houses, jambs, mirrors
     ycell = {key: sum(m.verts[v][1] for v in m.faces[fi]) / 4.0 for key, fi in cell.items()}
     xcell = {key: sum(abs(m.verts[v][0]) for v in m.faces[fi]) / 4.0 for key, fi in cell.items()}
+    tcell = {key: (stations[key[0]]["t"] + stations[key[0] + 1]["t"]) / 2.0 for key in cell}
     if det.get("window_depth"):
-        for part in ("door_f", "door_r", "windscreen", "chassis"):
+        for part in ("door_f", "door_r", "windscreen", "chassis", "boot"):
             fs = [fi for key, fi in cell.items() if m.role[fi] == "glass" and m.part[fi] == part]
             if fs:
                 _inset(m, fs, -float(det["window_depth"]), "black")
+    if bed:
+        fs = [fi for (i, k), fi in cell.items() if k in ("top_c", "top_q") and m.part[fi] == "chassis"
+              and tailgate_t + 0.004 < tcell[(i, k)] < bed_t]
+        if fs:
+            rim_uv = {v: uv for fi in fs for v, uv in zip(m.faces[fi], m.uv[fi])}
+            for wi in _inset(m, fs, -float(body.get("bed_depth", 0.4)), "paint1"):
+                a_, b_ = m.faces[wi][0], m.faces[wi][1]            # the rim keeps the deck's paint UVs
+                (ua, va), (ub, vb) = rim_uv.get(a_, (0.1, 0.9)), rim_uv.get(b_, (0.1, 0.9))
+                m.uv[wi] = ((ua, va), (ub, vb), (ub, vb - 0.12), (ua, va - 0.12))
+            for fi in fs:
+                m.role[fi] = "trim"
     if det.get("lamp_depth"):
         lamp_len = float(det.get("lamp_len", 0.85))
+        bezel = float(det.get("lamp_bezel", 0.02))
         for end in (1, -1):
-            sel = [fi for (i, k), fi in cell.items() if k == "belt" and m.part[fi] == "chassis"
+            sel = [fi for (i, k), fi in cell.items() if k == "belt" and m.part[fi] in ("chassis", "boot")
                    and ((end > 0 and ycell[(i, k)] > yF - lamp_len) or (end < 0 and ycell[(i, k)] < yR + lamp_len - 0.05))
                    and 0.30 * hw < xcell[(i, k)] < 0.95 * hw]
+            if not sel:
+                continue
+            if bezel > 0:                                 # the surround: a band of the shell around the bucket
+                _shrink(m, sel, bezel, m.role[sel[0]])
             for fi in sel:
-                m.role[fi] = "lens"
-            if sel:
-                _inset(m, sel, -float(det["lamp_depth"]), "black")
+                m.role[fi] = "lamp_fr" if end > 0 else "lamp_rr"
+            _inset(m, sel, -float(det["lamp_depth"]), "black")     # the bucket walls, the lens at its bottom
+            if bezel > 0:
+                _shrink(m, sel, 0.6 * bezel, "black")              # a smaller lens: the bucket narrows
         grille = [fi for (i, k), fi in cell.items() if k == "belt" and m.part[fi] == "chassis"
                   and ycell[(i, k)] > yF - lamp_len and xcell[(i, k)] < 0.30 * hw]
-        for fi in grille:
-            m.role[fi] = "black"
         if grille:
-            _inset(m, grille, -float(det["lamp_depth"]), "black")
+            if bezel > 0:
+                _shrink(m, grille, bezel, m.role[grille[0]])
+            for fi in grille:
+                m.role[fi] = "black"                         # the dark backing; teeth are the modeller's detail
+            _inset(m, grille, -float(det.get("grille_depth", det["lamp_depth"])), "black")
+    if bumper_vol:
+        out_m = float(det["bumper_out"])
+        for ya, end in ((max(a["axle_y"]), 1), (min(a["axle_y"]), -1)):
+            _car_bumper(m, stations, secs, ri, yR, L, ya + end * (ra + 0.03), end, out_m, bump_role,
+                        "bump_front" if end > 0 else "bump_rear")
     if det.get("well_depth"):
-        _arch_wells(m, vid, inside, float(det["well_depth"]), ri["rocker"], int(det.get("well_segments", 1)))
+        for ya in a["axle_y"]:
+            _arch_well(m, vid, inside, stations, yR, L, ya, ra, ri, x_in, (float(a["track"]) / 2.0, ya, zg + zc),
+                       int(det.get("well_segments", 2)))
     if det.get("jamb_depth"):
         for part in ("door_f", "door_r", "bonnet", "boot", "windscreen"):
             _jambs(m, part, float(det["jamb_depth"]), "black", "chassis")
     if det.get("mirror"):
-        t_c = float(stn["cowl"])
-        zb = zg + _curve(belt_k, t_c, ()) * H
-        _gbox(m, (hw + 0.02, yR + t_c * L - 0.30, zb + 0.06), (hw + 0.17, yR + t_c * L - 0.12, zb + 0.17), (1, 1, 1),
-              0.03, "paint1", "door_f", uv="skew")
+        t_m = float(stn["cowl"]) - 0.035
+        y_m = yR + t_m * L
+        i_m = min(range(n), key=lambda i: abs(stations[i]["t"] - t_m))
+        x_door = secs[i_m][ri["belt"]][0] if "belt" in ri else hw
+        _car_mirror(m, x_door, y_m, belts[i_m] + 0.03, "door_f")
+    _atlas_uvs(m, _ATLAS)
 
     pieces = [_piece("body", m)]
     if plan.get("interior", True):
-        pieces.append(_piece("interior", _car_interior(a, zg, yR, L, hw, det), part="chassis"))
+        lift = max(0.0, sill0 - 0.27)                      # a high body (SUV, pickup) lifts its floor and boxes
+        pieces.append(_piece("interior", _car_interior(a, zg + lift, yR, L, hw, det), part="chassis"))
     if det.get("exhaust", True):                          # one tailpipe on the right, under the rear bumper
         mx = Mesh()
-        _prism(mx, (hw * 0.5, yR + 0.55, zg + 0.24), (hw * 0.5, yR + 0.04, zg + 0.24), 0.08, 0.08, "chrome", "exhaust", 6)
+        ze = zg + 0.24 + max(0.0, sill0 - 0.27)
+        _prism(mx, (hw * 0.5, yR + 0.55, ze), (hw * 0.5, yR + 0.04, ze), 0.08, 0.08, "chrome", "exhaust", 6)
+        _atlas_uvs(mx, {"chrome": "generic.chrome_pipe"})
         pieces.append(_piece("exhaust", mx, part="exhaust", mirror=False))
     return {"pieces": pieces, "parts": [dict(p) for p in _CAR_PARTS]}
 
 
-def _arch_wells(m: Mesh, vid: list[list[int]], inside: list[bool], depth: float, row: int, segs: int = 1) -> None:
-    """Strips of quads from each arch edge (the rocker row over the opening) inwards and upwards: the wheel house tub."""
-    n = len(vid)
-    i = 0
-    while i < n:
-        if not inside[i]:
-            i += 1
-            continue
-        j = i
-        while j + 1 < n and inside[j + 1]:
-            j += 1
-        lo, hi = max(i - 1, 0), min(j + 1, n - 1)            # include the end columns of the arch
-        prev = {s: vid[s][row] for s in range(lo, hi + 1)}
-        for k in range(1, segs + 1):
-            f = k / segs
-            cur = {}
-            for s in range(lo, hi + 1):
-                x, y, z = m.verts[vid[s][row]]
-                cur[s] = m.v(x - depth * f, y, z + 0.06 * f * f)
-            for s in range(lo, hi):
-                quad = (prev[s], cur[s], cur[s + 1], prev[s + 1])
-                m.f(quad, "black", "chassis", _skew_uv(m, quad))
-            prev = cur
-        i = j + 1
+def _car_bumper(m: Mesh, stations: list[dict], secs: list, ri: dict, yR: float, L: float, y_arch: float, end: int,
+                out: float, role: str, part: str) -> None:
+    """A bumper as its own wrap-around volume (vanilla rule 11): a C-section swept along the body's outline at the
+    lower nose (or tail) from just past the wheel arch to the centre line, ``out`` metres proud of the body with a
+    rounded 4-segment profile; its top tucks into the body (a shut line and a step, not a painted row)."""
+    ii = [i for i, st in enumerate(stations) if (yR + st["t"] * L - y_arch) * end >= 0.0]
+    ii = sorted(ii, key=lambda i: end * stations[i]["t"])           # from the arch towards the end of the car
+    if len(ii) < 2:
+        return
+    path = []
+    for i in ii:
+        x_dm, z_dm = secs[i][ri["door_m"]]
+        x_rk, z_rk = secs[i][ri["rocker"]]
+        path.append((x_dm, yR + stations[i]["t"] * L, z_dm, z_rk))
+    first = len(m.faces)
+    rings, normals = [], []
+    # one straight band: the height at the arch end, the bottom at the lowest rocker point (the ends of the body
+    # rise; a band that followed them would droop); the dark backing shows as a shut line above it at the nose
+    zt0, zb0 = path[0][2], min(pt[3] for pt in path)
+    for k, (x, y, _zt, _zb) in enumerate(path):
+        a_ = path[max(k - 1, 0)]
+        b_ = path[min(k + 1, len(path) - 1)]
+        tx, ty = b_[0] - a_[0], b_[1] - a_[1]
+        nx, ny = ty, -tx                                       # the plan normal ...
+        if nx * x + ny * end < 0:                              # ... pointing out of the body (sideways, then ahead)
+            nx, ny = -nx, -ny
+        ln = math.hypot(nx, ny) or 1.0
+        nx, ny = nx / ln, ny / ln
+        if x <= 1e-6:                                          # the centre line: straight ahead, on the mirror plane
+            nx, ny, x = 0.0, float(end), 0.0
+        zt, zb = zt0 - 0.01, zb0 + 0.03
+        zm = (zt + zb) / 2.0
+        prof = [(-0.03, zt), (0.7 * out, zt), (out, zm), (0.7 * out, zb), (-0.03, zb)]
+        rings.append([m.v(0.0 if x == 0.0 else x + nx * o, y + ny * o, z) for o, z in prof])
+        normals.append((nx, ny))
+    for k in range(len(rings) - 1):
+        for j in range(len(rings[0]) - 1):
+            f = (rings[k][j], rings[k][j + 1], rings[k + 1][j + 1], rings[k + 1][j])
+            m.f(f, role, part, _skew_uv(m, f))
+    # one winding for the whole sweep: the face at the front of the first ring points out of the body
+    _flip_all(m, range(first, len(m.faces)), first + 1, (normals[0][0], normals[0][1], 0.0))
+    cap = tuple(rings[0])                                      # the end next to the arch faces the arch
+    fc = m.f(cap, role, part, _skew_uv(m, cap))
+    back = tuple(m.verts[rings[0][2]][c] - m.verts[rings[1][2]][c] for c in range(3))
+    if _dot(_normal(m, m.faces[fc]), back) < 0:
+        m.faces[fc] = tuple(reversed(m.faces[fc]))
+        m.uv[fc] = tuple(reversed(m.uv[fc]))
+
+
+def _car_mirror(m: Mesh, x0: float, y0: float, z0: float, part: str) -> None:
+    """A door mirror: a short black stalk from inside the door skin at ``(x0, y0, z0)`` out to a rounded painted head
+    (vanilla: an 8-26 triangle head of about 20 x 10 x 13 cm on a 3-6 triangle stalk that touches the door)."""
+    first = len(m.faces)
+    _prism(m, (x0 - 0.03, y0 + 0.01, z0 + 0.02), (x0 + 0.1, y0 - 0.005, z0 + 0.05), 0.04, 0.03, "black", part, 4)
+    _gbox(m, (x0 + 0.08, y0 - 0.06, z0 - 0.01), (x0 + 0.27, y0 + 0.045, z0 + 0.12), (1, 1, 1), 0.03, "paint1", part,
+          uv="skew")
+    _rect_uv(m, [i for i in range(first, len(m.faces)) if m.role[i] == "paint1"], _PAINT_DETAIL)
+
+
+def _arch_well(m: Mesh, vid: list[list[int]], inside: list[bool], stations: list[dict], yR: float, L: float,
+               ya: float, ra: float, ri: dict, x_in: float, wheel, segs: int = 2) -> None:
+    """The wheel house of the arch at ``ya``: a tub from the arch edge (the rocker row over the opening) in to
+    ``x_in``, a flat vertical liner plate there and a return wall at each end of the opening down to the sill, so the
+    body is never see-through (vanilla: a short return face and a liner plate inside every arch). Faces face the
+    wheel."""
+    cols = [i for i in range(len(vid)) if inside[i] and abs(yR + stations[i]["t"] * L - ya) < ra]
+    if not cols:
+        return
+    lo, hi = max(min(cols) - 1, 0), min(max(cols) + 1, len(vid) - 1)    # include the end columns of the arch
+    row, sill = ri["rocker"], ri["sill"]
+    first = len(m.faces)
+    prev = {s: vid[s][row] for s in range(lo, hi + 1)}
+    for k in range(1, segs + 1):
+        f = k / segs
+        cur = {}
+        for s in range(lo, hi + 1):
+            x, y, z = m.verts[vid[s][row]]
+            cur[s] = m.v(_lerp(x, x_in, f), y, z + 0.06 * f * f)
+        for s in range(lo, hi):
+            quad = (prev[s], cur[s], cur[s + 1], prev[s + 1])
+            m.f(quad, "black", "chassis", _skew_uv(m, quad))
+        prev = cur
+    bottom: dict[int, int] = {}
+    for s in (lo, hi):
+        x, y, z = m.verts[vid[s][sill]]
+        bottom[s] = m.v(x_in, y, z)
+        quad = (vid[s][row], vid[s][sill], bottom[s], prev[s])
+        m.f(quad, "black", "chassis", _skew_uv(m, quad))
+    # the liner: the inner rim of the tub over the top, the sill line under the arch (moved in to x_in) below;
+    # the wheel house stays open towards the ground like a real one
+    liner = tuple(prev[s] for s in range(lo, hi + 1)) + (bottom[hi],) + tuple(
+        vid[s][sill] for s in range(hi - 1, lo, -1)) + (bottom[lo],)
+    m.f(liner, "black", "chassis", _skew_uv(m, liner))
+    _face_toward(m, range(first, len(m.faces)), wheel)
 
 
 def _piece(name: str, m: Mesh, part: str | None = None, slot: str | None = None, mirror: bool = True) -> dict:
@@ -628,7 +861,35 @@ def _piece(name: str, m: Mesh, part: str | None = None, slot: str | None = None,
         "part_names": names,
         "uv": [[[_r(u, 5), _r(v, 5)] for u, v in uv] for uv in m.uv],
         "seam": sorted([list(e) for e in m.seam]),
+        "sharp": _sharp_edges(m),
     }
+
+
+def _sharp_edges(m: Mesh) -> list[list[int]]:
+    """Hard edges of a mesh by the vanilla rule: material (role) borders and real folds (above ``_HARD_DEG``, box
+    caps and prism ends); corners inside one material stay smooth."""
+    faces_of: dict[tuple[int, int], list[int]] = {}
+    for fi, f in enumerate(m.faces):
+        for k in range(len(f)):
+            a, b = f[k], f[(k + 1) % len(f)]
+            faces_of.setdefault((a, b) if a < b else (b, a), []).append(fi)
+    unit: dict[int, tuple[float, float, float]] = {}
+
+    def nrm(fi: int) -> tuple[float, float, float]:
+        if fi not in unit:
+            nx, ny, nz = _normal(m, m.faces[fi])
+            ln = math.sqrt(nx * nx + ny * ny + nz * nz) or 1.0
+            unit[fi] = (nx / ln, ny / ln, nz / ln)
+        return unit[fi]
+
+    lim = math.cos(math.radians(_HARD_DEG))
+    out = []
+    for e, fs in faces_of.items():
+        if len(fs) != 2:
+            continue
+        if m.role[fs[0]] != m.role[fs[1]] or _dot(nrm(fs[0]), nrm(fs[1])) < lim:
+            out.append(list(e))
+    return sorted(out)
 
 
 _UNDERBODY = ("tunnel", "engine", "tank", "radiator", "axle_f", "axle_r")
@@ -662,7 +923,9 @@ def _car_interior(a: dict, zg: float, yR: float, L: float, hw: float, det: dict)
         ub = _UNDERBODY if ub is True else ub
         cu = float(det.get("underbody_chamfer", 0.05))
         under = {
-            "tunnel": ((0.0, ya_r + 0.35, zg + 0.20), (0.22, ya_f - 0.40, fl - 0.02)),
+            # the tunnel reaches up into the body floor (its centre is ~4 cm above the cabin floor line): a box
+            # hanging under the floor would be a floating piece
+            "tunnel": ((0.0, ya_r + 0.35, zg + 0.20), (0.22, ya_f - 0.40, fl + 0.06)),
             "engine": ((0.0, yF - 1.45, zg + 0.34), (0.55, yF - 0.75, zg + 0.74)),
             "tank": ((0.0, yR + 0.35, zg + 0.24), (0.62, yR + 0.95, zg + 0.46)),
             "radiator": ((0.0, yF - 0.60, zg + 0.40), (0.62, yF - 0.48, zg + 0.70)),
@@ -984,6 +1247,244 @@ def _building(plan: dict) -> dict:
 # --------------------------------------------------------------------------- bike, boat, heli, plane (lofted hulls)
 
 
+#: Scooter anchors without ``--like`` (numbers of a typical SA scooter frame layout for L 1.94 x W 0.94 x H 1.33, y
+#: forward, z up, ground at -0.5): wheels, steering pivot and axis, rider pelvis, lamps, exhaust tip.
+_SCOOTER = {"dims": (1.94, 0.94, 1.33), "y_rear": -1.03, "ground_z": -0.5, "wheel_d": 0.464,
+            "axle_y": (-0.674, 0.675), "pivot": (0.0, 0.526, 0.105), "axis": (0.0, -0.105, 0.995),
+            "seat": (0.0, -0.337, 0.417), "headlights": (0.0, 0.501, 0.532), "taillights": (0.0, -0.96, 0.165),
+            "exhaust": (0.127, -0.82, -0.317)}
+
+
+def _with_wheel(a: dict, wheel_d: float | None) -> dict:
+    """``a`` with another wheel diameter: the hubs stay on their frames, the ground moves."""
+    if wheel_d:
+        a["wheel_d"] = _r(float(wheel_d), 4)
+        a["ground_z"] = _r(min(a["wheel_z"]) - float(wheel_d) / 2.0, 4)
+    return a
+
+
+def _scooter_anchors(L: float, W: float, H: float, ln: dict | None) -> dict:
+    """Anchors of a scooter blank: the like model's frames (scaled to the dimensions) or the defaults."""
+    if ln is not None and "forks_front" in ln["frames"] and "wheel_front" in ln["frames"]:
+        fr = ln["frames"]
+        Ll, Wl, Hl = ln["dims"]["L"], ln["dims"]["W"], ln["dims"]["H"]
+        sx, sy, sz = W / Wl, L / Ll, H / Hl
+        wd = float(ln.get("wheel_scale") or _SCOOTER["wheel_d"])
+
+        def at(name: str, default) -> list[float]:
+            p = fr.get(name)
+            return [_r(p[0] * sx, 4), _r(p[1] * sy, 4), _r(p[2] * sz, 4)] if p else list(default)
+
+        wf, wr = at("wheel_front", (0, 0, 0)), at("wheel_rear", (0, 0, 0))
+        zg = min(wf[2], wr[2]) - wd / 2.0
+        axis = ln.get("axes", {}).get("forks_front") or list(_SCOOTER["axis"])
+        bw = (ln["bbox"][1][0] - ln["bbox"][0][0]) * sx       # over the grips (the style width is the body only)
+        return {"y_rear": _r(ln["bbox"][0][1] * sy, 4), "ground_z": _r(zg, 4), "wheel_d": _r(wd, 4),
+                "width": _r(max(bw, W), 4),
+                "axle_y": [wr[1], wf[1]], "wheel_z": [wr[2], wf[2]], "pivot": at("forks_front", _SCOOTER["pivot"]),
+                "axis": [_r(v, 4) for v in axis], "seat": at("ped_frontseat", _SCOOTER["seat"]),
+                "headlights": at("headlights", _SCOOTER["headlights"]),
+                "taillights": at("taillights2", at("taillights", _SCOOTER["taillights"])),
+                "exhaust": at("exhaust", _SCOOTER["exhaust"])}
+    L0, W0, H0 = _SCOOTER["dims"]
+    sx, sy, sz = W / W0, L / L0, H / H0
+
+    def sc(p) -> list[float]:
+        return [_r(p[0] * sx, 4), _r(p[1] * sy, 4), _r(p[2] * sz, 4)]
+
+    wd = _SCOOTER["wheel_d"] * min(sy, sz)
+    zg = _SCOOTER["ground_z"] * sz
+    return {"y_rear": _r(_SCOOTER["y_rear"] * sy, 4), "ground_z": _r(zg, 4), "wheel_d": _r(wd, 4), "width": _r(W, 4),
+            "axle_y": [_r(v * sy, 4) for v in _SCOOTER["axle_y"]], "wheel_z": [_r(zg + wd / 2, 4)] * 2,
+            "pivot": sc(_SCOOTER["pivot"]), "axis": list(_SCOOTER["axis"]), "seat": sc(_SCOOTER["seat"]),
+            "headlights": sc(_SCOOTER["headlights"]), "taillights": sc(_SCOOTER["taillights"]),
+            "exhaust": sc(_SCOOTER["exhaust"])}
+
+
+def _cap(m: Mesh, ring: list[int], role: str, part: str, outward) -> None:
+    """An n-gon over a half ring (x >= 0, ends on the mirror plane) facing ``outward``."""
+    f = tuple(ring)
+    n = _normal(m, f)
+    if _dot(n, outward) < 0:
+        f = tuple(reversed(f))
+    fi = m.f(f, role, part, _planar_uv(m, f, 1.0))
+    m.uv[fi] = _planar_uv(m, m.faces[fi], 1.0)
+
+
+def _paint_rect(m: Mesh, fids, along: tuple[float, float], axis: int = 1) -> None:
+    """Continuous paint UVs of a lofted part: u along ``axis`` (``along`` = its range) in the clean strip, v by
+    height (up-facing tops in the clean band, low sides in the grime band)."""
+    u0, u1 = _U_PAINT
+    for fi in fids:
+        uv = []
+        for v in m.faces[fi]:
+            p = m.verts[v]
+            t = _clamp((p[axis] - along[0]) / max(along[1] - along[0], 1e-6), 0.0, 1.0)
+            uv.append((round(u0 + (u1 - u0) * t, 5), round(_clamp(0.25 + p[2] * 0.6, 0.05, 0.97), 5)))
+        m.uv[fi] = tuple(uv)
+
+
+def _flip_all(m: Mesh, fids, probe: int, outward) -> None:
+    """A lofted surface is wound one way throughout: flip all of ``fids`` when the face ``probe`` (known to be on the
+    outside) does not point along ``outward``."""
+    if _dot(_normal(m, m.faces[probe]), outward) >= 0:
+        return
+    for fi in fids:
+        m.faces[fi] = tuple(reversed(m.faces[fi]))
+        if m.uv[fi]:
+            m.uv[fi] = tuple(reversed(m.uv[fi]))
+
+
+def _ring_loft(m: Mesh, rings: list[list[tuple[float, float, float]]], role: str, part: str, *, closed: bool = False) -> list[list[int]]:
+    """Quads between consecutive rings of 3-D points (same count); ``closed`` joins the last point to the first."""
+    ids = [[m.v(*p) for p in ring] for ring in rings]
+    npt = len(rings[0])
+    for i in range(len(ids) - 1):
+        for k in range(npt if closed else npt - 1):
+            k2 = (k + 1) % npt
+            f = (ids[i][k], ids[i][k2], ids[i + 1][k2], ids[i + 1][k])
+            m.f(f, role, part, ((i / len(ids), k / npt), (i / len(ids), (k + 1) / npt),
+                                ((i + 1) / len(ids), (k + 1) / npt), ((i + 1) / len(ids), k / npt)))
+    return ids
+
+
+def _scooter(plan: dict) -> dict:
+    """A scooter built around its frames: rear cowl and floorboard as one loft, a leg shield that encloses the
+    steering axis, seat, headset with the lamp and bars at the axis top, fender and fork on the front wheel, engine
+    and muffler ending at the exhaust dummy, a tail lamp at the tail light dummy, wheels with a rim."""
+    d, a, p = plan["dims"], plan["anchors"], plan["profile"]
+    L, W, H = float(d["L"]), float(d["W"]), float(d["H"])
+    n = int(p["rows"])
+    sides = int(p["sides"])
+    zg, yR = float(a["ground_z"]), float(a["y_rear"])
+    wd = float(a["wheel_d"])
+    yr, yf = (float(v) for v in a["axle_y"])
+    zr, zf = (float(v) for v in a.get("wheel_z") or (zg + wd / 2, zg + wd / 2))
+    pv, ax = [float(v) for v in a["pivot"]], [float(v) for v in a["axis"]]
+    seat_y, seat_pz = float(a["seat"][1]), float(a["seat"][2])
+    hl, tl, ex = a["headlights"], a["taillights"], a["exhaust"]
+    tan = -ax[1] / max(ax[2], 1e-3)                        # the axis leans back by this much per metre of height
+
+    def axis_y(z: float) -> float:
+        return pv[1] - (z - pv[2]) * tan
+
+    seat_z = seat_pz - 0.10                                # the rider's pelvis sits 10 cm above the seat
+    cowl = seat_z - 0.07
+    floor_t, floor_b = zg + 0.21, zg + 0.12
+    W = float(a.get("width") or W)                         # over the grips
+    hw = min(0.27, W * 0.28)
+    shield_z = [floor_t - 0.04, floor_t + 0.12, floor_t + 0.34, floor_t + 0.56, float(hl[2]) - 0.08, float(hl[2]) - 0.03]
+    y_shield = axis_y(floor_t) - 0.05                      # the back of the shield at the floor
+    # ---- rear cowl and floorboard: one loft (y, half width, top, bottom, exponent)
+    secs = [(yR, 0.05, cowl - 0.12, zr - 0.02, 2.2), (yR + 0.06, hw * 0.66, cowl - 0.04, zr - 0.05, 2.4),
+            (yR + 0.18, hw * 0.94, cowl, zr - 0.07, 2.6), (seat_y - 0.15, hw, cowl + 0.005, zr - 0.06, 2.6),
+            (seat_y + 0.10, hw * 0.94, cowl - 0.015, floor_b + 0.02, 2.8),
+            (seat_y + 0.24, hw * 0.82, cowl - 0.07, floor_b, 2.8), (seat_y + 0.33, hw * 0.76, floor_t + 0.10, floor_b, 3.2),
+            (seat_y + 0.40, hw * 0.72, floor_t, floor_b, 3.4), (y_shield - 0.02, hw * 0.72, floor_t, floor_b, 3.4),
+            (y_shield + 0.04, hw * 0.64, floor_t - 0.01, floor_b + 0.01, 3.0)]
+    m = Mesh()
+    rings = []
+    for y, w, top, bot, q in secs:
+        rings.append((y, [(x, (top + bot) / 2.0 + z) for x, z in _superell(w, (top - bot) / 2.0, q, n)]))
+    ids = _loft_half(m, rings, "paint1", "chassis")
+    _cap(m, ids[0], "paint1", "chassis", (0.0, -1.0, 0.0))
+    _cap(m, ids[-1], "paint1", "chassis", (0.0, 1.0, 0.0))
+    _paint_rect(m, range(len(m.faces)), (yR, yR + L))
+    # ---- leg shield: horizontal half crescents around the axis, wide at the floor, narrow under the headset
+    first = len(m.faces)
+    srings = []
+    for k, z in enumerate(shield_z):
+        c = axis_y(z)
+        w = _lerp(hw * 0.98, hw * 0.62, k / (len(shield_z) - 1))
+        srings.append([(0.0, c + 0.08, z), (0.45 * w, c + 0.07, z), (0.8 * w, c + 0.035, z), (w, c - 0.01, z),
+                       (0.85 * w, c - 0.045, z), (0.4 * w, c - 0.05, z), (0.0, c - 0.05, z)])
+    sids = _ring_loft(m, srings, "paint1", "chassis")
+    _flip_all(m, range(first, len(m.faces)), first, (0.0, 1.0, 0.0))     # the first face is the front centre
+    _cap(m, sids[0], "paint1", "chassis", (0.0, 0.0, -1.0))
+    _cap(m, sids[-1], "paint1", "chassis", (0.0, 0.0, 1.0))
+    _paint_rect(m, range(first, len(m.faces)), (yR, yR + L))
+    # ---- seat: a soft loft on the cowl (the rider's contact: its top is 10 cm under the pelvis dummy)
+    ms = Mesh()
+    srows = [(seat_y - 0.30, 0.10, seat_z - 0.03), (seat_y - 0.24, 0.14, seat_z), (seat_y + 0.05, 0.15, seat_z),
+             (seat_y + 0.18, 0.13, seat_z - 0.01), (seat_y + 0.23, 0.08, seat_z - 0.04)]
+    sr = [(y, [(x, (top + cowl - 0.03) / 2.0 + z) for x, z in _superell(w, (top - cowl + 0.03) / 2.0, 2.6, max(4, n - 2))])
+          for y, w, top in srows]
+    sids2 = _loft_half(ms, sr, "black", "chassis")
+    _cap(ms, sids2[0], "black", "chassis", (0.0, -1.0, 0.0))
+    _cap(ms, sids2[-1], "black", "chassis", (0.0, 1.0, 0.0))
+    # ---- engine on the right beside the rear wheel, muffler ending at the exhaust dummy, tail lamp, axle link
+    me_ = Mesh()
+    _gbox(me_, (0.075, yr - 0.30, zr - 0.13), (0.21, yr + 0.14, zr + 0.12), (1, 2, 1), 0.04, "black", "chassis", uv="skew")
+    exx, exy, exz = (float(v) for v in ex)
+    _prism(me_, (exx, exy + 0.32, exz + 0.04), (exx, exy - 0.01, exz), 0.09, 0.09, "chrome", "chassis", 8)
+    tlx, tly, tlz = (float(v) for v in tl)
+    _gbox(me_, (-0.07, tly - 0.02, tlz - 0.035), (0.07, tly + 0.06, tlz + 0.035), (1, 1, 1), 0.012, "lamp_rr", "chassis",
+          uv="skew")
+    _atlas_uvs(me_, {"chrome": "generic.chrome_pipe", "lamp_rr": "lights.rear_measured"})
+    # ---- headset at the top of the axis: the headlamp at the headlights dummy, bars and grips, short mirrors
+    mh = Mesh()
+    hz = float(hl[2]) + 0.06
+    hy = axis_y(hz)
+    _gbox(mh, (-0.12, hy - 0.10, hz - 0.08), (0.12, hy + 0.11, hz + 0.08), (1, 1, 1), 0.035, "paint1", "handlebars",
+          uv="skew")
+    _rect_uv(mh, range(len(mh.faces)), _PAINT_DETAIL)
+    lamp_y = max(float(hl[1]), hy + 0.10)
+    _gbox(mh, (-0.075, lamp_y - 0.02, float(hl[2]) - 0.04), (0.075, lamp_y + 0.035, float(hl[2]) + 0.05), (1, 1, 1), 0.015,
+          "lamp_fr", "handlebars", uv="skew")
+    gx = W / 2.0 - 0.01
+    bz = hz + 0.06
+    by = axis_y(bz) - 0.02
+    _prism(mh, (-gx + 0.11, by, bz), (gx - 0.11, by, bz), 0.035, 0.035, "chrome", "handlebars", 8)
+    for sx in (-1.0, 1.0):
+        _prism(mh, (sx * (gx - 0.13), by, bz), (sx * gx, by, bz), 0.045, 0.045, "black", "handlebars", 8)
+        _prism(mh, (sx * (gx - 0.16), by, bz), (sx * (gx - 0.19), by - 0.04, min(bz + 0.12, zg + H - 0.05)),
+               0.015, 0.015, "black", "handlebars", 4)
+        mz = min(bz + 0.12, zg + H - 0.05)
+        _gbox(mh, (sx * (gx - 0.19) - 0.05, by - 0.07, mz - 0.03), (sx * (gx - 0.19) + 0.05, by - 0.03, mz + 0.035),
+              (1, 1, 1), 0.012, "chrome", "handlebars", uv="skew")
+    _atlas_uvs(mh, {"chrome": "generic.chrome_pipe", "lamp_fr": "lights.front_measured"})
+    # ---- front: fender over the wheel and a single fork arm from the shield down to the hub
+    mf = Mesh()
+    rf = wd / 2.0 + 0.045
+    prof = [(-0.08, -0.03), (-0.06, 0.0), (0.0, 0.015), (0.06, 0.0), (0.08, -0.03), (0.068, -0.035), (0.05, -0.013),
+            (0.0, 0.0), (-0.05, -0.013), (-0.068, -0.035)]
+    arc = []
+    for k in range(9):
+        ang = math.radians(25.0 + 125.0 * k / 8)          # from ahead of the hub over the top to behind it
+        cy, cz = math.cos(ang), math.sin(ang)
+        arc.append([(x, yf + (rf + r) * cy, zf + (rf + r) * cz) for x, r in prof])
+    fids = _ring_loft(mf, arc, "paint1", "forks_front", closed=True)
+
+    a0 = math.radians(25.0)                                # face 1 of ring 0 is on the outer top of the section
+    _flip_all(mf, range(len(mf.faces)), 1, (0.0, math.cos(a0), math.sin(a0)))
+    _cap(mf, fids[0], "paint1", "forks_front", (0.0, math.sin(math.radians(25.0)), -math.cos(math.radians(25.0))))
+    _cap(mf, fids[-1], "paint1", "forks_front", (0.0, -math.sin(math.radians(150.0)), math.cos(math.radians(150.0))))
+    _rect_uv(mf, range(len(mf.faces)), _PAINT_DETAIL)
+    _prism(mf, (-0.075, axis_y(floor_t + 0.10), floor_t + 0.10), (-0.075, yf, zf), 0.045, 0.06, "black",
+           "forks_front", 6)
+    mg = Mesh()                                            # the axle link that follows the front suspension
+    _prism(mg, (-0.10, yf, zf), (0.03, yf, zf), 0.05, 0.05, "black", "mudguard", 8)
+    pieces = [_piece("body", m), _piece("seat", ms, part="chassis"),
+              _piece("engine", me_, part="chassis", mirror=False), _piece("handlebars", mh, part="handlebars", mirror=False),
+              _piece("forks_front", mf, part="forks_front", mirror=False), _piece("mudguard", mg, part="mudguard", mirror=False)]
+    tw = wd * 0.26
+    for nm, y, z in (("wheel_front", yf, zf), ("wheel_rear", yr, zr)):
+        mw = Mesh()
+        tprof = [(wd * 0.31, -tw * 0.5), (wd * 0.36, -tw * 0.5), (wd * 0.46, -tw * 0.45), (wd * 0.5, -tw * 0.25),
+                 (wd * 0.5, tw * 0.25), (wd * 0.46, tw * 0.45), (wd * 0.36, tw * 0.5), (wd * 0.31, tw * 0.5)]
+        _lathe(mw, tprof, sides, "tyre", nm, axis=0, centre=(0.0, y, z))
+        rprof = [(0.0, -tw * 0.38), (wd * 0.315, -tw * 0.5), (wd * 0.315, tw * 0.5), (0.0, tw * 0.38)]
+        _lathe(mw, rprof, max(8, sides // 2), "rim", nm, axis=0, centre=(0.0, y, z))
+        _atlas_uvs(mw, {"tyre": "tyres.sidewall"})
+        pieces.append(_piece(nm, mw, part=nm, mirror=False))
+    return {"pieces": pieces, "parts": [dict(x) for x in _SCOOTER_PARTS]}
+
+
+_SCOOTER_PARTS = ({"name": "chassis", "slot": "chassis"}, {"name": "forks_front", "slot": "forks_front"},
+                  {"name": "handlebars", "slot": "handlebars"}, {"name": "mudguard", "slot": "mudguard"},
+                  {"name": "wheel_front", "slot": "wheel_front"}, {"name": "wheel_rear", "slot": "wheel_rear"})
+
+
 def _bike(plan: dict) -> dict:
     d, a, p = plan["dims"], plan["anchors"], plan["profile"]
     L, W, H = float(d["L"]), float(d["W"]), float(d["H"])
@@ -1166,6 +1667,22 @@ def _compose(frames: list[dict]) -> dict[str, tuple[float, float, float]]:
     return out
 
 
+def _frame_axes(frames: list[dict]) -> dict[str, tuple[float, float, float]]:
+    """Model-space direction of every named frame's local Z axis (``at``; a bike's steering axis)."""
+    world: dict[int, list[list[float]]] = {}
+    out: dict[str, tuple[float, float, float]] = {}
+    for fr in frames:
+        mt = fr["matrix"]
+        rot = [[mt[0], mt[3], mt[6]], [mt[1], mt[4], mt[7]], [mt[2], mt[5], mt[8]]]
+        pw = world.get(fr["parent"])
+        if pw is not None:
+            rot = [[sum(pw[r][k] * rot[k][c] for k in range(3)) for c in range(3)] for r in range(3)]
+        world[fr["i"]] = rot
+        if fr.get("name"):
+            out[str(fr["name"]).lower()] = (rot[0][2], rot[1][2], rot[2][2])
+    return out
+
+
 def _like_numbers(like: str, name: str | None, tier: str, profile: str) -> dict:
     """Numbers of the ``--like`` model: dimensions (style metrics: chassis width), bounding box, wheel dummies and IDE
     wheel scale, kit kind. Numbers only: no vertex, face or pixel is kept."""
@@ -1180,7 +1697,10 @@ def _like_numbers(like: str, name: str | None, tier: str, profile: str) -> dict:
                            "bbox": [[float(v) for v in d["bbox_like"][0]], [float(v) for v in d["bbox_like"][1]]],
                            "frames": {k: [round(v, 4) for v in p] for k, p in pos.items()
                                       if k.startswith(("wheel", "door", "bonnet", "boot", "bump", "windscreen",
-                                                       "ped_", "headlights", "taillights"))},
+                                                       "ped_", "headlights", "taillights", "forks", "handlebars",
+                                                       "mudguard", "exhaust", "engine"))},
+                           "axes": {k: [round(v, 4) for v in ax] for k, ax in _frame_axes(t["frames"]).items()
+                                    if k in ("forks_front", "handlebars")},
                            "wheel_scale": (t.get("anchors") or {}).get("wheel_scale"), "warn": list(t.get("warn") or [])}
     try:                                    # the chassis width of the style metrics (mirrors on doors excluded)
         from ..style import cache as SC
@@ -1193,13 +1713,17 @@ def _like_numbers(like: str, name: str | None, tier: str, profile: str) -> dict:
     return out
 
 
+#: Other names of the automobile bodies (style classes and common words).
+_BODY_ALIAS = {"coupe_muscle": "coupe", "suv_pickup": "suv", "truck_bus": "van", "emergency": "sedan",
+               "sport": "sports", "hatch": "hatchback", "estate": "wagon", "suv_90s": "suv_boxy", "boxy": "suv_boxy",
+               "truck": "pickup", "crossover": "suv"}
+
+
 def _car_body_for(like_model: str | None, requested: str | None) -> str:
     bodies = _automobile()["bodies"]
     if requested:
         key = requested.strip().lower()
-        alias = {"coupe_muscle": "coupe", "suv_pickup": "suv", "truck_bus": "van", "wagon": "sedan",
-                 "emergency": "sedan", "sport": "sports"}
-        key = alias.get(key, key)
+        key = _BODY_ALIAS.get(key, key)
         if key not in bodies:
             import difflib
 
@@ -1208,6 +1732,9 @@ def _car_body_for(like_model: str | None, requested: str | None) -> str:
                             did_you_mean=difflib.get_close_matches(key, list(bodies), n=3, cutoff=0.4))
         return key
     if like_model:
+        own = _automobile().get("like_body", {}).get(like_model.lower())
+        if own:
+            return own
         try:
             from ..style import classes as C
 
@@ -1273,10 +1800,9 @@ def _car_plan(like: str | None, name: str | None, dims, tier: str, body: str | N
         like_out = None
     import copy
 
-    pr = copy.deepcopy(prof)
     tr = copy.deepcopy(_automobile()["tiers"][tier])
-    ov = tr.pop("profile", {})
-    for k, v in ov.items():                       # the tier's own shape and detail numbers over the body's
+    pr = tr.pop("profile", {})
+    for k, v in copy.deepcopy(prof).items():      # the tier's numbers are defaults: the body's own values win
         if isinstance(v, dict) and isinstance(pr.get(k), dict):
             pr[k].update(v)
         else:
@@ -1320,8 +1846,9 @@ def blank_plan(kind: str, *, name: str | None = None, like: str | None = None, d
         plan.update(_car_plan(like, nm, dv, tier, body, profile, wheel_d))
         plan["interior"] = bool(interior)
     else:
-        plan.update(_other_plan(k, nm, like, dv, tier, profile))
-    plan["slots"] = {p["name"]: part_slot(p, None, nm) for p in _parts_of(k["name"])}
+        plan.update(_other_plan(k, nm, like, dv, tier, profile, body, wheel_d))
+    parts = _SCOOTER_PARTS if plan.get("body") == "scooter" else _parts_of(k["name"])
+    plan["slots"] = {p["name"]: part_slot(p, None, nm) for p in parts}
     return plan
 
 
@@ -1331,13 +1858,39 @@ def _parts_of(kind: str) -> list[dict]:
     return [dict(p) for p in kinds()["kinds"][kind].get("parts", [])]
 
 
-def _other_plan(k: dict, name: str, like: str | None, dims, tier: str, profile: str) -> dict:
+def _bike_body(k: dict, like_model: str | None, requested: str | None) -> str:
+    bodies = k.get("bodies") or {"sport": ""}
+    if requested:
+        key = requested.strip().lower()
+        key = {"moped": "scooter", "vespa": "scooter", "sportbike": "sport", "motorbike": "sport"}.get(key, key)
+        if key not in bodies:
+            import difflib
+
+            raise SatkError("BAD_PARAMS", f"no bike body {requested!r}", hint="bodies: " + ", ".join(bodies),
+                            did_you_mean=difflib.get_close_matches(key, list(bodies), n=3, cutoff=0.4))
+        return key
+    return str((k.get("like_body") or {}).get((like_model or "").lower()) or "sport")
+
+
+def _other_plan(k: dict, name: str, like: str | None, dims, tier: str, profile: str, body: str | None = None,
+                wheel_d: float | None = None) -> dict:
     """Dimensions, anchors and the tier's numbers of a blank that is not an automobile."""
     kind = k["name"]
     warn: list[str] = []
     ln = _like_numbers(like, name, tier, profile) if like else None
     base = k["dims"]
     dv = _dims_arg(dims)
+    if body and kind != "bike":
+        raise SatkError("BAD_PARAMS", f"body {body!r}: only automobile and bike blanks have bodies")
+    bike_body = _bike_body(k, ln["model"] if ln else None, body) if kind == "bike" else None
+    if bike_body == "scooter":
+        if ln is not None and ln["kind"] != "bike":
+            warn.append(f"KIND_MISMATCH: {ln['sid']} is a {ln['kind']}, the blank is a bike")
+        L, W, H = dv or ([ln["dims"]["L"], ln["dims"]["W"], ln["dims"]["H"]] if ln else list(_SCOOTER["dims"]))
+        return {"dims": {"L": _r(L, 3), "W": _r(W, 3), "H": _r(H, 3)}, "body": "scooter",
+                "warn": warn + list((ln or {}).get("warn", [])),
+                "like": {"sid": ln["sid"], "name": ln["model"]} if ln else None, "profile": dict(k["tiers"][tier]),
+                "anchors": _with_wheel(_scooter_anchors(L, W, H, ln), wheel_d)}
     if ln is not None:
         if k["group"] == "vehicle" and ln["kind"] != k.get("kit_kind"):
             warn.append(f"KIND_MISMATCH: {ln['sid']} is a {ln['kind']}, the blank is a {kind}")
@@ -1349,13 +1902,15 @@ def _other_plan(k: dict, name: str, like: str | None, dims, tier: str, profile: 
         like_out = None
     out: dict[str, Any] = {"dims": {"L": _r(L, 3), "W": _r(W, 3), "H": _r(H, 3)}, "like": like_out, "warn": warn,
                            "profile": dict(k["tiers"][tier])}
+    if bike_body:
+        out["body"] = bike_body
     a: dict[str, Any] = {}
     if k["group"] == "vehicle":
         zg = -0.45 * H
         a["y_rear"] = _r(-L / 2.0, 3)
         a["ground_z"] = _r(zg, 3)
         if kind == "bike":
-            wd = float((ln or {}).get("wheel_scale") or 0.68)
+            wd = float(wheel_d or (ln or {}).get("wheel_scale") or 0.68)
             fr = (ln or {}).get("frames") or {}
             if "wheel_front" in fr and "wheel_rear" in fr:
                 axle = [fr["wheel_rear"][1], fr["wheel_front"][1]]
@@ -1377,8 +1932,9 @@ def _other_plan(k: dict, name: str, like: str | None, dims, tier: str, profile: 
 def mesh_spec(plan: dict) -> dict:
     """The pieces of a plan (see the module docstring): ``{"kind", "name", "parts", "pieces": [...]}``."""
     kind = plan["kind"]
-    gen = {"automobile": _car, "bike": _bike, "boat": _boat, "heli": _heli, "plane": _plane, "prop_box": _prop_box,
-           "prop_cyl": _prop_cyl, "building_box": _building}.get(kind)
+    gen = {"automobile": _car, "bike": _scooter if plan.get("body") == "scooter" else _bike, "boat": _boat,
+           "heli": _heli, "plane": _plane, "prop_box": _prop_box, "prop_cyl": _prop_cyl,
+           "building_box": _building}.get(kind)
     if gen is None:
         raise SatkError("NOT_FOUND", f"no generator for blank kind {kind!r}")
     out = gen(plan)

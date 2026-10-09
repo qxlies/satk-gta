@@ -19,7 +19,7 @@ from satk.kit import kinds as K
 
 KINDS = B.KINDS
 TIERS = B.TIERS
-BODIES = ("sedan", "coupe", "sports", "suv", "van")
+BODIES = ("sedan", "coupe", "sports", "suv", "van", "hatchback", "wagon", "suv_boxy", "pickup")
 GOLDEN = json.loads((Path(__file__).resolve().parents[1] / "golden" / "blanks.json").read_text(encoding="utf-8"))
 
 
@@ -150,16 +150,21 @@ def test_automobile_half_body_is_symmetric_and_sized(body, tier):
     assert min(xs) >= -1e-6 and min(abs(x) for x in xs) == 0.0               # the half x >= 0, with a mirror line
     lo, hi = _bbox({"pieces": [hull]})
     assert hi[1] - lo[1] == pytest.approx(d["L"], abs=0.02)                  # the shell spans the length
-    assert 2 * hi[0] == pytest.approx(d["W"] + 0.34, abs=0.02)               # the width plus the mirrors
+    hw = d["W"] / 2
+    shell = [v[0] for v in hull["verts"] if v[0] <= hw + 0.01]
+    assert 2 * max(shell) == pytest.approx(d["W"], abs=0.02)                  # the body without the mirrors
+    assert hw + 0.15 < hi[0] < hw + 0.35                                      # a mirror head outside the door
     assert lo[2] >= a["ground_z"] and hi[2] - a["ground_z"] == pytest.approx(d["H"], abs=0.06)
     # the arch of each wheel is centred on its axle: a vertex of the opening sits on the axle line
+    clear = plan["profile"]["wheel_clear"]
     for ya in a["axle_y"]:
-        assert any(abs(v[1] - ya) < 0.03 and abs(v[2] - (a["wheel_z"] + a["wheel_d"] / 2 + 0.07)) < 0.06
+        assert any(abs(v[1] - ya) < 0.03 and abs(v[2] - (a["wheel_z"] + a["wheel_d"] / 2 + clear)) < 0.06
                    for v in hull["verts"]), (body, tier, ya)
 
 
 def test_automobile_parts_cover_the_vanilla_part_list():
-    for body, absent in (("sedan", ()), ("coupe", ("door_r",)), ("van", ("door_r",))):
+    for body, absent in (("sedan", ()), ("coupe", ("door_r",)), ("van", ("door_r",)), ("hatchback", ()),
+                         ("wagon", ()), ("suv_boxy", ()), ("pickup", ("door_r",))):
         _plan, spec = _spec("automobile", body=body)
         faces = {}
         for piece in spec["pieces"]:
@@ -197,45 +202,166 @@ def test_automobile_follows_the_tier_and_options():
     assert [p["name"] for p in sa["pieces"]] == ["body", "interior", "exhaust"]
 
 
-def test_uv_maps_follow_the_paint_rule():
-    """Up-facing panels map to the clean upper band of vehiclegrunge256, sides to the grime band, the underbody below."""
-    plan, spec = _spec("automobile")
+def _unit_normal(verts, f):
+    n = [0.0, 0.0, 0.0]
+    pts = [verts[i] for i in f]
+    for k in range(len(f)):
+        p, q = pts[k], pts[(k + 1) % len(f)]
+        n[0] += (p[1] - q[1]) * (p[2] + q[2])
+        n[1] += (p[2] - q[2]) * (p[0] + q[0])
+        n[2] += (p[0] - q[0]) * (p[1] + q[1])
+    ln = (n[0] ** 2 + n[1] ** 2 + n[2] ** 2) ** 0.5 or 1.0
+    return [c / ln for c in n]
+
+
+@pytest.mark.parametrize("body", BODIES)
+def test_uv_maps_follow_the_paint_rule(body):
+    """Paint is ONE continuous island in the clean left strip of vehiclegrunge256 (u 0.03-0.23, never the drip band):
+    up-facing panels high in the clean band, sides lower in the grime band, the belly at the bottom."""
+    plan, spec = _spec("automobile", body=body)
     hull = spec["pieces"][0]
     hw = plan["dims"]["W"] / 2
     up, side, under = [], [], []
+    corner: dict = {}
     for f, uv, role in zip(hull["faces"], hull["uv"], hull["role"]):
-        pts = [hull["verts"][i] for i in f]
-        if max(p[0] for p in pts) > hw + 0.01:
-            continue                                               # the mirrors outside the shell use detail UVs
-        n = [0.0, 0.0, 0.0]
-        for k in range(len(f)):
-            p, q = pts[k], pts[(k + 1) % len(f)]
-            n[0] += (p[1] - q[1]) * (p[2] + q[2])
-            n[1] += (p[2] - q[2]) * (p[0] + q[0])
-            n[2] += (p[0] - q[0]) * (p[1] + q[1])
-        ln = (n[0] ** 2 + n[1] ** 2 + n[2] ** 2) ** 0.5 or 1.0
+        if role != "paint1":
+            continue
+        assert all(0.03 - 1e-6 <= u <= 0.23 + 1e-6 for u, _v in uv), (body, uv)
+        for vi, c in zip(f, uv):
+            corner.setdefault(vi, set()).add((round(c[0], 4), round(c[1], 4)))
+        if max(hull["verts"][i][0] for i in f) > hw + 0.01:
+            continue                                               # the mirror heads use their own clean rectangle
+        n = _unit_normal(hull["verts"], f)
         v = sum(c[1] for c in uv) / len(uv)
-        if role in ("paint1", "glass") and n[2] / ln > 0.985:
+        if n[2] > 0.985:
             up.append(v)
-        elif role in ("paint1", "glass") and abs(n[0]) / ln > 0.85:
+        elif abs(n[0]) > 0.85:
             side.append(v)
-        elif role == "black" and n[2] / ln < -0.85:
-            under.append((ln / 2.0, v))
+    for f, uv, role in zip(hull["faces"], hull["uv"], hull["role"]):
+        if role == "black" and _unit_normal(hull["verts"], f)[2] < -0.85:
+            under.append(sum(c[1] for c in uv) / len(uv))
     assert up and side and under
-    assert min(up) >= 0.7 and max(side) < 0.7
-    low = sum(a for a, v in under if v < 0.1)
-    assert low >= 0.85 * sum(a for a, _v in under), "the belly keeps the underside band; wells and boxes use detail UVs"
-    assert hull["seam"], "the sill line and the shoulder carry UV seams"
+    assert min(up) >= 0.85 and sorted(side)[len(side) // 2] < 0.7     # door panels: the grime band
+    shell = {vi for f, r in zip(hull["faces"], hull["role"]) if r == "paint1" for vi in f
+             if hull["verts"][vi][0] <= hw + 0.01}
+    split = [vi for vi in shell if len(corner[vi]) > 1]
+    assert not split, f"{body}: {len(split)} paint vertices carry two UVs (a seam inside the paint)"
+    assert hull["seam"], "the sill line and the shoulder carry unwrap seams"
+
+
+@pytest.mark.parametrize("body", ("sedan", "hatchback", "suv_boxy", "pickup"))
+def test_shading_is_soft_with_hard_material_borders(body):
+    """Every face is smooth in Blender; the spec's sharp edges are exactly role borders and real folds (> 85 deg)."""
+    _plan, spec = _spec("automobile", body=body)
+    hull = spec["pieces"][0]
+    faces_of: dict = {}
+    for fi, f in enumerate(hull["faces"]):
+        for k in range(len(f)):
+            a, b = f[k], f[(k + 1) % len(f)]
+            faces_of.setdefault((min(a, b), max(a, b)), []).append(fi)
+    sharp = {tuple(e) for e in hull["sharp"]}
+    assert sharp
+    for e in sharp:
+        fs = faces_of[e]
+        n1, n2 = (_unit_normal(hull["verts"], hull["faces"][i]) for i in fs)
+        dot = sum(x * y for x, y in zip(n1, n2))
+        assert hull["role"][fs[0]] != hull["role"][fs[1]] or dot < 0.0872, e
+    soft_corners = sum(1 for e, fs in faces_of.items() if len(fs) == 2 and e not in sharp
+                       and hull["role"][fs[0]] == hull["role"][fs[1]] == "paint1"
+                       and sum(x * y for x, y in zip(*(_unit_normal(hull["verts"], hull["faces"][i]) for i in fs))) < 0.94)
+    assert soft_corners > 20, "paint corners of 20-85 deg stay smooth (vanilla rule)"
+
+
+@pytest.mark.parametrize("body", ("sedan", "suv_boxy"))
+def test_arches_are_round_with_liners_and_the_mirror_touches_the_door(body):
+    plan, spec = _spec("automobile", body=body)
+    a, hull = plan["anchors"], spec["pieces"][0]
+    clear = plan["profile"]["wheel_clear"]
+    ra = a["wheel_d"] / 2 + clear
+    zc = a["wheel_z"]
+    for ya in a["axle_y"]:
+        # the opening: vertices on a circle around the wheel centre, at least 5 segments over the top
+        arc = {round(v[1], 3) for v in hull["verts"] if abs(v[1] - ya) < ra and v[2] > zc + 0.2 * ra
+               and abs(((v[1] - ya) ** 2 + (v[2] - zc) ** 2) ** 0.5 - ra) < 0.02 and v[0] > a["track"] / 2}
+        assert len(arc) >= 6, (body, ya, sorted(arc))
+        # a vertical liner plate inside the arch: a black face whose vertices share one x (the liner plane)
+        liners = [f for f, r in zip(hull["faces"], hull["role"]) if r == "black" and len(f) >= 6
+                  and max(hull["verts"][i][0] for i in f) - min(hull["verts"][i][0] for i in f) < 1e-3
+                  and all(abs(hull["verts"][i][1] - ya) <= ra + 0.03 for i in f)]
+        assert liners, (body, ya)
+        assert all(hull["verts"][f[0]][0] < a["track"] / 2 - a["wheel_d"] * 0.15 for f in liners)   # inside the tyre
+    hw = plan["dims"]["W"] / 2
+    mirror = [v for v in hull["verts"] if v[0] > hw + 0.01]
+    assert mirror and min(v[0] for v in hull["verts"] if v[0] > hw * 0.9 and v[2] > max(m[2] for m in mirror) - 0.2
+                          and abs(v[1] - mirror[0][1]) < 0.15) < hw              # the stalk starts inside the skin
+
+
+def test_rear_glass_and_hatch_parts():
+    _plan, sedan = _spec("automobile", body="sedan")
+    hull = sedan["pieces"][0]
+    names = hull["part_names"]
+    back_glass = [f for f, r, pt in zip(hull["faces"], hull["role"], hull["part"]) if r == "glass"
+                  and names[pt] == "chassis" and _unit_normal(hull["verts"], f)[1] < -0.3]
+    assert back_glass, "the sedan has a rear window (fixed glass in the chassis)"
+    _plan, hatch = _spec("automobile", body="hatchback")
+    hull = hatch["pieces"][0]
+    names = hull["part_names"]
+    assert any(r == "glass" and names[pt] == "boot" for r, pt in zip(hull["role"], hull["part"])), \
+        "the hatch carries its rear glass"
+    plan, pick = _spec("automobile", body="pickup")
+    hull = pick["pieces"][0]
+    top = plan["anchors"]["ground_z"] + 0.6 * plan["dims"]["H"]
+    bed = [f for f, r in zip(hull["faces"], hull["role"]) if r == "trim" and _unit_normal(hull["verts"], f)[2] > 0.9
+           and max(hull["verts"][i][2] for i in f) < top]
+    assert bed, "the pickup has an open bed (a floor sunk under the rails)"
+
+
+def test_wheel_diameter_and_dims_order():
+    plan = B.blank_plan("automobile", body="hatchback", dims="4.4,2.0,1.45", wheel_d=0.62)
+    assert plan["dims"] == {"L": 4.4, "W": 2.0, "H": 1.45} and plan["anchors"]["wheel_d"] == 0.62
+    scoot = B.blank_plan("bike", body="scooter", wheel_d=0.5)
+    assert scoot["anchors"]["wheel_d"] == 0.5 and scoot["body"] == "scooter"
+    with pytest.raises(SatkError):
+        B.blank_plan("bike", body="chopper")
+    with pytest.raises(SatkError):
+        B.blank_plan("boat", body="sedan")
+
+
+def test_scooter_is_built_around_its_frames():
+    """Steering axis inside the leg shield, seat 10 cm under the rider dummy, muffler tip at the exhaust dummy."""
+    plan, spec = _spec("bike", body="scooter")
+    a = plan["anchors"]
+    assert [p["name"] for p in spec["parts"]] == ["chassis", "forks_front", "handlebars", "mudguard", "wheel_front",
+                                                 "wheel_rear"]
+    assert set(plan["slots"]) >= {"mudguard", "forks_front"}
+    body = next(p for p in spec["pieces"] if p["name"] == "body")
+    pv, ax = a["pivot"], a["axis"]
+    tan = -ax[1] / ax[2]
+    for z in (a["ground_z"] + 0.35, a["ground_z"] + 0.6, a["headlights"][2] - 0.1):
+        ay = pv[1] - (z - pv[2]) * tan
+        ring = [v for v in body["verts"] if abs(v[2] - z) < 0.12 and abs(v[1] - ay) < 0.3 and v[0] < 0.02]
+        assert ring and min(v[1] for v in ring) < ay < max(v[1] for v in ring), (z, ay)
+    seat = next(p for p in spec["pieces"] if p["name"] == "seat")
+    assert max(v[2] for v in seat["verts"]) == pytest.approx(a["seat"][2] - 0.10, abs=0.01)
+    eng = next(p for p in spec["pieces"] if p["name"] == "engine")
+    ex = a["exhaust"]
+    assert min(((v[0] - ex[0]) ** 2 + (v[1] - ex[1]) ** 2 + (v[2] - ex[2]) ** 2) ** 0.5 for v in eng["verts"]) < 0.08
+    for nm in ("wheel_front", "wheel_rear"):
+        w = next(p for p in spec["pieces"] if p["name"] == nm)
+        assert {"tyre", "rim"} <= set(w["role"])
 
 
 def test_blanks_are_deterministic_and_match_the_golden_numbers():
-    for kind in KINDS:
+    variants = [(kind, None) for kind in KINDS] + [("automobile", b) for b in BODIES[1:]] + [("bike", "scooter")]
+    for kind, body in variants:
         for tier in TIERS:
-            _plan, a = _spec(kind, tier)
-            _plan, b = _spec(kind, tier)
+            kw = {"body": body} if body else {}
+            _plan, a = _spec(kind, tier, **kw)
+            _plan, b = _spec(kind, tier, **kw)
             assert json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
             tris = {p["name"]: B.tri_count(p["faces"]) for p in a["pieces"]}
-            assert tris == GOLDEN["tris"][f"{kind}/{tier}"], (kind, tier, tris)
+            key = f"{kind}/{tier}" + (f"/{body}" if body else "")
+            assert tris == GOLDEN["tris"][key], (key, tris)
 
 
 def test_world_blank_origin_follows_the_like_numbers(monkeypatch):
@@ -297,7 +423,9 @@ def test_quickstart_is_short_english_and_the_help_topic():
     assert len(text.encode("utf-8")) <= 6144 and text.isascii()
     assert TOPIC.read_text(encoding="utf-8") == text, "refresh: copy docs/agent/creation-quickstart.md to data/style/topics/creation.md"
     from satk.runtime import help as H
+    from satk.style.ops import register_topics
 
+    register_topics()                                     # the style package registers its help topics
     env = H.render("creation")
     assert env["topic"] == "creation" and env["text"].strip() == text.strip()
     for kind in ("Car", "Prop", "Building", "Weapon", "Ped"):

@@ -113,7 +113,7 @@ me = bpy.data.meshes.new(args['name'])
 bm.to_mesh(me)
 bm.free()
 for p in me.polygons:
-    p.use_smooth = False
+    p.use_smooth = bool(args.get('smooth'))
 o = bpy.data.objects.new(args['name'], me)
 bpy.context.scene.collection.objects.link(o)
 if args.get('wn'):
@@ -136,6 +136,13 @@ def test_shade_reaches_the_dff(live):
     m = _py("from satk_blender.kit.shade import dff_shade_metrics\n"
             "result.update(dff_shade_metrics(bpy.data.objects['ball_wn'], ctx.out_dir))")
     assert m["shade.normal_bend"] < 0.5 and m["shade.flat_share"] > 0.9 and m["dff.verts_per_tri"] > 1.5
+    # an input that is already smooth (shape lofts, blanks) passes the re-read check: the DFF is compared with the
+    # shaded scene mesh, not required to be smoother than the input
+    _py(_SPHERE, {"name": "ball_smooth", "smooth": True})
+    r = _call("kit.shade", {"objects": ["ball_smooth"]})["result"]
+    row = dict(zip(r["cols"], r["rows"][0]))
+    assert row["flat_before"] == 0.0 and row["flat_dff"] == 0.0
+    assert row["bend_dff"] == pytest.approx(row["bend_before"], rel=0.15)
 
 
 def test_template_premier_scaffold(live):
@@ -165,7 +172,7 @@ def test_kinds_scaffold(live):
         plan = live["plans"][k]
         assert r["frames"] == plan["counts"]["frames"] and r["slots"] == plan["counts"]["slots"], k
         if k == "building":
-            assert r["lod"] == "lodbuilding"
+            assert r["lod"] == "lodkitbuilding"
         if k == "weapon":
             names = _py("result['n'] = [o.name for o in bpy.data.collections['kitweapon.dff'].objects]")["n"]
             assert "gunflash" in names
@@ -207,8 +214,19 @@ def test_generators_and_export(live):
              "tyre = [i for i, m in enumerate(me.materials) if m and m.get('satk_role') == 'tyre']\n"
              "us = [l.uv for p in me.polygons if p.material_index in tyre for l in (me.uv_layers[0].data[i] for i in p.loop_indices)]\n"
              "result['u'] = [min(u.x for u in us), max(u.x for u in us)]\n"
+             "result['v'] = [min(1 - u.y for u in us), max(1 - u.y for u in us)]\n"
+             "tread = [l.uv.x for p in me.polygons if p.material_index in tyre and abs(p.normal.x) < 0.5 "
+             "for l in (me.uv_layers[0].data[i] for i in p.loop_indices)]\n"
+             "side = [l.uv.x for p in me.polygons if p.material_index in tyre and abs(p.normal.x) > 0.9 "
+             "for l in (me.uv_layers[0].data[i] for i in p.loop_indices)]\n"
+             "result['tread'] = [min(tread), max(tread)]\nresult['side'] = [min(side), max(side)]\n"
              "result['tex'] = me.materials[tyre[0]].get('satk_texture')")
     assert uv["tex"] == "vehicletyres128" and 0.0 <= uv["u"][0] and uv["u"][1] <= 0.5
+    # vanilla mapping: the tread column (u 0-0.25) and the sidewall column (u 0.25-0.5) of one 32 px tyre quarter,
+    # each segment the full column width (a disk over the strip averaged the light rim band: beige tyres)
+    assert uv["tread"][1] <= 0.25 and uv["tread"][1] - uv["tread"][0] > 0.2, uv
+    assert uv["side"][0] >= 0.25 and uv["side"][1] - uv["side"][0] > 0.2, uv
+    assert 0.25 <= uv["v"][0] and uv["v"][1] <= 0.5, uv
     vlo = _call("kit.vlo", {})["result"]
     assert vlo["tris"] <= 130
     dam = _call("kit.damage", {})["result"]
@@ -226,6 +244,10 @@ def test_generators_and_export(live):
 
     off, size = find_embedded_col(dff)
     assert [m.name for m in iter_col(dff[off:off + size])] == ["kitcar_col"]
+    from satk.kit.export import clump_extensions
+
+    exts = clump_extensions(dff)                      # the game reads ONE clump Extension: the COL must be in it
+    assert len(exts) == 1 and exts[0][3] == 1, exts
     txd = parse_txd(Path(res["files"]["txd"]).read_bytes())
     assert {t.name.lower() for t in txd.textures} == {"kitcar92interior128", "kitcar92wheel64"}
     assert all(t.levels == 1 and t.d3dfmt in ("DXT1", "DXT3") for t in txd.textures)
@@ -240,7 +262,7 @@ def test_building_lod(live):
     _py(_BODY.replace("'body'", "'hd'"))
     _call("kit.fill", {"slot": "kitbuilding", "objects": ["hd"]})
     r = _call("kit.lod", {"model": "kitbuilding"})["result"]
-    assert 0.15 <= r["ratio"] <= 0.3 and r["object"] == "lodbuilding"
+    assert 0.15 <= r["ratio"] <= 0.3 and r["object"] == "lodkitbuilding" and r["coverage"] >= 0.8
 
 
 def test_game_ready_class_prop(live, tmp_path):
@@ -283,6 +305,9 @@ def test_reexport_premier_roundtrip(live, clean_root):
 
     off, size = find_embedded_col(dff)
     assert [m.name for m in iter_col(dff[off:off + size])] == ["premier_col"]
+    from satk.kit.export import clump_extensions
+
+    assert [e[3] for e in clump_extensions(dff)] == [1]   # col=kit: DragonFF's two Extensions are merged
     txd_b = Path(res["files"]["txd"]).read_bytes()
     txd = parse_txd(txd_b)
     assert len(txd_b) < 50_000 and len(txd.textures) == 2
@@ -322,3 +347,90 @@ def test_uv_region_bake_and_own_texture(live):
     assert m["material"] == "kitcrate.map" and m["texture"] == "kitcrate_tex"
     own = _py("img = bpy.data.images['kitcrate_tex']\nresult['s'] = list(img.size)\nresult['shared'] = bool(img.get('satk_shared'))")
     assert own == {"s": [64, 64], "shared": False}
+
+
+def test_a3_blank_look_and_kit_methods(live):
+    """A blank sedan in a kit scaffold: the game look classifies the session as a vehicle (paint swap, dirt 2), the
+    blank is smooth with hard material borders, kit.info lists frames, kit.fill welds, kit.shade keeps corners soft,
+    kit.vlo keeps the silhouette, kit.col adds contact faces and the export carries ONE clump Extension."""
+    path = _need(live, "premier")
+    from satk.kit import blanks as B
+    from satk.kit.export import clump_extensions
+
+    _call("scene.clear")
+    _call("kit.template", {"plan": path, "replace": True})
+    bp = live["work"] / "plans" / "blank_kitcar.json"
+    bp.write_text(json.dumps(B.blank_plan("automobile", name="kitcar", body="sedan")), encoding="utf-8")
+    r = _call("kit.blank", {"plan": str(bp), "replace": True, "split": True, "fill": True})["result"]
+    assert not r["split"].get("warn"), r["split"]
+    sm = _py("o = bpy.data.objects['chassis']\n"
+             "result['smooth'] = all(p.use_smooth for p in o.data.polygons)\n"
+             "result['sharp'] = sum(1 for e in o.data.edges if e.use_edge_sharp)\n"
+             "result['sec'] = o.get('satk_sec')")
+    assert sm["smooth"] and sm["sharp"] > 50 and sm["sec"] == "cars"
+    look = _call("look.apply", {"look": "game"})["result"]
+    assert look["flags"].get("kind_vehicle") and look["flags"].get("paint") and look["flags"].get("dirt"), look
+    _call("look.restore", {})
+    info = _call("kit.info", {"frames": True})["result"]
+    full = json.loads(Path(info["frames_file"]).read_text(encoding="utf-8"))
+    names = {row[0] for row in full["frames"]["rows"]}
+    assert {"wheel_rf_dummy", "chassis", "door_lf_ok"} <= names and info["frames"]["cols"][3] == "world"
+    assert len(info["frames"]["rows"]) <= 8 and full["frames"]["total"] == 51
+    _py("import bmesh\n"
+        "for nm, x0 in (('pa', 0.0), ('pb', 1.0)):\n"
+        "    bm = bmesh.new()\n"
+        "    vs = [bm.verts.new(c) for c in ((x0, 0, 0), (x0 + 1, 0, 0), (x0 + 1, 1, 0), (x0, 1, 0))]\n"
+        "    bm.faces.new(vs)\n"
+        "    me = bpy.data.meshes.new(nm)\n"
+        "    bm.to_mesh(me)\n"
+        "    bm.free()\n"
+        "    bpy.context.scene.collection.objects.link(bpy.data.objects.new(nm, me))")
+    f = _call("kit.fill", {"slot": "chassis_vlo", "objects": ["pa", "pb"], "weld": True})["result"]
+    assert f["welded"] == 2
+    sh = _call("kit.shade", {"model": "kitcar"})["result"]       # the blank is smooth already: the check passes
+    assert sh["objects"] >= 8 and len(sh["cols"]) == 6
+    vlo = _call("kit.vlo", {})["result"]
+    assert vlo["method"] == "sections" and 40 <= vlo["tris"] <= 130
+    col = _call("kit.col", {})["result"]
+    assert 8 <= col.get("contact_faces", 0) <= 30
+    dam = _call("kit.damage", {})["result"]
+    assert dam["parts"] >= 4
+    res = get_op("kit.export").call({"session": NAME, "col": "auto"})
+    dff = Path(res["files"]["dff"]).read_bytes()
+    exts = clump_extensions(dff)
+    assert len(exts) == 1 and exts[0][3] == 1, exts
+    from satk.formats.dff import find_embedded_col
+    from satk.rw import col as RC
+
+    off, size = find_embedded_col(dff)
+    m = RC.decode_model(bytes(dff[off:off + size]))
+    assert m.spheres and 8 <= len(m.faces) <= 30 and m.shadow_faces          # spheres + contact faces + shadow
+    # a clay side render as a "true side photo": the silhouette matches itself, the preview draws it behind
+    side = _call("look.render", {"views": ["side"], "size": 512, "look": "clay"})["result"]
+    assert side.get("wheels_added", 0) >= 3
+    sil = _call("look.silhouette", {"ref": side["file"], "view": "side"})["result"]
+    assert sil["iou"] > 0.85 and len(sil["stations"]) == 20 and Path(sil["overlay"]).is_file()
+    pv = get_op("blender.preview").call({"subject": f"session:{NAME}", "views": ["side"], "passes": ["game"],
+                                          "ref": side["file"], "size": 256})
+    assert Path(pv["files"]["sheet"]).is_file() and "-0" in Path(pv["files"]["sheet"]).name
+
+
+def test_game_look_paints_studio_materials(live):
+    """A studio material with the paint key (material.create 60,255,0 keeps a linear viewport colour; DragonFF
+    exports the Base Color, 60/255) gets the paint swap in the game look, as the engine swaps the exported colour:
+    the preview never shows a lime key."""
+    path = _need(live, "premier")
+    _call("scene.clear")
+    _call("kit.template", {"plan": path, "replace": True})
+    _call("mesh.primitive", {"kind": "cube", "size": 1, "name": "probe", "location": [4, 0, 0]})
+    _call("material.create", {"name": "probe_paint", "color": [60, 255, 0], "object": "probe"})
+    look = _call("look.apply", {"look": "game"})["result"]
+    v = _py("import satk_blender.look.materials as LM\nm = bpy.data.materials['probe_paint']\n"
+            "g = m.node_tree.nodes.get(LM.PREFIX)\n"
+            "result['rgb'] = [round(x * 255) for x in g.inputs['Material'].default_value[:3]]\n"
+            "result['key'] = [round(x * 255) for x in LM.material_rgb(m)]")
+    _call("look.restore", {})
+    assert look["flags"].get("kind_vehicle") and look["flags"].get("paint"), look
+    from satk.look.gamelook import PAINT_DEFAULT
+
+    assert v["key"] == [60, 255, 0] and v["rgb"] == list(PAINT_DEFAULT[0]), v   # paint 1, not the key

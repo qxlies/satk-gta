@@ -11,8 +11,9 @@ Steps (every one works on copies: the source objects and their materials are nev
    ``.gltf``/``.fbx``/``.ply``/``.stl``; meshes are evaluated (modifiers applied), joined into one object
    in model space and normalised: ``height``/``scale``, origin at the base centre (``base``), the bounding
    box centre (``center``) or as is (``keep``); doubles merged, loose parts and degenerate faces removed.
-2. **Decimate** to the triangle ``budget``: a planar dissolve (1°, keeps material/UV seams), then
-   ``COLLAPSE`` passes; the result is triangulated (DragonFF writes triangles).
+2. **Triangles**: the mesh keeps them (counts are never a target). Only a requested ``budget`` (> 0) reduces it
+   (a planar dissolve, 1°, keeps material/UV seams, then ``COLLAPSE`` passes); either way the engine cap holds:
+   at most 65,535 exported vertices per geometry (:func:`vertex_cap`). The result is triangulated.
 3. **UV** - ``keep`` the source UVs, ``smart`` project, or ``box`` (cube projection, 32 px/m at
    ``tex_size``); ``auto`` keeps them when there are any.
 4. **Textures** - materials with an image texture keep it (scaled to a power of two <= ``tex_size``),
@@ -272,6 +273,57 @@ def normalize(hi, *, height, scale: float, origin: str) -> dict:
 
 
 # --------------------------------------------------------------------------- 2. decimate
+#: The engine's limit: vertices per geometry (RpGeometry indices are 16 bit).
+MAX_VERTS = 65535
+
+
+def triangulate_only(obj) -> dict:
+    """The mesh as triangles, nothing removed (DragonFF writes triangles)."""
+    n0 = _tris(obj.data)
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(obj.data)
+        bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3])
+        bm.to_mesh(obj.data)
+    finally:
+        bm.free()
+    obj.data.update()
+    return {"src_tris": n0, "tris": _tris(obj.data)}
+
+
+def export_verts(me) -> int:
+    """Vertices the DFF will hold: corners differing in position, UV or normal are separate vertices."""
+    uv = me.uv_layers.active.data if me.uv_layers.active else None
+    try:
+        nrm = me.corner_normals
+    except AttributeError:
+        nrm = None
+    keys = set()
+    for l in me.loops:
+        k = (l.vertex_index,)
+        if uv is not None:
+            u = uv[l.index].uv
+            k += (round(u.x, 5), round(u.y, 5))
+        if nrm is not None:
+            n = nrm[l.index].vector
+            k += (round(n.x, 3), round(n.y, 3), round(n.z, 3))
+        keys.add(k)
+    return len(keys)
+
+
+def vertex_cap(obj, cap: int = MAX_VERTS) -> dict:
+    """Collapse-decimate only when the exported vertices would pass the engine cap (``cap``)."""
+    n = export_verts(obj.data)
+    out = {"export_verts": n}
+    for _ in range(6):
+        if n <= cap:
+            break
+        _apply_decimate(obj, decimate_type="COLLAPSE", ratio=max(0.05, cap / n * 0.95), use_collapse_triangulate=True)
+        n = export_verts(obj.data)
+        out["vertex_cap"] = cap
+        out["export_verts"] = n
+        out["tris"] = _tris(obj.data)
+    return out
 
 
 def decimate(obj, budget: int) -> dict:
@@ -851,7 +903,11 @@ def make_game_ready(args: dict, out: str, *, hide_sources: str = "all") -> dict:
     _result_collection().objects.link(lo)
     lo["satk_gameready"] = "hd"
     lo["satk_gr_name"] = name
-    stats.update(decimate(lo, int(args["budget"])))
+    if int(args.get("budget") or 0) > 0:
+        stats.update(decimate(lo, int(args["budget"])))
+    else:
+        stats.update(triangulate_only(lo))
+    stats.update(vertex_cap(lo))
     t = lap("decimate_s", t)
     uv = args["uv"]
     has_uv = len(lo.data.uv_layers) > 0

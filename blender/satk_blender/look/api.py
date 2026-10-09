@@ -34,7 +34,7 @@ from . import lights as Lt
 from . import materials as M
 
 __all__ = ["LOOKS", "VIEWS", "STD_VIEWS", "apply", "restore", "render_views", "sheet", "frame_points",
-           "footprints", "model_groups"]
+           "footprints", "model_groups", "class_objects"]
 
 LOOKS = G.LOOKS
 #: view -> (azimuth from +Y toward +X in degrees, elevation in degrees, orthographic)
@@ -72,6 +72,30 @@ def model_groups(objs) -> dict:
             key = r.name
         out.setdefault(str(key), []).append(o)
     return out
+
+
+def class_objects(objs, scene=None) -> list:
+    """The objects that tell the class of a model group: the group itself, its parent chain (kit roots, dummies)
+    and, for a group of untagged meshes (a studio session), the empties of the scene and of the meshes'
+    collections. Meshes alone never say "vehicle": the tags live on roots and dummies."""
+    out: dict = {}
+    for o in objs:
+        out[o.name] = o
+        r = o.parent
+        while r is not None:
+            out.setdefault(r.name, r)
+            r = r.parent
+    if not any(o.get("satk_look_entry") for o in objs):
+        colls = {c for o in objs for c in o.users_collection}
+        for c in colls:
+            for o in c.all_objects:
+                if o.type == "EMPTY" and not o.get("satk_ghost") and not o.get("satk_look_aux"):
+                    out.setdefault(o.name, o)
+        if scene is not None and not any(o.get("satk_model") for o in objs):
+            for o in scene.objects:
+                if o.type == "EMPTY" and not o.get("satk_ghost") and not o.get("satk_look_entry")                         and not o.get("satk_look_aux"):
+                    out.setdefault(o.name, o)
+    return list(out.values())
 
 
 def _remember_hidden(o) -> None:
@@ -128,12 +152,14 @@ def apply(scene=None, look: str = "game", dirt: float = G.DIRT_DEFAULT, time="12
         M.set_env(e)
         M.clear_caches()
         if groups is not None:
-            by_model = {str(i): [o for o in g if o.type == "MESH"] for i, g in enumerate(groups)}
+            by_model = {str(i): list(g) for i, g in enumerate(groups)}
         else:
             by_model = model_groups([o for o in objs if o.type == "MESH"])
         seen: set = set()
-        for _key, gobjs in sorted(by_model.items()):
-            kind = M.classify(gobjs)
+        for _key, gall in sorted(by_model.items()):
+            kind = M.classify(class_objects(gall, scene))
+            gobjs = [o for o in gall if o.type == "MESH"]
+            flags[f"kind_{kind}"] = flags.get(f"kind_{kind}", 0) + 1
             for o in gobjs:
                 if G.is_gunflash(o.name) and not o.hide_render:
                     _remember_hidden(o)
@@ -290,6 +316,8 @@ def place_camera(scene, view, pts, aspect: float = 1.0):
     import numpy as np
 
     d, ortho, _az = _view_dir(view)
+    if isinstance(view, dict) and view.get("inside"):
+        return _inside_camera(scene, view, d)
     if abs(d.z) > 0.999:
         up_hint = Vector((0.0, 1.0, 0.0))
     else:
@@ -313,9 +341,10 @@ def place_camera(scene, view, pts, aspect: float = 1.0):
         dist = depth + 10.0
         target = right * cx + up * cy + fwd * cz
     else:
+        fov = float(view.get("fov") or FOV) if isinstance(view, dict) else FOV
         cd.type = "PERSP"
-        cd.angle = math.radians(FOV)
-        th = math.tan(math.radians(FOV) / 2) * (1.0 - 2 * MARGIN)
+        cd.angle = math.radians(fov)
+        th = math.tan(math.radians(fov) / 2) * (1.0 - 2 * MARGIN)
         tv = th / aspect
         tx, ty = cx, cy
         dist = 1.0
@@ -331,6 +360,22 @@ def place_camera(scene, view, pts, aspect: float = 1.0):
     cam.rotation_euler = fwd.to_track_quat("-Z", "Y").to_euler() if abs(d.z) <= 0.999 else (0.0, 0.0, 0.0)
     cd.clip_start = max(0.01, dist - depth - 1.0) if ortho else max(0.02, dist * 0.02)
     cd.clip_end = dist + depth * 2 + 50.0
+    scene.camera = cam
+    return cam
+
+
+def _inside_camera(scene, view: dict, d: Vector):
+    """A camera standing at ``view["pos"]`` and looking along az/el (a room seen from inside)."""
+    cam = _camera(scene)
+    cd = cam.data
+    cd.sensor_fit = "HORIZONTAL"
+    cd.type = "PERSP"
+    cd.angle = math.radians(float(view.get("fov") or 80.0))
+    cam.location = Vector(view["pos"])
+    fwd = d.normalized()
+    cam.rotation_euler = fwd.to_track_quat("-Z", "Y").to_euler() if abs(fwd.z) <= 0.999 else         ((0.0, 0.0, 0.0) if fwd.z < 0 else (math.pi, 0.0, 0.0))
+    cd.clip_start = 0.02
+    cd.clip_end = 2000.0
     scene.camera = cam
     return cam
 
@@ -451,8 +496,9 @@ def render_views(scene=None, cams=STD_VIEWS, size=384, fmt: str = "jpg", *, out_
             if cam_obj is not None and cam_obj.type == "CAMERA":
                 scene.camera = cam_obj
             else:
-                place_camera(scene, v, pts, aspect=wh[0] / wh[1])
-            name = v if isinstance(v, str) else f"v{i}"
+                vp = v.get("points") if isinstance(v, dict) and v.get("points") is not None else pts
+                place_camera(scene, v, vp, aspect=wh[0] / wh[1])
+            name = v if isinstance(v, str) else str(v.get("label") or f"v{i}") if isinstance(v, dict) else f"v{i}"
             path = os.path.join(out_dir, f"{prefix}_{i:02d}_{name}.{fmt}")
             out.append(_write(scene, path, wh, fmt, st.get("env") if look == "game" else None).replace("\\", "/"))
     finally:

@@ -112,12 +112,13 @@ def test_profile_band_and_tiers(fake_cache):
     p = P.profile("car.sedan", "vanilla")
     hd = p["veh.hd_tris"]
     assert hd["peer_set"] == "car.sedan" and hd["n"] == 14 and (hd["lo"], hd["hi"]) == (hd["p10"], hd["p90"])
+    # no tier has a triangle band: sa_plus shows the same vanilla reference numbers
     sp = P.profile("car.sedan", "sa_plus")["veh.hd_tris"]
-    assert (sp["lo"], sp["hi"], sp["status"], sp["cap"]) == (3000, 4500, "proposal", 5000)
+    assert (sp["lo"], sp["hi"], sp["status"]) == (hd["p10"], hd["p90"], "measured") and "cap" not in sp
     assert P.band("shade.normal_bend", "car.sedan", "sa_plus") == P.band("shade.normal_bend", "car.sedan", "vanilla")
-    assert P.band("veh.hd_tris", "car", "sa_plus") == (3000, 4500)
-    assert P.band("geo.tris", "prop@1-2m", "sa_plus")[1] == pytest.approx(2 * P.profile("prop@1-2m", "vanilla")[
-        "geo.tris"]["p90"])
+    assert P.band("veh.hd_tris", "car", "sa_plus") == P.band("veh.hd_tris", "car", "vanilla")
+    assert P.band("geo.tris", "prop@1-2m", "sa_plus") == P.band("geo.tris", "prop@1-2m", "vanilla")
+    assert P.band("uv.texel_px_m", "prop@1-2m", "sa_plus")[1] > P.band("uv.texel_px_m", "prop@1-2m", "vanilla")[1]
     # a model resolves to its peer set; small sets fall back to the parent
     d = P.describe("model:400", "vanilla")
     assert d["target"]["peer_set"] == "car.sedan" and d["target"]["like"]["name"] == "car00"
@@ -164,7 +165,10 @@ def test_check_clean_synthetic_car_passes(fake_cache, tmp_path):
     r = _check(tmp_path, car_dff(), tier="vanilla")
     assert r["peer_set"] == "car" and "frames match vehicle type car" in r["how"]
     assert r["verdict"] == "pass", r["rows"]
-    assert not _rows(r, "error", "warn", "low", "high")
+    assert not _rows(r, "error", "warn", "defect")
+    assert {row[9] for row in r["rows"]} <= set(CK.SECTIONS) and r["defects"] == 0
+    assert {"engine", "fit", "coverage", "reference"} <= set(r["sections"])
+    assert r["form"]["pieces"] >= 3 and "floating_pieces" in r["form"]
 
 
 def test_check_semantic_errors(fake_cache, tmp_path):
@@ -193,10 +197,14 @@ def test_check_metrics_out_of_band_and_tier(fake_cache, tmp_path):
     rows = _rows(r)
     assert rows[("geom.normals", "chassis")][6] == "error"
     assert rows[("veh.frames", "wheel")][6] == "warn"            # not a critical frame
-    assert rows[("uv.zero_area_share", "")][6] == "high"
-    assert rows[("dims.L", "")][6] == "low"
+    # numbers outside the vanilla range are reference rows: named, never a verdict
+    uv, dl = rows[("uv.zero_area_share", "")], rows[("dims.L", "")]
+    assert (uv[6], uv[9], dl[6]) == ("info", "reference", "info")
+    assert uv[7].startswith("above vanilla p10..p90") and dl[7].startswith("below vanilla p10..p90")
+    assert r["verdict"] == "fail"                                # geom.normals is an engine error
     sa = _check(tmp_path, clump([g], frames, [(2, 0)]), name="mycar2", tier="sa_plus")
-    assert _rows(sa)[("veh.hd_tris", "")][7].endswith("(proposal)")
+    hd = _rows(sa)[("veh.hd_tris", "")]
+    assert hd[6] == "info" and "proposal" not in hd[7] and "not a target" in hd[7]
 
 
 def test_check_like_by_file_name_and_structure_diff(fake_cache, tmp_path, monkeypatch):
@@ -253,17 +261,16 @@ def test_anatomy_json_and_markdown(tmp_path):
 
 def test_card_markdown_and_lint_preset(fake_cache):
     md = CD.card_md("car.sedan", "sa_plus")
-    assert "| `veh.hd_tris` | count |" in md and "proposal" in md and "3,000-4,500" in md
+    assert "| `veh.hd_tris` | count |" in md and "never targets" in md and "proposal" not in md
     for line in md.splitlines():
         if line.startswith("| `"):
-            assert len(re.findall(r"(?<!\\)\|", line)) == 8
-    lp = CD.lint_preset("vanilla")
-    r = lp["rules"]
-    assert {"dff.tris_budget", "veh.hd_tris", "veh.part_tris", "dff.flat_shading", "dff.vert_sharing"} <= set(r)
-    assert r["veh.hd_tris"]["params"]["budget"]["default"] > 0 and "cars" in r["dff.tris_budget"]["params"]["budget"]
-    assert json.loads(json.dumps(lp)) == lp
-    sp = CD.lint_preset("sa_plus")
-    assert sp["rules"]["veh.hd_tris"]["params"]["budget"]["default"] == 5000
+            assert len(re.findall(r"(?<!\\)\|", line)) == 7
+    for tier in ("vanilla", "sa_plus"):
+        lp = CD.lint_preset(tier)
+        r = lp["rules"]
+        assert {"dff.flat_shading", "dff.vert_sharing"} <= set(r)
+        assert all(r[k] == {"sev": "info"} for k in ("dff.tris_budget", "veh.hd_tris", "veh.part_tris"))
+        assert json.loads(json.dumps(lp)) == lp
 
 
 def test_leave_one_out(fake_cache):

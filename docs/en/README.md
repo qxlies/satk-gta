@@ -63,6 +63,9 @@ One concrete layout of a workspace (game copy, source clones, viewer and MTA for
 | change game text, zones, water or the time cycle | `satk gxt get CRED001`, `satk zone list --at 2495,-1687` | [worldfiles.md](worldfiles.md) |
 | edit or add an animation | `satk anim list ifp:ped --name walk`, `satk anim extract anim:ped/walk_civi --out walk.json` | [anim.md](anim.md) |
 | see whether my mods fit into the engine limits | `satk limits plan --profile installed` | [limits.md](limits.md) |
+| [obs.md](obs.md) | validate, read, summarize, convert and merge engine traces, bench results and `.saenet` / `.saerec` containers | `satk obs` |
+| [obs-spec.md](obs-spec.md) | the observability formats: timeline key, JSONL records, bench JSON, container layout, versions | `satk obs schema` |
+| pack files into one verifiable `.saepak`, derive render caches, count duplicate textures | `satk pack build mymod`, `satk pack census` | [pack.md](pack.md) |
 | convert a map (SA-MP, MTA, IPL) | `satk map convert my_map.pwn --to mta` | [mapconv.md](mapconv.md) |
 | compare my game with the stock one | `satk index diff vanilla installed` | [index.md](index.md) |
 | find out why the game crashed | `satk crash analyze --last` | [crash.md](crash.md) |
@@ -70,6 +73,7 @@ One concrete layout of a workspace (game copy, source clones, viewer and MTA for
 | fly a camera and ask "what is this object" | `satk view goto`, `satk view capture --marks 6` | [viewer.md](viewer.md) |
 | open an area in Blender and export it to MTA | `satk blender import-area --center 2495,-1687 --r 60` | [blender.md](blender.md) |
 | create a new car, prop or building in Blender that looks like the stock game | `satk blender session start --gui` | [authoring.md](authoring.md), [sa-style.md](sa-style.md) |
+| build an asset with my own AI agents | `satk asset inventory`, `asset check --strict` | [asset-pipeline.md](asset-pipeline.md) |
 | check a model against the stock style of its class | `satk asset check model:426 --tier vanilla` | [style.md](style.md) |
 | start a new asset from a template or a clean blank | `satk kit kinds`, `satk kit blank` | [kit.md](kit.md) |
 | see my model the way the game draws it, next to stock ones | `satk blender preview model:426 --lineup model:405,model:560` | [look.md](look.md) |
@@ -110,10 +114,14 @@ One concrete layout of a workspace (game copy, source clones, viewer and MTA for
 | [models.md](models.md) | GPU-free model previews, export to glTF, OBJ and raw | `satk model`, `asset export` |
 | [catalog.md](catalog.md) | an offline HTML catalog of models, textures and zones with thumbnails | `satk catalog build` |
 | [lint.md](lint.md) | the asset linter: DFF, TXD, COL, IDE and the links between them | `satk asset lint`, `asset lint-rules` |
-| [style.md](style.md) | the vanilla SA style in numbers per class and tier; checking a model or texture against it | `satk style profile`, `asset check`, `style texture` |
+| [style.md](style.md) | SA style guidance and class references; defects, coverage and strict completion of a model or texture | `satk style profile`, `asset check`, `style texture` |
 | [batch.md](batch.md) | run any operation over many files, saved multi-step recipes | `satk batch`, `recipe` |
 | [modinspect.md](modinspect.md) | what a mod changes and how Mod Loader combines mods | `satk mod inspect`, `conflicts`, `effective`, `check` |
 | [limits.md](limits.md) | engine capacity planning, stock headroom, crash signatures and adjuster INI suggestions | `satk limits plan` |
+| [pack.md](pack.md) | `.saepak` content containers (content addressed, IMG compatible, per-chunk hashes), derived-asset cache files and the texture dedup census | `satk pack build`, `verify`, `inspect`, `dac`, `census` |
+| [saepak.md](saepak.md) | the byte layout of the `.saepak` container, format 1.0 | `satk pack build`, `verify`, `inspect` |
+| [dac.md](dac.md) | the byte layout of the DAC (derived-asset cache) file, format 1.0 | `satk pack dac` |
+| [imagegen.md](imagegen.md) | UI icons from an image API (keyed, resized, validated, with provenance) and a Pillow placeholder set that needs no key | `satk imagegen` |
 | [idmgr.md](idmgr.md) | free model ids, id conflicts between mods, remapping a mod | `satk id` |
 | [mapconv.md](mapconv.md) | map converters (SA-MP Pawn, MTA `.map`, IPL, JSON), binary IPL, area cleaning | `satk map convert`, `map validate`, `ipl`, `map clean` |
 | [worldfiles.md](worldfiles.md) | world data of total conversions: GXT/FXT text, zones, water, time cycle, population cycle, radar tiles | `satk gxt`, `fxt`, `zone`, `water`, `timecyc`, `popcycle`, `radar` |
@@ -129,6 +137,7 @@ One concrete layout of a workspace (game copy, source clones, viewer and MTA for
 | [ingame.md](ingame.md) | the in-game test loop: a mod in the real game (MTA fork), test spots, behaviour checks vs vanilla with frames, hot reload | `satk ingame start`, `drive`, `check`, `reload` |
 | [blender.md](blender.md) | headless Blender: import models and areas, renders, export to MTA; the add-on | `satk blender` |
 | [studio.md](studio.md) | a live Blender session for step-by-step modelling by an AI assistant | `satk blender session`, `call` |
+| [inventory.md](inventory.md) | the task list of an asset: every part as an item, checked as built, missing, unattached or rejected | `satk asset inventory`, `inventory starter` |
 | [look.md](look.md) | SA-like previews of game models, your own DFF files and live sessions, side by side | `satk blender preview` |
 | [kit.md](kit.md) | templates, shading, generators and export for any asset kind (cars to peds) | `satk kit kinds`, `kit template`, `kit export` |
 | [convert.md](convert.md) | convert rigid 3D models to SA scale, geometry, textures and packages | `satk asset convert`, `convert prepare`, `convert finish` |
@@ -138,6 +147,7 @@ One concrete layout of a workspace (game copy, source clones, viewer and MTA for
 | [ai.md](ai.md) | connecting AI clients (Claude Code, Codex, Cursor, VS Code, LM Studio and others), the skill | `satk mcp config --client`, `agent install-skill` |
 | [sa-style.md](sa-style.md) | what makes an asset look like San Andreas: textures, shape, shading, size, detail tiers, mistakes | `satk asset get`, `texture image` |
 | [authoring.md](authoring.md) | creating assets of any kind in a live Blender session, gate by gate | `satk blender session`, `asset check` |
+| [asset-pipeline.md](asset-pipeline.md) | building an asset with your own AI agents: builder, critic, polisher and six evidence gates | `satk asset inventory`, `asset check --strict` |
 | [bugreport.md](bugreport.md) | a private, local report for satk problems | `satk bug-report` |
 | [release.md](release.md) | the portable Windows release | `satk dev release` |
 | [credits.md](credits.md) | acknowledgements and every source satk and its research used, by topic | — |

@@ -237,7 +237,7 @@ SCENE_CONTRACT: dict[str, Any] = {
     },
     "collision": "vehicles: collection '<model>_col' (embedded in the DFF, named <model>_col); world: '<model>.col' "
                  "file with one model named <model>",
-    "lod": "map LOD: a separate clump collection 'lod<name[3:]>.dff'; vehicles: the *_vlo atomic",
+    "lod": "map LOD: a separate clump collection 'lod<name>.dff'; vehicles: the *_vlo atomic",
     "export": "kit.export: own textures only in the TXD, frame-local bounding spheres, re-import diff",
 }
 

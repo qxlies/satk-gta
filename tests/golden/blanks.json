@@ -2,12 +2,12 @@
  "_comment": "Triangles per piece of every blank at the default dimensions (numbers only): half meshes count their half.",
  "tris": {
   "automobile/vanilla": {
-   "body": 726,
+   "body": 816,
    "interior": 264,
    "exhaust": 20
   },
   "automobile/sa_plus": {
-   "body": 1024,
+   "body": 1084,
    "interior": 484,
    "exhaust": 20
   },
@@ -70,6 +70,106 @@
   },
   "building_box/sa_plus": {
    "building": 302
+  },
+  "automobile/vanilla/coupe": {
+   "body": 746,
+   "interior": 264,
+   "exhaust": 20
+  },
+  "automobile/sa_plus/coupe": {
+   "body": 1062,
+   "interior": 484,
+   "exhaust": 20
+  },
+  "automobile/vanilla/sports": {
+   "body": 770,
+   "interior": 264,
+   "exhaust": 20
+  },
+  "automobile/sa_plus/sports": {
+   "body": 1046,
+   "interior": 484,
+   "exhaust": 20
+  },
+  "automobile/vanilla/suv": {
+   "body": 902,
+   "interior": 264,
+   "exhaust": 20
+  },
+  "automobile/sa_plus/suv": {
+   "body": 1070,
+   "interior": 484,
+   "exhaust": 20
+  },
+  "automobile/vanilla/van": {
+   "body": 890,
+   "interior": 264,
+   "exhaust": 20
+  },
+  "automobile/sa_plus/van": {
+   "body": 1118,
+   "interior": 484,
+   "exhaust": 20
+  },
+  "automobile/vanilla/hatchback": {
+   "body": 812,
+   "interior": 264,
+   "exhaust": 20
+  },
+  "automobile/sa_plus/hatchback": {
+   "body": 1170,
+   "interior": 484,
+   "exhaust": 20
+  },
+  "automobile/vanilla/wagon": {
+   "body": 1038,
+   "interior": 264,
+   "exhaust": 20
+  },
+  "automobile/sa_plus/wagon": {
+   "body": 1264,
+   "interior": 484,
+   "exhaust": 20
+  },
+  "automobile/vanilla/suv_boxy": {
+   "body": 1004,
+   "interior": 264,
+   "exhaust": 20
+  },
+  "automobile/sa_plus/suv_boxy": {
+   "body": 1302,
+   "interior": 484,
+   "exhaust": 20
+  },
+  "automobile/vanilla/pickup": {
+   "body": 852,
+   "interior": 220,
+   "exhaust": 20
+  },
+  "automobile/sa_plus/pickup": {
+   "body": 1104,
+   "interior": 396,
+   "exhaust": 20
+  },
+  "bike/vanilla/scooter": {
+   "body": 188,
+   "seat": 38,
+   "engine": 132,
+   "handlebars": 284,
+   "forks_front": 196,
+   "mudguard": 28,
+   "wheel_front": 200,
+   "wheel_rear": 200
+  },
+  "bike/sa_plus/scooter": {
+   "body": 228,
+   "seat": 58,
+   "engine": 132,
+   "handlebars": 284,
+   "forks_front": 196,
+   "mudguard": 28,
+   "wheel_front": 256,
+   "wheel_rear": 256
   }
  }
 }

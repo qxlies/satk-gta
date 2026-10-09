@@ -28,7 +28,9 @@ def test_fork_git_setup():
 
     L = layout()
     info = fork_info(L)
-    assert info["exists"] and info["branch"] == "main"
+    # engine lanes work on feat/* branches stacked on main: the checkout may be on any branch, but main must exist
+    assert info["exists"] and info["branch"]
+    git("rev-parse", "--verify", "refs/heads/main", cwd=L.fork)
     assert EXPECTED_BASE.startswith(info["base"])
     assert info["remotes"]["neon"] == {"fetch": file_url(L.donor), "push": "DISABLED"}
     assert info["remotes"]["upstream"]["push"] == "DISABLED"
@@ -102,6 +104,10 @@ def test_noop_build_of_one_project():
     L = layout()
     if not (L.bin / "mta" / "game_sa.dll").is_file():
         pytest.skip("client not built yet")
+    from satk.engine.common import git
+
+    if git("status", "--porcelain", "--untracked-files=no", cwd=L.fork).strip():
+        pytest.skip("the fork has uncommitted edits (an engine lane is working in it): a build would test their state")
     out = build(project="Game SA", platform="Win32")
     assert out["ok"] and out["rows"][0][3] == 0 and out["errors_total"] == 0
 

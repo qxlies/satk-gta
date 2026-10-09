@@ -1,0 +1,245 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "trailer",
+ "summary": "trailer: a box, tank or flat bed on frame rails and axles with a hookup; lamps, guards and mudguards at simple, doors and fittings at standard and hero.",
+ "regions": {
+  "overall": {
+   "summary": "the whole trailer, 3/4 views",
+   "views": []
+  },
+  "front": {
+   "summary": "front wall, hookup, landing legs",
+   "views": [
+    "front"
+   ]
+  },
+  "rear": {
+   "summary": "rear doors or gate, lamps, plate, underride bar",
+   "views": [
+    "rear"
+   ]
+  },
+  "sides": {
+   "summary": "sides, guards, markers",
+   "views": [
+    "left",
+    "right"
+   ]
+  },
+  "wheels": {
+   "summary": "wheels, axles, mudguards",
+   "views": [
+    "wheels"
+   ]
+  },
+  "underside": {
+   "summary": "frame and axles from below",
+   "views": [
+    "underside"
+   ]
+  },
+  "deck": {
+   "summary": "load deck or roof",
+   "views": [
+    "left",
+    "right"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "body",
+   "name": "Body (box, tank or bed)",
+   "region": "overall",
+   "category": "shell",
+   "construction": "closed welded body or the load deck",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "chassis"
+  },
+  {
+   "key": "wheel",
+   "name": "Wheel (cloned to the dummies)",
+   "region": "wheels",
+   "category": "wheel",
+   "construction": "kit.wheel or mesh.lathe",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "wheel"
+  },
+  {
+   "key": "frame_rails",
+   "name": "Frame rails",
+   "region": "underside",
+   "category": "structure",
+   "construction": "rails and crossmembers under the body",
+   "attaches_to": "body",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "hookup",
+   "name": "Hookup",
+   "region": "front",
+   "category": "structure",
+   "construction": "kingpin plate or a drawbar at the hookup frame",
+   "attaches_to": "frame_rails",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "axles",
+   "name": "Axles and suspension",
+   "region": "wheels",
+   "category": "running_gear",
+   "construction": "axle beams with springs or bags",
+   "attaches_to": "frame_rails",
+   "stage": "G2",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "mudguards",
+   "name": "Mudguards",
+   "region": "wheels",
+   "category": "shell",
+   "construction": "guards over the wheel sets",
+   "attaches_to": [
+    "body",
+    "frame_rails"
+   ],
+   "stage": "G2",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "tail_lamps",
+   "name": "Tail lamps",
+   "region": "rear",
+   "category": "lamp",
+   "construction": "lamp lenses at the rear corners",
+   "attaches_to": [
+    "body",
+    "frame_rails"
+   ],
+   "stage": "G3",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "landing_legs",
+   "name": "Landing legs",
+   "region": "front",
+   "category": "structure",
+   "construction": "legs with a crank (waive for a drawbar trailer)",
+   "attaches_to": "frame_rails",
+   "stage": "G3",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "rear_doors",
+   "name": "Rear doors or gate",
+   "region": "rear",
+   "category": "panel",
+   "construction": "doors with hinges and locking bars",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "standard",
+   "required": false
+  },
+  {
+   "key": "side_guards",
+   "name": "Side guards",
+   "region": "sides",
+   "category": "structure",
+   "construction": "rails between the axles and the legs",
+   "attaches_to": "frame_rails",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "underride_bar",
+   "name": "Underride bar",
+   "region": "rear",
+   "category": "structure",
+   "construction": "bar under the rear",
+   "attaches_to": "frame_rails",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "marker_lights",
+   "name": "Marker lights and reflectors",
+   "region": "sides",
+   "category": "lamp",
+   "construction": "small lenses along the sides",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "number_plate",
+   "name": "Number plate",
+   "region": "rear",
+   "category": "sign",
+   "construction": "plate card at the rear",
+   "attaches_to": [
+    "body",
+    "underride_bar"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "air_lines",
+   "name": "Air and electric lines",
+   "region": "front",
+   "category": "fixture",
+   "construction": "coiled lines swept from the front wall",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "toolbox",
+   "name": "Toolbox and spare wheel",
+   "region": "underside",
+   "category": "fixture",
+   "construction": "box and a spare under the frame",
+   "attaches_to": "frame_rails",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "door_hardware",
+   "name": "Hinges, handles and locking bars",
+   "region": "rear",
+   "category": "trim",
+   "construction": "small closed pieces on the doors",
+   "attaches_to": "rear_doors",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "deck_detail",
+   "name": "Tie-down rails or roof detail",
+   "region": "deck",
+   "category": "structure",
+   "construction": "rails, rings or roof bows",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "hero"
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/trailer.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

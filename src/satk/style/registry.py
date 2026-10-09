@@ -49,6 +49,7 @@ UNITS = {
     "m2": "square metres",
     "1/m2": "items per square metre",
     "cm": "centimetres",
+    "mm": "millimetres",
     "uv": "UV units (1.0 = one texture width or height)",
     "px/m": "texture pixels per metre",
     "luma": "0..255, luma = 0.299 R + 0.587 G + 0.114 B",
@@ -180,6 +181,20 @@ _DEFS = (
     _M("tex.hf_energy", "luma", "texture",
        "Mean absolute 3x3 Laplacian of the luma: high-frequency detail (photo-like textures score high, flat "
        "vector art low)."),
+    _M("tex.tone_lo", "luma", "texture",
+       "Median absolute difference of the luma blurred at 1/64 and at 1/8 of the shorter side: soft tonal drift "
+       "and light gradients inside regions (a flat fill is 0 away from its edges)."),
+    _M("tex.tone_mid", "luma", "texture",
+       "Median absolute difference of the luma and the luma blurred at 1/64 of the shorter side: the fine tonal "
+       "variation of a photo (the median ignores the few pixels on painted marks)."),
+    _M("tex.chroma_lo", "luma", "texture",
+       "Median of the largest channel of the colour minus luma band-passed like tex.tone_lo: slight hue and "
+       "saturation drift."),
+    _M("tex.flat_share", "share", "texture",
+       "Share of the pixels whose 5x5 window spans at most 2 luma levels: dead-flat patches of a clean CG fill."),
+    _M("tex.crisp", "ratio", "texture",
+       "Median 5x5 luma range at strong edges (at least 24 levels) divided by max(tex.tone_mid, 0.5): crisp "
+       "marks on a flat ground score high (not defined with fewer than 20 edge pixels)."),
     # ---- map lighting
     _M("light.prelit_lum_p50", "luma", "map", "Median luma of the day prelight colours of the vertices.",
        "measure"),
@@ -194,6 +209,60 @@ _DEFS = (
     _M("col.mesh_faces", "count", "collision", "Faces of the collision mesh.", "measure"),
     _M("col.shadow_faces", "count", "collision", "Faces of the shadow mesh (COL3).", "measure"),
     _M("col.face_light_dominant", "level", "collision", "Most common face light value of the collision mesh faces."),
+    # ---- asset.check form, fit, symmetry and coverage rows (satk.style.form / fit / symmetry / coverage)
+    _M("form.floating", "mm", "model",
+       "A group of pieces (welded connected components) that touches nothing grounded: no vertex within 6 mm of "
+       "another piece's face and no crossing faces; the body shell is the ground. Value: the gap to the "
+       "nearest grounded piece. Vanilla hovers that are allowed: flat cards, glass behind its frame, small heads, "
+       "tiny bits, panels at their shut line, animated parts, fill hidden from all six axis directions.", "check"),
+    _M("form.intersect", "mm", "model",
+       "A piece of at least 12 triangles that crosses another and lies at least 90 % behind its surface, at least "
+       "30 mm deep. Value: the depth. Information only (vanilla buries engines and arms too).", "check"),
+    _M("form.loose_share", "share", "part",
+       "Share of the body part's triangles outside its largest welded piece; a defect above 0.6 on road cars "
+       "(vanilla road cars 0.16-0.57).", "check"),
+    _M("form.hard_corners", "count", "part",
+       "Folds of 60-100 deg (angle between the two face normals) whose corner normals are split by more than "
+       "1 deg without a material or UV seam. A defect when such creases are more than 20 % of the folds and "
+       "fewer than 8 % of the folds are smooth over the whole model (vanilla: smooth at least 9.8 %).", "check"),
+    _M("form.dense_flat", "share", "part",
+       "Share of a part's triangles that only add density on flat or gently curved surface: 2 per redundant "
+       "vertex, a vertex that could collapse into a neighbour with its faces within 8 deg and edges under 10 cm "
+       "on average (never on seams, open edges or double-sided cards). A finding at a model share of 0.33 and "
+       "100 triangles (vanilla at most 0.261): a defect on map models, advice elsewhere.", "check"),
+    _M("tex.look", "count", "texture",
+       "asset.check texture row: flat/CG-clean (tex.tone_mid under the role's p5, or tex.flat_share over its "
+       "p95 and at least 0.2) or too sharp (tex.crisp over its p95) against the vanilla textures of the role; "
+       "advice only, never blocking.", "check"),
+    _M("form.see_through", "share", "vehicle",
+       "Per arched wheel: share of side rays through the opening above the tyre (1.04-1.1 x the radius) that "
+       "find no surface facing them in the near half of the car; a defect above 0.34.", "check"),
+    _M("fit.wheel_arch[<wheel>]", "mm", "vehicle",
+       "Centre of the arch's side outline (from the body outboard of the tyre mid-plane) along Y from the wheel "
+       "centre; a defect beyond 0.25 x the wheel radius. The info row gives the outline radius / wheel radius.",
+       "check"),
+    _M("fit.dummy[<frame>]", "mm", "vehicle",
+       "Lamp dummies: distance, seen head-on, to the nearest face of their lamp key colour (defect above "
+       "100 mm); exhaust and petrolcap: distance to any geometry (above 250 / 200 mm).", "check"),
+    _M("fit.hinge[<part>]", "share", "vehicle",
+       "Position of the opening panel's dummy along the panel's span across the hinge axis (0 / 1 = an edge); a "
+       "defect beyond 0.3 in from an edge or 150 mm off the panel.", "check"),
+    _M("fit.steer[<part>]", "mm", "vehicle",
+       "Bikes: area-weighted centre of handlebars / forks_front off the steering axis (forks_front local Z); a "
+       "defect 40 mm farther than on the like model (400 mm without one).", "check"),
+    _M("fit.rider[<point>]", "mm", "vehicle",
+       "Bikes: rider contact point (seat top under ped_frontseat, foot rest at the like model's foot point, grip "
+       "end of the handlebars) relative to ped_frontseat, against the like model; a defect above 60 mm.",
+       "check"),
+    _M("sym.part[<part>]", "mm", "part",
+       "90th percentile of the nearest-vertex distances between a left part mirrored in X and its right twin "
+       "(information above 25 mm).", "check"),
+    _M("sym.dummy[<frame>]", "mm", "vehicle",
+       "Distance between a left frame mirrored in X and its right twin (information above 25 mm).", "check"),
+    _M("sym.body[<part>]", "share", "part",
+       "Share of the body's vertices whose mirror image is farther than 20 mm from the body surface.", "check"),
+    _M("cov.<item>", "count", "model",
+       "Class checklist item of data/style/coverage/<class>.json: present or missing (information).", "check"),
 )
 
 #: name -> :class:`Metric`, in definition order.

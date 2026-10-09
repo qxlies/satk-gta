@@ -63,26 +63,31 @@ without reading design notes or the satk source code. Any client registered with
 
 ### Creation scenarios E5-E7 (= S25, S26)
 
-These take tens of calls, so the 8-call rule of the protocol does not apply. Score instead: PASS = every gate
-reached with its numbers in the class band of the chosen tier and the human checkpoints shown; SOFT = reached but
-with unexplained out-of-band rows or a missed checkpoint; FAIL = hand-typed geometry (a vertex list or a private
-mesh library instead of session methods), more than 2 style topics read before G1 without need, a full-size image
-opened, or a forbidden action. Record calls, wall time to G1 and to the first export, context size at the first
-export, and the lines of agent-written geometry code (target <= 300).
+These take tens of calls, so the 8-call rule of the protocol does not apply. Score by the look and the defects,
+never by counts: PASS = every gate reached with its sheet shown (human checkpoints at G1 and G3), the features of
+the brief recognisable, the SA look next to vanilla peers (soft, rounded, joined, soft textures), no engine errors
+and no open `form`/`fit` defects in `asset.check`; SOFT = reached with open form or fit defects, missing checklist
+items or a missed checkpoint; FAIL = vertex-by-vertex geometry (a vertex list or a private mesh library instead of
+session methods), measuring code for photos (grids, solved cameras, back-projection), geometry changed only to
+move a number, a full-size image opened, or a forbidden action. Record calls, wall time to G1 and to the first
+export and the context size at the first export as information.
 
-#### E5 car blockout to G2
+#### E5 car to the composition gate (G2)
 
 - Prompt: "Make an SA-style replacement for the Premier (model 426) inspired by <a real sedan>. Get it to the
-  shape-and-shading gate and show me."
-- Expected: reads `style` + `style_vehicle` (<= 12K characters); `asset.init` with tier `sa_plus`;
-  `kit.template --like model:426`; blockout in the session; G1 lineup sheet shown by about 15 min with
-  `dims.L_rel` in the sedan band; `kit.shade`; at G2 `shade.normal_bend` and `shade.flat_share` inside the car
-  band, `part.tris[chassis]` inside the `sa_plus` proposal; second sheet shown.
+  composition gate and show me."
+- Expected: reads `style`, `style_construction`, `style_references` and `style_vehicle`; `asset.init` with tier
+  `sa_plus`; a design description and `<project>/refs/features.md` from the sedan's spec sheet and photos (described, not
+  measured); `kit.template --like model:426`; body from rounded section lofts (or a reshaped sedan blank) with
+  smooth shading; G1 lineup sheet shown and the answer awaited; at G2 one welded shell with cut panels, lined
+  arches, wrapped bumpers, mirrors on stalks, dummies refitted, and the `form`/`fit` rows of `asset.check` clean;
+  the composition sheet shown.
 
 #### E6 street prop with collision (and the LOD question)
 
 - Prompt: "Make a new bus shelter for Grove Street with collision, in the stock style."
-- Expected: kind `prop`, its size bucket's `geo.tris` and `uv.texel_px_m`; tiling or 0..1 UVs as the class does;
+- Expected: kind `prop`; closed pieces that touch (posts, roof, bench, panels), no gaps; texel density like the
+  size bucket (`uv.texel_px_m`, reference); tiling or 0..1 UVs as the class does;
   prelight with warm night colours (`blender.game_ready --asset-class prop` or the kit); collision from primitives
   (`col.gen`) with a non-zero face light; draw distance at most 100-299; NO LOD unless the model is about 30 m or
   more (props almost never have one) - the agent should say why.
@@ -90,8 +95,9 @@ export, and the lines of agent-written geometry code (target <= 300).
 #### E7 weapon
 
 - Prompt: "Replace the baseball bat with a cricket bat in SA style."
-- Expected: `kit.template --like model:336`; real length against the 1.84 m ped; smooth shading (melee);
-  one 64 px photo-like texture (`style.texture` in the weapon band); `asset.check` clean; the readme names the
+- Expected: `kit.template --like model:336`; built from the side profile (blade and rounded handle, not a
+  stretched box); real length against the 1.84 m ped; smooth shading (melee); one small soft photo-like texture
+  (`style.texture` compared with the weapon role); `asset.check` without engine errors; the readme names the
   inherited `weapon.dat` line.
 
 #### Discovery checks (no session needed)

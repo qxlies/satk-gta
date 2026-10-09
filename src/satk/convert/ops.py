@@ -11,8 +11,8 @@ Tier = Literal["sa_plus", "vanilla"]
 
 
 @op("asset.convert", group="blender", mcp=False, long_running=True,
-    summary="Convert a GLB/glTF, FBX, OBJ, DAE or blend into an SA asset: class scale and budgets, seam-aware "
-            "reduction, Cycles texture bake and SA finish, kit shading, prelight, COL/LOD, kit package, check and lineup.",
+    summary="Convert a GLB/glTF, FBX, OBJ, DAE or blend into an SA asset: class scale, seam-aware cleanup "
+            "(no triangle target), Cycles texture bake and SA finish, kit shading, prelight, COL/LOD, kit package, check and lineup.",
     summary_ru="Преобразовать трёхмерную модель в ассет SA: масштаб, упрощение, запекание текстур, освещение, "
                "коллизия, уровни детализации, упаковка и проверка.",
     examples=("satk asset convert model.glb --kind prop", "satk asset convert car.fbx --kind vehicle --like model:426"))
@@ -25,7 +25,7 @@ def asset_convert(model: str, kind: str = "prop", like: str | None = None, tier:
         model: local .glb, .gltf, .fbx, .obj, .dae or .blend; external textures stay read-only.
         kind: kit kind, including prop, building, vehicle (automobile), weapon, interior and pickup.
         like: vanilla model SID for the frame scaffold, scale anchors and style peer set.
-        tier: measured vanilla budgets or the sa_plus proposal; visual rules remain the same.
+        tier: vanilla or sa_plus texture sizes and kit scaffold; visual rules remain the same.
         dims: target L,W,H in metres (Blender Y,X,Z); omitted = class anchors, or the like model's dimensions.
         out: private output folder under work; default work/out/convert/<name>-<content hash>.
         name: new model name; default a safe form of the source file stem.
@@ -68,7 +68,7 @@ def convert_prepare(model: str, kind: str = "prop", like: str | None = None, tie
     if session:
         install(session, timeout)
     return obj(None, plan=str(path).replace("\\", "/"), name=p["name"], kind=p["kind"],
-               dims=p["dims"], budget=p["budget"], session=session, warn=p.get("warn", []))
+               dims=p["dims"], limit=p["limit"], session=session, warn=p.get("warn", []))
 
 
 @op("convert.finish", group="blender", mcp=False, long_running=True,

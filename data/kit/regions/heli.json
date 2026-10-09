@@ -1,0 +1,179 @@
+{
+ "kind": "heli",
+ "version": 1,
+ "summary": "Close-up review regions of a helicopter (boxes relative to the chassis).",
+ "ref": [
+  "chassis"
+ ],
+ "leak": {
+  "cull": false,
+  "gap": true,
+  "inside": true,
+  "floor_exclude": [
+   "wheel*"
+  ],
+  "floor_pct": 6.0,
+  "slit": false
+ },
+ "regions": [
+  {
+   "name": "front",
+   "summary": "nose: cockpit glass and frame, lights, sensors",
+   "box": {
+    "y": [
+     0.55,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 0,
+     "el": 8
+    },
+    {
+     "az": 35,
+     "el": 18
+    },
+    {
+     "az": -35,
+     "el": 18
+    }
+   ]
+  },
+  {
+   "name": "tail",
+   "summary": "tail boom, fin, tail rotor, stabilisers",
+   "box": {
+    "y": [
+     0.0,
+     0.45
+    ]
+   },
+   "cameras": [
+    {
+     "az": -90,
+     "el": 8
+    },
+    {
+     "az": 150,
+     "el": 18
+    },
+    {
+     "az": -150,
+     "el": 18
+    }
+   ]
+  },
+  {
+   "name": "left",
+   "summary": "left side: cabin, doors, skids, boom",
+   "cameras": [
+    {
+     "az": -90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": -90,
+     "el": 20
+    }
+   ]
+  },
+  {
+   "name": "right",
+   "summary": "right side: cabin, doors, skids, boom",
+   "cameras": [
+    {
+     "az": 90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": 90,
+     "el": 20
+    }
+   ]
+  },
+  {
+   "name": "rotor",
+   "summary": "main rotor hub, mast, blades, engine cowling",
+   "box": {
+    "z": [
+     0.55,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 30,
+     "el": 55
+    },
+    {
+     "az": 210,
+     "el": 30
+    }
+   ]
+  },
+  {
+   "name": "skids",
+   "summary": "skids or gear and their struts, steps",
+   "box": {
+    "z": [
+     0.0,
+     0.35
+    ]
+   },
+   "cameras": [
+    {
+     "az": -90,
+     "el": 4
+    },
+    {
+     "az": 30,
+     "el": 10
+    }
+   ]
+  },
+  {
+   "name": "cockpit",
+   "summary": "cabin with doors and glass hidden: seats, panel, controls",
+   "box": {
+    "y": [
+     0.5,
+     1.0
+    ],
+    "z": [
+     0.2,
+     0.95
+    ]
+   },
+   "hide": [
+    "door_*"
+   ],
+   "leak": false,
+   "glass": "hide",
+   "cameras": [
+    {
+     "az": -90,
+     "el": 30
+    },
+    {
+     "az": 0,
+     "el": 35
+    }
+   ]
+  },
+  {
+   "name": "underside",
+   "summary": "belly seen from below: no holes into the cabin",
+   "ground": false,
+   "leak_inside": false,
+   "cameras": [
+    {
+     "az": 30,
+     "el": -45
+    }
+   ]
+  }
+ ]
+}

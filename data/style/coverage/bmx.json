@@ -1,0 +1,90 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "bmx",
+ "ref": "style_vehicle",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (3; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "frame",
+   "what": "the frame (chassis)",
+   "how": {
+    "frame_geom": {
+     "parts": "^chassis$",
+     "min_tris": 40
+    }
+   },
+   "fix": "build the frame tubes as chassis (swept round profiles)",
+   "vanilla": "3/3"
+  },
+  {
+   "id": "wheels",
+   "what": "front and rear wheels",
+   "how": {
+    "frame_geom": "^wheel_(front|rear)$"
+   },
+   "fix": "build wheel_front and wheel_rear with spokes on an alpha card",
+   "vanilla": "3/3"
+  },
+  {
+   "id": "handlebars",
+   "what": "handlebars",
+   "how": {
+    "parts": "^handlebars$"
+   },
+   "fix": "build the handlebars with grips (bargrip frame at the grip)",
+   "vanilla": "3/3"
+  },
+  {
+   "id": "bargrip",
+   "what": "the bargrip frame (rider hands)",
+   "how": {
+    "frames": "^bargrip$"
+   },
+   "fix": "add the bargrip frame where the hands hold the bars",
+   "vanilla": "3/3"
+  },
+  {
+   "id": "fork",
+   "what": "the front fork",
+   "how": {
+    "parts": "^forks_front$"
+   },
+   "fix": "build forks_front",
+   "vanilla": "3/3"
+  },
+  {
+   "id": "chainset",
+   "what": "the chainset (crank and chain ring)",
+   "how": {
+    "parts": "^chainset$"
+   },
+   "fix": "build the chainset under the seat tube",
+   "vanilla": "3/3"
+  },
+  {
+   "id": "pedals",
+   "what": "both pedals",
+   "how": {
+    "parts": "^pedal_[lr]$"
+   },
+   "fix": "build pedal_l and pedal_r on the crank ends",
+   "vanilla": "3/3"
+  },
+  {
+   "id": "seat",
+   "what": "a saddle under ped_frontseat",
+   "how": {
+    "seat": true
+   },
+   "fix": "a saddle whose top sits where the rider pose expects it",
+   "vanilla": "3/3"
+  }
+ ]
+}

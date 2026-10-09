@@ -8,8 +8,11 @@
 Each damaged part is a copy of the evaluated undamaged part (same topology, so ``_dam``/``_ok`` triangles =
 1.0, vanilla 0.8-1.1), pushed in by smooth dents (deterministic: the seed and the part name pick the dent
 centres) and rotated about its hinge (doors droop, bonnet and boot buckle, bumpers hang at one corner).
-Glass becomes the ``shatter`` preset. Dents grow until the vertex displacement p90 reaches ``min_p90``
-(vanilla p90 at least 12 cm) or ``max_depth``.
+Every vertex of a dent moves along ONE direction (into the body at the dent centre, from the outer skin's
+normals), so the inner skin of a thick panel (door cards, bonnet liners, jambs) follows the outer one and never
+pokes through it. Glass becomes the ``shatter`` preset; material slots that end up holding the same material are
+merged. Dents grow until the vertex displacement p90 reaches ``min_p90`` (vanilla p90 at least 12 cm) or
+``max_depth``.
 """
 
 from __future__ import annotations
@@ -46,8 +49,48 @@ def _p90(vals: list[float]) -> float:
     return s[min(len(s) - 1, int(0.9 * (len(s) - 1) + 0.5))]
 
 
+def _dent_dir(new, c: Vector, rad: float, body_centre: Vector) -> Vector:
+    """The push direction of a dent at ``c``: minus the area-weighted normal of the faces near it that face away
+    from the body centre (the outer skin); faces of an inner skin face the other way and are left out."""
+    acc = Vector((0.0, 0.0, 0.0))
+    for poly in new.polygons:
+        ctr = poly.center
+        if (ctr - c).length > rad:
+            continue
+        n = poly.normal
+        if n.dot(ctr - body_centre) > 0.0:
+            acc += n * poly.area
+    if acc.length < 1e-9:
+        acc = c - body_centre
+    return -acc.normalized() if acc.length > 1e-9 else Vector((0.0, 0.0, -1.0))
+
+
+def _merge_slots(me) -> int:
+    """Merge material slots that hold the same material (glass and glass_core both shattered, ...)."""
+    first: dict[str, int] = {}
+    remap: dict[int, int] = {}
+    for i, m in enumerate(me.materials):
+        key = m.name if m is not None else ""
+        if key in first:
+            remap[i] = first[key]
+        else:
+            first[key] = i
+    if not remap:
+        return 0
+    for poly in me.polygons:
+        if poly.material_index in remap:
+            poly.material_index = remap[poly.material_index]
+    keep = sorted(first.values())
+    new_index = {old: k for k, old in enumerate(keep)}
+    for poly in me.polygons:
+        poly.material_index = new_index[poly.material_index]
+    for i in sorted(remap, reverse=True):
+        me.materials.pop(index=i)
+    return len(remap)
+
+
 def damage_part(ok, dam, *, depth: float, sag: float, seed: int, min_p90: float, max_depth: float,
-                shatter_mat) -> dict:
+                shatter_mat, body_centre: Vector | None = None) -> dict:
     """Fill ``dam`` from ``ok``. Returns the numbers of this part."""
     me, free = U.evaluated_mesh(ok)
     try:
@@ -57,7 +100,6 @@ def damage_part(ok, dam, *, depth: float, sag: float, seed: int, min_p90: float,
     new.transform(dam.matrix_world.inverted_safe() @ ok.matrix_world)
     new.name = dam.name
     base = [v.co.copy() for v in new.vertices]
-    nrm = [v.normal.copy() for v in new.vertices]
     n = len(base)
     if n == 0:
         raise SatkError("BAD_PARAMS", f"kit.damage: {ok.name} is empty")
@@ -67,17 +109,22 @@ def damage_part(ok, dam, *, depth: float, sag: float, seed: int, min_p90: float,
     h = zlib.crc32(f"{seed}:{dam.name}".encode())
     centres = [base[(h >> (8 * k)) % n] for k in range(2)]
     rad = 0.38 * diag
+    # the vehicle's centre in the part's space: dents push towards it
+    bc = dam.matrix_world.inverted_safe() @ (body_centre if body_centre is not None else Vector((0.0, 0.0, 0.0)))
+    dirs = [_dent_dir(new, c, rad, bc) for c in centres]
     rot = _hinge(str(dam.get("satk_part") or dam.name), sag)
     d = depth
     for _ in range(8):
         disp = []
         for i, co in enumerate(base):
-            w = 0.0
-            for c in centres:
+            push = Vector((0.0, 0.0, 0.0))
+            for c, dr in zip(centres, dirs):
                 x = (co - c).length / rad
                 if x < 1.0:
-                    w = max(w, (1.0 - x * x) ** 2)
-            p = rot @ (co - nrm[i] * (d * w))
+                    w = (1.0 - x * x) ** 2
+                    if w * d > push.length:
+                        push = dr * (d * w)
+            p = rot @ (co + push)
             new.vertices[i].co = p
             disp.append((p - co).length)
         p90 = _p90(disp)
@@ -90,6 +137,7 @@ def damage_part(ok, dam, *, depth: float, sag: float, seed: int, min_p90: float,
             if m is not None and str(m.get("satk_role", "")) == "glass":
                 new.materials[si] = shatter_mat
                 shattered += 1
+    merged = _merge_slots(new)
     new.update()
     old = dam.data
     dam.data = new
@@ -102,8 +150,11 @@ def damage_part(ok, dam, *, depth: float, sag: float, seed: int, min_p90: float,
         me2, free2 = U.evaluated_mesh(ok)
         ok_t = sum(len(pp.vertices) - 2 for pp in me2.polygons)
         free2()
-    return {"part": dam.name, "ratio": round(dam_t / max(1, ok_t), 3), "p90_m": round(p90, 3),
-            "depth_m": round(d, 3), "glass": shattered}
+    out = {"part": dam.name, "ratio": round(dam_t / max(1, ok_t), 3), "p90_m": round(p90, 3),
+           "depth_m": round(d, 3), "glass": shattered}
+    if merged:
+        out["merged_slots"] = merged
+    return out
 
 
 def damage_method(ctx, p: dict) -> dict:
@@ -123,6 +174,8 @@ def damage_method(ctx, p: dict) -> dict:
     from satk.kit import kinds as K
 
     shatter = M.ensure(name, K.preset("shatter", name))
+    root = U.kit_root(coll)
+    centre = root.matrix_world.translation.copy() if root is not None else Vector((0.0, 0.0, 0.0))
     rows, skipped = [], []
     for part, d in sorted(by_part.items()):
         if only and part not in only:
@@ -134,7 +187,7 @@ def damage_method(ctx, p: dict) -> dict:
             skipped.append(part)
             continue
         rows.append(damage_part(ok, dam, depth=depth, sag=sag, seed=seed, min_p90=min_p90, max_depth=max_depth,
-                                shatter_mat=shatter))
+                                shatter_mat=shatter, body_centre=centre))
     if not rows:
         raise SatkError("BAD_PARAMS", "kit.damage: no *_ok part with geometry has a *_dam slot",
                         hint="model the *_ok parts (doors, bonnet, bumpers) first", data={"skipped": skipped[:10]})

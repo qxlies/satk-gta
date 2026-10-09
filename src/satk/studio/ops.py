@@ -36,7 +36,7 @@ def blender_session(action: Literal["start", "status", "list", "stop", "restore"
         action: start (reuses a running session), status, list, stop, restore (load a checkpoint into the running
             session), replay (rebuild a journal in a session), prune (dead sessions; with name: old checkpoints).
         name: session name (a-z, 0-9, '-', '_'); default 'default', or the project name with project.
-        project: asset project (name or folder from asset.init): its journal, checkpoints, bands and target size.
+        project: asset project (name or folder from asset.init): its journal, checkpoints and target size.
         blend: start: a .blend file to open.
         gui: start: open a visible Blender window instead of a headless one.
         threads: start: Blender threads (default all cores; SATK_BLENDER_THREADS).
@@ -103,16 +103,16 @@ def _ref(ref: str | None) -> Any:
     examples=("satk blender call scene.info",
               "satk blender call mesh.primitive --params '{\"kind\":\"cube\",\"size\":2}' --snapshot 3q",
               "satk blender call modifier.add --params '{\"object\":\"body\",\"type\":\"MIRROR\"}'",
-              "satk blender call batch --params @steps.json --snapshot sheet"))
+              "satk blender call batch --params-file steps.json --snapshot sheet"))
 def blender_call(method: str, params: dict[str, Any] | None = None, session: str | None = None,
                  blend: str | None = None, save: str | None = None, snapshot: str | None = None, size: int = 512,
                  look: str | None = None, stats: Stats = "auto", checkpoint: bool | None = None,
-                 timeout: float = 90.0) -> dict:
+                 timeout: float = 90.0, params_file: str | None = None) -> dict:
     """One step of a Blender modelling session.
 
     Args:
         method: studio method name (satk blender methods lists them; 'batch' runs params.steps).
-        params: the method's parameters as a JSON object (or @file.json).
+        params: the method's parameters as a JSON object (or @file.json); keys given here override params_file.
         session: session name; omitted = 'default' when it runs, else a one-shot cold Blender run.
         blend: a .blend to open before the step.
         save: save the scene to this .blend after the step (under the work directory).
@@ -124,9 +124,12 @@ def blender_call(method: str, params: dict[str, Any] | None = None, session: str
             5th mutating step, python steps, and once after a batch of 2+ mutating steps.
         timeout: the step's time budget in seconds: the session stops a method that runs longer and answers
             TIMEOUT (the session stays usable).
+        params_file: a JSON file with the parameters (a batch: {"steps": [...]}); saves quoting long JSON in a shell.
     """
     from . import api
 
+    if params_file:
+        params = {**_read_params(params_file), **(params or {})}
     snap: Any = snapshot
     if snapshot is not None and look:
         snap = api.snapshot_spec(snapshot, None)
@@ -134,6 +137,27 @@ def blender_call(method: str, params: dict[str, Any] | None = None, session: str
     res = api.call(method, params, session=session, blend=blend, save=save, snapshot=snap,
                    size=size if snapshot else None, stats=stats, checkpoint=checkpoint, timeout=timeout)
     return obj(None, **res)
+
+
+def _read_params(path: str) -> dict:
+    """The JSON object of ``path`` (UTF-8, a BOM tolerated)."""
+    import json
+    from pathlib import Path
+
+    from ..core import paths
+
+    f = Path(path)
+    if not f.is_file():
+        raise SatkError("NOT_FOUND", f"no params file {paths.jpath(f.absolute())}",
+                        hint="give the path of a .json file with the method's parameters")
+    try:
+        data = json.loads(f.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeDecodeError, ValueError) as e:
+        raise SatkError("BAD_PARAMS", f"params file {f.name}: {type(e).__name__}: {e}"[:300],
+                        hint="the file must hold one JSON object, such as {\"steps\": [...]}") from None
+    if not isinstance(data, dict):
+        raise SatkError("BAD_PARAMS", f"params file {f.name} must hold a JSON object, not {type(data).__name__}")
+    return data
 
 
 @op("blender.methods",
@@ -180,27 +204,31 @@ def blender_methods(query: str | None = None, session: str | None = None, limit:
 
 @op("asset.init",
     summary="Start an asset project for authoring in Blender (any kind: vehicle, prop, building, interior, weapon, "
-            "ped, pickup, upgrade): asset.json with kind, intent replace|add, like SID, target platform, tier "
-            "(sa_plus default), target size from the like model, gates G0-G5.",
+            "ped, pickup, upgrade): asset.json with kind, intent replace|add, like SID, platform, tier, target size "
+            "from the like model, gates G0-G5, and the starter inventory at --detail (hero default).",
     summary_ru="Создать проект ассета (asset.json): тип, замена или добавление, образец SID, платформа, уровень "
-               "детализации (по умолчанию sa_plus), размеры образца, этапы G0-G5.",
+               "детализации (по умолчанию sa_plus), размеры образца, этапы G0-G5 и стартовый инвентарь деталей "
+               "(--detail, по умолчанию hero).",
     mcp=False,
     examples=("satk asset init mycar --kind automobile --intent replace --like model:426",
               "satk asset init bench1 --kind prop --dims 1.8,0.6,0.9"))
 def asset_init(dir: str, kind: str | None = None, intent: Literal["replace", "add"] = "add", like: str | None = None,
                target: Literal["sp", "mta", "samp"] = "sp", tier: Literal["vanilla", "sa_plus"] = "sa_plus",
-               dims: list[float] | None = None, force: bool = False) -> dict:
+               dims: list[float] | None = None, force: bool = False,
+               detail: Literal["simple", "standard", "hero", "none"] = "hero") -> dict:
     """Create an asset project (contract K7).
 
     Args:
         dir: project name (-> work/assets/<name>) or a folder under the work directory.
         kind: asset kind (automobile, bike, boat, plane, heli, prop, building, interior_shell, weapon, ped, pickup, ...).
         intent: replace a vanilla model (needs like) or add a new one.
-        like: the vanilla model it replaces or resembles (model:426): class, bands and target size.
+        like: the vanilla model it replaces or resembles (model:426): class and target size.
         target: platform: sp (single player, Mod Loader), mta or samp.
         tier: vanilla (blends into traffic) or sa_plus (more detail, the default for new assets).
         dims: target size in metres: width (x), length (y), height (z); overrides the like model.
         force: overwrite an existing asset.json.
+        detail: ambition of the commission: seeds design/inventory.json (the task list) from the kind's starter at
+            simple, standard or hero (richer than vanilla, the default); none = no inventory.
     """
     from . import project as P
 
@@ -208,7 +236,7 @@ def asset_init(dir: str, kind: str | None = None, intent: Literal["replace", "ad
         raise SatkError("BAD_PARAMS", "--kind is required", data={"kinds": list(P.kinds())},
                         hint="satk asset init <name> --kind automobile|prop|building|weapon|ped|...")
     return obj(None, **P.init(dir, kind=kind, intent=intent, like=like, target=target, tier=tier, dims=dims,
-                              force=force))
+                              force=force, detail=detail))
 
 
 @op("asset.status",
@@ -280,21 +308,47 @@ def _sheet(session: str, up: bool) -> str | None:
 
 
 @op("ref.import",
-    summary="Prepare a reference photo for modelling: EXIF rotation applied and metadata stripped, shrunk to at "
-            "most 1600 px JPEG, plus a copy with a labelled pixel grid to read coordinates for ref.plane "
-            "(points + real distance). Into the project's refs folder or work/refs.",
-    summary_ru="Подготовить фото-референс: без EXIF, не больше 1600 px, JPEG и копия с сеткой пикселей для "
-               "ref.plane.",
-    mcp=False, examples=("satk ref import photo.jpg --project mycar",))
-def ref_import(photo: str, project: str | None = None, max_px: int = 1600, grid: int = 100) -> dict:
+    summary="Prepare a reference photo: EXIF rotation applied and metadata stripped, at most 1600 px JPEG, its view "
+            "(side front rear top = a true elevation; 3q detail = describe only) kept next to it; the hint says to "
+            "describe features, not measure. A pixel-grid copy only with --grid.",
+    summary_ru="Подготовить фото-референс: без EXIF, не больше 1600 px, JPEG и его вид (side/front/rear/top или "
+               "3q/detail); признаки описываются, а не измеряются; сетка пикселей только с --grid.",
+    mcp=False, examples=("satk ref import photo.jpg --project mycar --view side",
+                         "satk ref import street.jpg --project mycar --view 3q"))
+def ref_import(photo: str, project: str | None = None, max_px: int = 1600,
+               view: Literal["side", "front", "rear", "top", "3q", "detail"] | None = None, grid: bool = False,
+               grid_step: int = 100) -> dict:
     """Reference photo preparation.
 
     Args:
         photo: the photo file (jpg, png, webp, bmp, tif).
         project: asset project (its refs folder); omitted = work/refs.
         max_px: longest side in pixels (256-4096).
-        grid: grid step of the coordinate copy in pixels.
+        view: side, front, rear or top for a true elevation (far away, both wheels round: it may go on ref.plane
+            and be compared with look.silhouette); 3q or detail for any other photo (features only, never measured).
+        grid: also write a copy with a labelled pixel grid (opt-in; never for 3q or detail photos).
+        grid_step: grid step of that copy in pixels.
     """
     from .refimg import import_photo
 
-    return obj(None, **import_photo(photo, project=project, max_px=max_px, grid=grid))
+    return obj(None, **import_photo(photo, project=project, max_px=max_px, grid=grid, grid_step=grid_step, view=view))
+
+
+@op("ref.board",
+    summary="One labelled JPEG (about 1 megapixel) of 1-12 reference photos (default: every reference of the project) "
+            "for a review round: the model is judged next to it, by its design features, never by its pixels.",
+    summary_ru="Один подписанный JPEG (около 1 мегапикселя) из 1-12 фото-референсов для раунда ревью.",
+    mcp=False, examples=("satk ref board --project mycar",))
+def ref_board(images: list[str] | None = None, project: str | None = None, labels: list[str] | None = None,
+              cols: int | None = None) -> dict:
+    """Reference board.
+
+    Args:
+        images: photo files (default: the project's references, or work/refs).
+        project: asset project whose refs folder holds the photos and the board.
+        labels: one label per image (default: number, view and name).
+        cols: columns of the board (default 1-3 by the count).
+    """
+    from .refimg import board
+
+    return obj(None, **board(images, project=project, labels=labels, cols=cols))

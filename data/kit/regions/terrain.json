@@ -1,0 +1,50 @@
+{
+ "kind": "terrain",
+ "version": 1,
+ "summary": "Review regions of a large flat map piece (road, ground, landscape): seen from above and from a driver's height looking along it; its underside and skirts are never seen.",
+ "leak": {
+  "cull": true,
+  "gap": false,
+  "inside": false,
+  "floor_exclude": [],
+  "floor_pct": 2.0
+ },
+ "regions": [
+  {
+   "name": "overview",
+   "summary": "the whole piece from above",
+   "cameras": [
+    {
+     "az": 30,
+     "el": 60
+    },
+    {
+     "az": 210,
+     "el": 60
+    }
+   ]
+  },
+  {
+   "name": "edges",
+   "summary": "the edges where it meets the neighbouring pieces (no cracks, no steps)",
+   "cameras": [
+    {
+     "az": 0,
+     "el": 25
+    },
+    {
+     "az": 90,
+     "el": 25
+    },
+    {
+     "az": 180,
+     "el": 25
+    },
+    {
+     "az": -90,
+     "el": 25
+    }
+   ]
+  }
+ ]
+}

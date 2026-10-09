@@ -31,7 +31,7 @@ from . import classes as C
 __all__ = ["CACHE_VERSION", "StyleCache", "cache_paths", "build", "load", "percentiles", "aggregate", "facts"]
 
 #: Bump when :mod:`satk.style.measure` or the aggregation changes meaning (old caches are ignored).
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 #: Below this many models the build runs in-process (a pool costs ~1 s to start on Windows).
 POOL_MIN = 400
 #: Metrics that are lists or bboxes: kept per model, never aggregated.
@@ -71,7 +71,8 @@ def facts(db) -> list[dict]:
     try:
         q = lambda s, *a: conn.execute(s, a).fetchall()  # noqa: E731
         inst: dict[int, list[int]] = {}
-        for mid, interior, n in q("SELECT model_id, area != 0, count(*) FROM inst GROUP BY 1, 2"):
+        # area 13 is drawn in every area (the engine's "everywhere" code): an exterior placement, not an interior
+        for mid, interior, n in q("SELECT model_id, area NOT IN (0, 13), count(*) FROM inst GROUP BY 1, 2"):
             inst.setdefault(mid, [0, 0])[1 if interior else 0] += n
         as_lod = dict(q("SELECT j.model_id, count(*) FROM inst i JOIN inst j ON j.id = i.lod_id GROUP BY 1"))
         objdat = {r[0].lower() for r in q("SELECT name FROM object_data")}

@@ -194,6 +194,7 @@ def duplicate(ctx, p: dict) -> dict:
         c.objects.link(new)
     off = U.vec(p, "offset", M)
     if mirror:
+        bpy.context.view_layer.update()     # an object placed earlier in the same batch has a stale matrix_world
         # world copy = F @ world; the mesh takes a local reflection S (normals flipped) so that the object
         # transform F @ MW @ S keeps a positive scale
         ax = "xyz".index(mirror)
@@ -337,7 +338,7 @@ def measure(ctx, p: dict) -> dict:
 
     pat = U.text(p, "objects", "scene.stats", "*")
     names = [o.name for o in ST.geometry_objects() if fnmatch.fnmatchcase(o.name, pat)]
-    out = ST.collect(names[:200])
+    out = ST.collect(names[:200], full=True)
     if U.flag(p, "precise", "scene.stats", False):
         lo = [float("inf")] * 3
         hi = [float("-inf")] * 3

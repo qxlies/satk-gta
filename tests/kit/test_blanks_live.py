@@ -36,11 +36,11 @@ SHAPING = [
     ("mesh.transform", {"object": CAR + "_body", "select": {"where": ["y<-2.45"]}, "translate": [0, -0.06, 0]}),
     ("mesh.transform", {"object": CAR + "_body", "scale": [1.02, 1, 1], "pivot": "origin"}),
 ]
-#: asset.check rows that must be in band (the acceptance of the blank)
-BAND_ROWS = ("shade.normal_bend", "shade.flat_share", "dff.verts_per_tri", "geo.largest_piece_share",
-             "geo.sliver_share", "uv.zero_area_share", "geo.median_dihedral")
-#: the rows that must not be ``high``/``low`` for the vanilla tier either (its band is the vanilla one)
-SIZE_ROWS = ("veh.hd_tris", "dims.L", "dims.W", "dims.H")
+#: asset.check rows that must stay in band: soft shading and clean UVs/faces. Vertex splits and dihedral medians are
+#: not targets (the blank's paint is one UV island on purpose; counts are reported, never graded)
+BAND_ROWS = ("shade.normal_bend", "shade.flat_share", "geo.sliver_share", "uv.zero_area_share")
+#: the size rows that must not be ``high``/``low`` (triangle counts are reported, never a target)
+SIZE_ROWS = ("dims.L", "dims.W", "dims.H")
 
 
 def _write(pdir: Path, key: str, plan: dict) -> str:
@@ -233,9 +233,57 @@ def test_car_split_fills_the_kit_slots_and_exports_clean(live, cars, tier):
     assert c["blank"]["tris"] > 0 and c["export"]["frames"] >= 50
     from satk.formats.dff import find_embedded_col
 
-    assert find_embedded_col(Path(c["export"]["files"]["dff"]).read_bytes())[1] > 0
+    dff = Path(c["export"]["files"]["dff"]).read_bytes()
+    assert find_embedded_col(dff)[1] > 0
+    # the panel lines shade as the shell they were cut from: at the cut, bonnet/doors/boot carry the normal of the
+    # body next to them (no faceted lids); a crease stays hard
+    assert c["split"]["seams"]["corners"] > 0, c["split"]
+    seams = _seam_angles(dff)
+    for part in ("bonnet_ok", "door_lf_ok", "door_rf_ok"):
+        assert seams[part] and sorted(seams[part])[len(seams[part]) // 2] < 2.0, (part, seams[part])
     lint = get_op("asset.lint").call({"target": c["export"]["files"]["dff"], "preset": "strict"})
     assert lint["summary"]["error"] == 0, lint["summary"]
+
+
+def _seam_angles(dff: bytes) -> dict:
+    """``{part: [degrees]}``: per vertex of a part that lies on another geometry's vertex, the smallest angle between
+    its normal and the other geometry's normals there (model space; 0 = one smooth surface across the cut)."""
+    import math
+
+    from satk.formats.dff import decode_geometries, model_matrices, scan_dff
+
+    info = scan_dff(dff)
+    mm = model_matrices(info.frames)
+    geo = {}
+    for g in decode_geometries(dff):
+        name = info.frames[g.frame].name or ""
+        if name.endswith(("_dam", "_vlo")) or name == "wheel" or g.normals is None:
+            continue
+        m = mm[g.frame]
+        pts, nrm = [], []
+        for i in range(len(g.positions) // 3):
+            x, y, z = g.positions[3 * i:3 * i + 3]
+            a, b, c = g.normals[3 * i:3 * i + 3]
+            pts.append(tuple(x * m[k] + y * m[3 + k] + z * m[6 + k] + m[9 + k] for k in range(3)))
+            v = [a * m[k] + b * m[3 + k] + c * m[6 + k] for k in range(3)]
+            ln = math.sqrt(sum(t * t for t in v)) or 1.0
+            nrm.append([t / ln for t in v])
+        geo[name] = (pts, nrm)
+    out: dict = {}
+    for name, (pts, nrm) in geo.items():
+        if name == "chassis":
+            continue
+        best: dict = {}
+        for other, (q, qn) in geo.items():
+            if other == name:
+                continue
+            for i, p in enumerate(pts):
+                for j, r in enumerate(q):
+                    if abs(p[0] - r[0]) < 0.002 and abs(p[1] - r[1]) < 0.002 and abs(p[2] - r[2]) < 0.002:
+                        d = max(-1.0, min(1.0, sum(nrm[i][k] * qn[j][k] for k in range(3))))
+                        best[i] = min(best.get(i, 180.0), math.degrees(math.acos(d)))
+        out[name] = list(best.values())
+    return out
 
 
 @pytest.mark.game

@@ -8,8 +8,9 @@
 ``kit.blank`` builds the pieces of a plan as ordinary mesh objects named ``<model>_<piece>``: the half body
 (``MIRROR`` modifier on X, clipping and merging on) carries the vanilla part boundaries as the face attribute
 ``satk_part`` (index into the ``part_names`` of the object property ``satk_blank``), material slots follow the kit
-presets (``<model>.<role>``), UV layers ``UVMap``/``UVMap2`` are the paint mapping on ``vehiclegrunge256``, and the
-sill line carries UV seams. ``kit.blank_split`` applies the mirror, cuts the parts out along that attribute (doors per
+presets (``<model>.<role>``), UV layers ``UVMap``/``UVMap2`` are the paint mapping on ``vehiclegrunge256`` (one
+continuous island in its clean part) and the shared atlas regions, faces are smooth with hard edges on material
+borders, and vehicle pieces carry ``satk_sec`` (the game look classifies them as a vehicle). ``kit.blank_split`` applies the mirror, cuts the parts out along that attribute (doors per
 side) into ``<model>_<part>`` objects and, with ``fill``, moves them into the kit slots (``kit.fill``).
 """
 
@@ -27,6 +28,8 @@ from . import util as U
 
 __all__ = ["blank_method", "split_method", "build_piece", "blank_objects"]
 
+#: IDE section of the vehicle blank kinds (the look and the export read ``satk_sec``).
+_SEC = {"automobile": "cars", "bike": "cars", "boat": "cars", "heli": "cars", "plane": "cars"}
 #: A mirrored lamp keeps the right-hand key after the mirror; the left side swaps it when the parts are cut out.
 _MIRROR_ROLE = {"lamp_fr": "lamp_fl", "lamp_rr": "lamp_rl", "lamp_fl": "lamp_fr", "lamp_rl": "lamp_rr"}
 
@@ -80,7 +83,7 @@ def build_piece(piece: dict, spec: dict, model: str, ctx=None, primary: bool = F
     slot = {r: i for i, r in enumerate(roles)}
     for poly, r in zip(me.polygons, piece["role"]):
         poly.material_index = slot[r]
-        poly.use_smooth = False
+        poly.use_smooth = True                # soft from the start; the hard edges are the spec's "sharp" list
     if piece.get("uv"):
         for lname in ("UVMap", "UVMap2"):
             layer = me.uv_layers.new(name=lname)
@@ -89,11 +92,14 @@ def build_piece(piece: dict, spec: dict, model: str, ctx=None, primary: bool = F
                     layer.data[li].uv = (u, v)
     attr = me.attributes.new("satk_part", "INT", "FACE")
     attr.data.foreach_set("value", piece["part"])
-    if piece.get("seam"):
-        want = {tuple(sorted(e)) for e in piece["seam"]}
-        for e in me.edges:
-            if tuple(sorted(e.vertices)) in want:
-                e.use_seam = True
+    seams = {tuple(sorted(e)) for e in piece.get("seam") or []}
+    sharp = {tuple(sorted(e)) for e in piece.get("sharp") or []}
+    for e in me.edges:
+        key = tuple(sorted(e.vertices))
+        if key in seams:
+            e.use_seam = True
+        if key in sharp:
+            e.use_edge_sharp = True
     me.update()
     o = bpy.data.objects.new(name, me)
     (ctx.collection(None) if ctx is not None else bpy.context.scene.collection).objects.link(o)
@@ -106,6 +112,9 @@ def build_piece(piece: dict, spec: dict, model: str, ctx=None, primary: bool = F
     o["satk_blank"] = json.dumps({"kind": spec["kind"], "piece": piece["name"], "primary": primary,
                                   "part_names": piece["part_names"], "parts": spec["parts"], "tier": spec["tier"]})
     o["satk_blank_model"] = model
+    sec = _SEC.get(str(spec.get("kind")))
+    if sec:
+        o["satk_sec"] = sec                   # the game look classifies the session as a vehicle
     return o
 
 
@@ -145,6 +154,10 @@ def _read_mesh(me) -> dict:
     part = [int(d.value) for d in attr.data] if attr is not None else [0] * len(polys)
     return {"verts": verts, "polys": polys, "loops": loops, "mat": [p.material_index for p in me.polygons],
             "uv": uvs, "part": part, "seam": {tuple(sorted(e.vertices)) for e in me.edges if e.use_seam},
+            "sharp": {tuple(sorted(e.vertices)) for e in me.edges if e.use_edge_sharp},
+            "smooth": [p.use_smooth for p in me.polygons],
+            # corner normals of the whole shell: the parts keep them (a cut must not show in the shading)
+            "cn": [tuple(c.vector) for c in me.corner_normals] if hasattr(me, "corner_normals") else None,
             # the evaluated mesh points at evaluated copies of the materials: take the originals by name
             "materials": [bpy.data.materials.get(m.name) if m is not None else None for m in me.materials]}
 
@@ -184,7 +197,7 @@ def _part_mesh(a: dict, faces: list[int], name: str, role_swap=None):
         me.materials.append(a["materials"][m] if m < len(a["materials"]) else None)
     for poly, i in zip(me.polygons, faces):
         poly.material_index = slot[a["mat"][i]]
-        poly.use_smooth = False
+        poly.use_smooth = bool(a["smooth"][i]) if a.get("smooth") else True
         if role_swap is not None:
             sw = role_swap(a["materials"][a["mat"][i]] if a["mat"][i] < len(a["materials"]) else None)
             if sw is not None:
@@ -199,9 +212,23 @@ def _part_mesh(a: dict, faces: list[int], name: str, role_swap=None):
     inv = {new: old for old, new in remap.items()}
     for e in me.edges:
         x, y = e.vertices
-        if tuple(sorted((inv[x], inv[y]))) in a["seam"]:
+        key = tuple(sorted((inv[x], inv[y])))
+        if key in a["seam"]:
             e.use_seam = True
+        if key in a.get("sharp", ()):
+            e.use_edge_sharp = True
     me.update()
+    cn = a.get("cn")
+    if cn:
+        # the shell's own corner normals: along the cut a part's border vertex would otherwise average only its own
+        # faces (a bonnet edge pointing straight up next to a wing side pointing out: a hard crease on every panel
+        # line); with the shell's normals the panels shade as the one surface they were cut from
+        normals = [(0.0, 0.0, 1.0)] * len(me.loops)
+        for poly, i in zip(me.polygons, faces):
+            for li, src in zip(poly.loop_indices, a["loops"][i]):
+                normals[li] = cn[src]
+        me.normals_split_custom_set(normals)
+        me["satk_normals"] = "shell"
     return me
 
 
@@ -249,6 +276,8 @@ def split_method(ctx, p: dict) -> dict:
         pt = slot_of.get(part, {"slot": part})
         o["satk_blank_part_of"] = model
         o["satk_blank_part"] = part
+        if src.get("satk_sec"):
+            o["satk_sec"] = src["satk_sec"]
         o["satk_blank_slot"] = _resolve_slot(pt, side, model)
         made.append(o)
     if not p.get("keep"):
@@ -261,7 +290,24 @@ def split_method(ctx, p: dict) -> dict:
                  "tris": sum(U.tris(o) for o in made), "changed": [o.name for o in made]}
     if p.get("fill"):
         res["fill"] = _fill_slots(ctx, model, made, res)
+    # the panel lines shade as the one surface they were cut from (bonnet, doors, boot next to the body)
+    from .shade import match_seams
+
+    bpy.context.view_layer.update()
+    parts = [o for o in made if _alive(o)]
+    if p.get("fill"):
+        parts = [bpy.data.objects[s] for s, _t in res["fill"] if bpy.data.objects.get(s) is not None]
+    sm = match_seams(parts)
+    if sm.get("corners"):
+        res["seams"] = {"objects": sm["objects"], "corners": sm["corners"]}
     return res
+
+
+def _alive(o) -> bool:
+    try:
+        return bool(o.name)
+    except ReferenceError:
+        return False
 
 
 def _resolve_slot(part: dict, side: str | None, model: str) -> str:

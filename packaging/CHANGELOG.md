@@ -6,6 +6,72 @@ The release zip ships this file as `CHANGELOG.md`.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-09
+
+Public preview. Asset authoring now emphasizes the model's form, construction and finish in the San Andreas
+style, with explicit tasks and independent visual review beside vanilla peers. Counts remain reference
+information. Commands, answers and file layouts can still change before 1.0.
+
+### Added
+
+#### Asset authoring and review
+
+- Style guides describe the vanilla language with evidence: rounded sections, crowned surfaces, joined parts,
+  reference selection and construction for each asset kind. The new
+  [AI asset pipeline](https://github.com/qxlies/satk-gta/blob/v0.4.0/docs/en/asset-pipeline.md) explains six gates
+  (design, form, compose, detail, surface, finish), independent critique and final polishing with your own agents.
+  Portable builder, critic and polisher prompts are included; the maintainers' agent harness is not distributed.
+- Live Blender form tools: `mesh.loft` with shape sections, `mesh.sweep`, soft `mesh.transform` moves,
+  `mesh.relax`, `mesh.deform`, `mesh.attach` (snap, weld, bridge) and `mesh.flare` with return lips and liners.
+- Inventories: `asset init --detail` creates `design/inventory.json` from a per-kind starter list;
+  `scene.tag` associates real geometry with items, and `asset inventory` reports built, missing, unattached and
+  rejected parts from a session, `.blend` or exported DFF. Validation checks waivers and attachments; kit exports
+  carry an inventory sidecar.
+- `asset check --strict`: a definition of done backed by the inventory, per-kind coverage, mesh defects and
+  full recorded leak checks for every exported DFF, including LODs. The answer lists `blocking` and `advice`.
+- `blender preview --regions`: close-up sheets for each kind, including hidden interiors, backs and undersides.
+  `look leak` locates holes and slits, records coverage and ties each package report to the checked DFF bytes.
+- Checks for degenerate or flipped geometry, UV defects, part coverage and wasted density on flat surfaces
+  (`form.dense_flat`); texture look advice and additional photo-like finishing options.
+
+#### Other tools
+
+- Crash analysis resolves matching PDB symbols for MTA modules, including function offsets and source lines;
+  dump module information includes PDB identity, and stack rows identify the symbol source.
+- Engine helpers accept `--fork` for separate checkouts. `engine worktree` manages full or sparse server
+  worktrees with a profile derived from premake and a refresh operation. `engine test` selects client/satk
+  suites and Win32/x64 platforms; patch-site checks, generation and scanning support engine development.
+- `ingame bench` and `bench-compare`: repeatable benchmark scenes and result comparisons. Launch-time
+  `--conf`/`--cvar` overrides and restart-based presets configure a run without rewriting shared settings.
+- `satk obs`: validate, inspect, summarize, convert and merge engine traces and benchmark results;
+  JSON Schemas for the shared timeline, JSONL records and bench documents, plus `.saenet`/`.saerec` containers.
+- `satk pack`: deterministic `.saepak` containers with manifests and chunk hashes, derived-asset cache files
+  (normals, tangents, night colours and light effects) and a texture-deduplication census. These are file tools;
+  the release does not supply an engine that mounts the containers.
+- `satk imagegen`: optional image-endpoint icon generation, chroma-key cleanup, contact sheets and provenance;
+  Pillow placeholder sets work without a key or network. The public key variable is `SATK_IMAGEGEN_API_KEY`.
+
+### Changed
+
+- `asset check` groups evidence into engine, form, fit, symmetry, coverage, reference, mesh and texture
+  sections. Triangle and shading counts are information rather than style grades; strict completion still
+  requires all blocking defects to be resolved. Live session stats report changed geometry and located form
+  problems without assigning count-based verdicts.
+- Kit blanks have softer bodies, more vehicle body variants (including a scooter), rounded lined arches and
+  fuller front/rear composition. `kit.shade` follows material/UV seams and designed creases.
+- Previews of live session meshes use the same class paint, dirt and wheel placement as exported models;
+  lineup selection favors relevant vanilla peers. Conversion guidance treats shading numbers as reference.
+
+### Fixed
+
+- Kit exports no longer duplicate the clump extension when embedding vehicle collision.
+- Region, LOD and leak checks cover every supported kind and infer a kit export's kind from its inventory
+  sidecar. Strict completion rejects placeholder tags, invalid inventory shortcuts and stale or edited leak
+  reports.
+- Derived-asset cache runs retain models in different folders that share the same file name.
+- Image generation uses a satk-specific API-key setting; offline fixtures avoid token-shaped strings while
+  retaining key-redaction coverage.
+
 ## [0.3.0] - 2026-10-06
 
 Public preview. The second public version: new assets in the San Andreas style made in Blender, many more modding
@@ -222,6 +288,7 @@ First internal version, used from a git checkout.
   linter, crash dumps, game-ready export from Blender, offline HTML catalog, extended index (water,
   timecyc, handling and more), model descriptions, knowledge base of engine sources, in-game agent for MTA.
 
-[Unreleased]: https://github.com/qxlies/satk-gta/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/qxlies/satk-gta/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/qxlies/satk-gta/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/qxlies/satk-gta/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/qxlies/satk-gta/releases/tag/v0.2.1

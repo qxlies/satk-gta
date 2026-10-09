@@ -1,0 +1,236 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "bmx",
+ "summary": "pedal bicycle: a thin tube frame, fork and bars, two spoked wheels, chainset and pedals that animate.",
+ "regions": {
+  "overall": {
+   "summary": "the whole bicycle, side and 3/4 views",
+   "views": []
+  },
+  "frame": {
+   "summary": "tubes and joints",
+   "views": [
+    "left",
+    "right"
+   ]
+  },
+  "drivetrain": {
+   "summary": "chainset, pedals, chain, sprocket",
+   "views": [
+    "drivetrain"
+   ]
+  },
+  "wheels": {
+   "summary": "rims, spokes, hubs, tyres, brakes",
+   "views": [
+    "wheels"
+   ]
+  },
+  "cockpit": {
+   "summary": "bars, grips, stem, seat",
+   "views": [
+    "cockpit"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "frame",
+   "name": "Frame tubes",
+   "region": "frame",
+   "category": "structure",
+   "construction": "top tube, down tube, seat tube and stays swept with a round profile and joined at the joints",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "chassis"
+  },
+  {
+   "key": "wheel_front",
+   "name": "Front wheel",
+   "region": "wheels",
+   "category": "wheel",
+   "construction": "lathe tyre and rim, a hub, spokes as thin sweeps or a spoke card",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "wheel_front"
+  },
+  {
+   "key": "wheel_rear",
+   "name": "Rear wheel",
+   "region": "wheels",
+   "category": "wheel",
+   "construction": "lathe tyre and rim, hub with the sprocket, spokes",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "wheel_rear"
+  },
+  {
+   "key": "forks_front",
+   "name": "Fork",
+   "region": "frame",
+   "category": "running_gear",
+   "construction": "fork legs and steerer through the head tube",
+   "attaches_to": "frame",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "forks_front"
+  },
+  {
+   "key": "handlebars",
+   "name": "Handlebars and stem",
+   "region": "cockpit",
+   "category": "control",
+   "construction": "bar with a crossbar on a stem",
+   "attaches_to": "forks_front",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "handlebars"
+  },
+  {
+   "key": "grips",
+   "name": "Grips",
+   "region": "cockpit",
+   "category": "control",
+   "construction": "soft grips at the bar ends",
+   "attaches_to": "handlebars",
+   "stage": "G2",
+   "detail": "simple",
+   "count": 2,
+   "frame": "bargrip"
+  },
+  {
+   "key": "seat",
+   "name": "Saddle and post",
+   "region": "cockpit",
+   "category": "interior",
+   "construction": "padded saddle on a post into the seat tube",
+   "attaches_to": "frame",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "chainset",
+   "name": "Chainring and cranks",
+   "region": "drivetrain",
+   "category": "mechanism",
+   "construction": "chainring disc with the crank arms through the bottom bracket",
+   "attaches_to": "frame",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "chainset"
+  },
+  {
+   "key": "pedals",
+   "name": "Pedals",
+   "region": "drivetrain",
+   "category": "mechanism",
+   "construction": "pedal blocks on the crank ends",
+   "attaches_to": "chainset",
+   "stage": "G2",
+   "detail": "simple",
+   "count": 2,
+   "frame": [
+    "pedal_l",
+    "pedal_r"
+   ]
+  },
+  {
+   "key": "chain",
+   "name": "Chain",
+   "region": "drivetrain",
+   "category": "mechanism",
+   "construction": "thin swept band from the chainring to the sprocket",
+   "attaches_to": [
+    "chainset",
+    "wheel_rear"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "brakes",
+   "name": "Brakes",
+   "region": "wheels",
+   "category": "running_gear",
+   "construction": "U-brake or caliper on the stays with a lever and a cable",
+   "attaches_to": [
+    "frame",
+    "handlebars"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "pegs",
+   "name": "Stunt pegs",
+   "region": "wheels",
+   "category": "structure",
+   "construction": "short tubes on the axle ends",
+   "attaches_to": [
+    "wheel_rear",
+    "wheel_front"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "required": false,
+   "count": 2
+  },
+  {
+   "key": "reflectors",
+   "name": "Reflectors",
+   "region": "frame",
+   "category": "lamp",
+   "construction": "small reflector cards on the seat post and wheels",
+   "attaches_to": [
+    "frame",
+    "seat"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "required": false
+  },
+  {
+   "key": "cables",
+   "name": "Brake cables",
+   "region": "cockpit",
+   "category": "control",
+   "construction": "cables swept from the levers along the frame",
+   "attaches_to": "handlebars",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "spokes_geometry",
+   "name": "Spokes as geometry",
+   "region": "wheels",
+   "category": "wheel",
+   "construction": "crossed thin spokes from hub to rim",
+   "attaches_to": [
+    "wheel_front",
+    "wheel_rear"
+   ],
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "gyro_number_plate",
+   "name": "Number plate or gyro",
+   "region": "cockpit",
+   "category": "sign",
+   "construction": "race plate card on the bars or a rotor under the stem",
+   "attaches_to": "handlebars",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/bmx.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

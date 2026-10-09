@@ -1,0 +1,117 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "weapon_melee",
+ "summary": "melee or thrown weapon along +Z: blade, head or body up, grip down; no barrel, magazine or flash.",
+ "regions": {
+  "overall": {
+   "summary": "the whole weapon from both sides",
+   "views": []
+  },
+  "blade": {
+   "summary": "blade, head or body, its edge and tip",
+   "views": [
+    "blade",
+    "tip",
+    "sides"
+   ]
+  },
+  "grip": {
+   "summary": "grip, guard, wrap and pommel",
+   "views": [
+    "grip",
+    "ends"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "blade",
+   "name": "Blade or head",
+   "region": "blade",
+   "category": "shell",
+   "construction": "the blade (knife, katana), head (bat, club, nightstick) or body (grenade, spray can) along +Z: lofted or lathed with a bevelled edge",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "grip",
+   "name": "Grip",
+   "region": "grip",
+   "category": "weapon_part",
+   "construction": "the grip along -Z below the blade: lathe or loft with a slight taper and a soft section",
+   "attaches_to": "blade",
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "guard",
+   "name": "Guard or collar",
+   "region": "grip",
+   "category": "weapon_part",
+   "construction": "a guard, ferrule or collar where the blade meets the grip (a flat disc, a cross bar or a ring)",
+   "attaches_to": [
+    "blade",
+    "grip"
+   ],
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "pommel",
+   "name": "Pommel or end cap",
+   "region": "grip",
+   "category": "weapon_part",
+   "construction": "the pommel or end cap at the bottom of the grip, rounded",
+   "attaches_to": "grip",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "texture",
+   "name": "Photo texture",
+   "region": "overall",
+   "category": "decal",
+   "construction": "small soft photo texture: metal sheen on the blade, wrap or wood on the grip",
+   "attaches_to": "blade",
+   "stage": "G4",
+   "detail": "simple"
+  },
+  {
+   "key": "edge_bevel",
+   "name": "Edge or striking face",
+   "region": "blade",
+   "category": "trim",
+   "construction": "the cutting edge or striking face as a bevel band along the blade (inset and scale)",
+   "attaches_to": "blade",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "grip_wrap",
+   "name": "Grip wrap or rings",
+   "region": "grip",
+   "category": "trim",
+   "construction": "wrap ridges, rings or rivets on the grip as geometry where they read",
+   "attaches_to": "grip",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "fittings",
+   "name": "Fittings",
+   "region": "grip",
+   "category": "trim",
+   "construction": "rivets, a lanyard hole, a tang end or a cap screw as the design has them",
+   "attaches_to": "grip",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  }
+ ]
+}

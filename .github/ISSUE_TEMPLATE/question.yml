@@ -26,4 +26,4 @@ body:
     attributes:
       label: satk version
       description: The `satk` and `python` fields of `satk version`, if satk is installed.
-      placeholder: "satk 0.3.0, python 3.12.10"
+      placeholder: "satk 0.4.0, python 3.12.10"

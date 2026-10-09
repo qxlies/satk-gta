@@ -22,6 +22,7 @@ from .common import (
     find_msbuild,
     find_premake,
     find_rc,
+    fork_profile,
     layout,
     read_json,
     sha256_file,
@@ -36,11 +37,16 @@ def _r(status: str, msg: str, fix: str | None = None) -> dict:
     return {"status": status, "msg": msg, "fix": fix}
 
 
+def _fork_arg(L: Layout) -> str:
+    return "" if L.is_default else f" --fork {jpath(L.fork)}"
+
+
 def _fork(L: Layout, deep: bool) -> dict:
     from .setup import fork_info
 
     if not (L.fork / ".git").exists():
-        return _r("fail", f"no fork checkout at {jpath(L.fork)}", "satk engine setup")
+        return _r("fail", f"no fork checkout at {jpath(L.fork)}",
+                  "satk engine setup" if L.is_default else "satk engine worktree create --path <work>/wt/<name> --branch <branch>")
     info = fork_info(L)
     msg = f"branch {info['branch']} @ {info['head']}, base {info['base']}, {info['ahead_of_base']} commit(s) ahead"
     if info["dirty"]:
@@ -170,6 +176,8 @@ def _premake(L: Layout, deep: bool) -> dict:
 
 
 def _dxfiles(L: Layout, deep: bool) -> dict:
+    if fork_profile(L) == "server":
+        return _r("skip", "server profile: no client in the tree")
     h = L.dxfiles / "Include" / "d3dx9.h"
     lib = L.dxfiles / "Lib" / "x86" / "d3dx9.lib"
     if not h.is_file():
@@ -219,6 +227,8 @@ def _installed(L: Layout, deep: bool) -> dict:
     if bad:
         sev = "fail" if any(s.endswith(":mismatch") for s in bad) else "warn"
         return _r(sev, "not installed/verified: " + ", ".join(bad), "satk engine setup --deps")
+    if fork_profile(L) == "server":
+        return _r("ok", "server profile: net_64.dll matches the pin")
     return _r("ok", "CEF, discord-rpc, rapidjson, unifont installed; net.dll/net_64/netc match the pins")
 
 
@@ -226,7 +236,7 @@ def _sln(L: Layout, deep: bool) -> dict:
     from .build import gen_fingerprint, gen_state
 
     if not L.sln.is_file():
-        return _r("warn", "Build/MTASA.sln missing", "satk engine gen")
+        return _r("warn", "Build/MTASA.sln missing", "satk engine gen" + _fork_arg(L))
     st = gen_state(L)
     try:
         fresh = st.get("fingerprint") == gen_fingerprint(L)
@@ -235,7 +245,7 @@ def _sln(L: Layout, deep: bool) -> dict:
     n = len(list((L.fork / "Build").glob("*.vcxproj")))
     if not fresh:
         return _r("warn", f"MTASA.sln ({n} projects) is older than the tree/deps; build regenerates it",
-                  "satk engine gen")
+                  "satk engine gen" + _fork_arg(L))
     return _r("ok", f"MTASA.sln, {n} projects, generated {st.get('time')}")
 
 
@@ -246,17 +256,20 @@ def _bins(L: Layout, deep: bool) -> dict:
     missing = [r[1] for r in rows if not r[2]]
     if missing:
         return _r("warn", f"{len(rows) - len(missing)}/{len(rows)} key outputs built; missing e.g. {missing[0]}",
-                  "satk engine build --project all")
+                  "satk engine build --project all" + _fork_arg(L))
+    if fork_profile(L) == "server":
+        return _r("ok", f"all {len(rows)} key outputs present (server x64 + Tests_Client)")
     return _r("ok", f"all {len(rows)} key outputs present (client Win32 + server x64)")
 
 
 def _disk(L: Layout, deep: bool) -> dict:
-    free = disk_free_gb(L.root)
+    where = L.root if L.is_default else L.fork
+    free = disk_free_gb(where)
     if free < 5:
-        return _r("fail", f"{free} GB free on {L.root.drive}", "free disk space (Build/obj ~5 GB per config)")
+        return _r("fail", f"{free} GB free on {where.drive}", "free disk space (Build/obj ~5 GB per config)")
     if free < 12:
-        return _r("warn", f"{free} GB free on {L.root.drive} (< 12 GB)", "free disk space before big builds")
-    return _r("ok", f"{free} GB free on {L.root.drive}")
+        return _r("warn", f"{free} GB free on {where.drive} (< 12 GB)", "free disk space before big builds")
+    return _r("ok", f"{free} GB free on {where.drive}")
 
 
 CHECKS: dict[str, Callable[[Layout, bool], dict]] = {
@@ -278,8 +291,8 @@ CHECKS: dict[str, Callable[[Layout, bool], dict]] = {
 }
 
 
-def run_checks(deep: bool = False) -> list[dict]:
-    L = layout()
+def run_checks(deep: bool = False, L: Layout | None = None) -> list[dict]:
+    L = L or layout()
     out = []
     for name, fn in CHECKS.items():
         try:
@@ -309,13 +322,16 @@ def _doctor_engine() -> dict:
     return summary(run_checks(deep=False))
 
 
-def status(deep: bool = False) -> dict:
-    """Compact engine state for ``satk_status`` / ``satk engine status``."""
+def status(deep: bool = False, L: Layout | None = None) -> dict:
+    """Compact engine state for ``satk_status`` / ``satk engine status`` (``L``: a second fork, ``--fork``)."""
     from .build import artifacts, gen_state
     from .setup import fork_info, load_lock
 
-    L = layout()
+    L = L or layout()
     out: dict = {"fork": fork_info(L) if (L.fork / ".git").exists() else {"exists": False, "path": jpath(L.fork)}}
+    if not L.is_default:
+        out["fork_id"] = L.fork_id
+        out["profile"] = fork_profile(L) or "full"
     state = read_json(L.state, {}) or {}
     out["builds"] = state.get("builds", {})
     g = gen_state(L)
@@ -327,7 +343,7 @@ def status(deep: bool = False) -> dict:
     out["outputs"] = f"{sum(1 for r in rows if r[2])}/{len(rows)}"
     out["disk_free_gb"] = disk_free_gb(L.root)
     if deep:
-        out["checks"] = summary(run_checks(deep=True))
+        out["checks"] = summary(run_checks(deep=True, L=L))
     return out
 
 

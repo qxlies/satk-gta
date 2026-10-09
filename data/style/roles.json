@@ -110,5 +110,20 @@
     "tex.colours",
     "tex.colours15"
   ],
-  "max_edges": 4
+  "max_edges": 4,
+  "look": {
+    "_comment": [
+      "Look advice of style.texture and the asset.check texture section (satk.style.texture.look_advice), against the vanilla",
+      "sample of the texture's role: 'flat/CG-clean' when tex.tone_mid (fine tonal variation) is below the role's tone_mid_pct",
+      "percentile, or tex.flat_share (dead-flat 5x5 patches) is above its flat_share_pct percentile and at least flat_share_min;",
+      "'too sharp' when tex.crisp (edge contrast / fine variation) is above its crisp_pct percentile. At p5/p95 about 5-8 % of",
+      "the vanilla sample of each role gets advice (decals and car paint are flat by design: their own bands allow it). The bin of",
+      "the first atelier run (ls_bin_paint, role prop): tone_mid 0.81 (vanilla prop p5 1.3, p50 7.3), flat share 0.66 (p95 0.27),",
+      "crisp 72 (p95 43): both. Advice only: never a gate."
+    ],
+    "tone_mid_pct": 5,
+    "flat_share_pct": 95,
+    "flat_share_min": 0.2,
+    "crisp_pct": 95
+  }
 }

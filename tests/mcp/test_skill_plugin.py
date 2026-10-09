@@ -126,6 +126,7 @@ def _companions() -> list[str]:
 def test_companion_files_travel_with_the_skill(home, tmp_path, run_cli):
     rels = _companions()
     assert "style/README.md" in rels and "briefs/asset-brief.md" in rels
+    assert "briefs/asset-roles.md" in rels
     dest = tmp_path / "other"
     env = run_cli(["agent", "install-skill", "--dest", str(dest)]).json
     assert env["rows"][0][2:] == ["ok", "installed"]

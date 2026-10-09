@@ -1,0 +1,92 @@
+{
+ "kind": "weapon",
+ "version": 1,
+ "summary": "Close-up review regions of a hand-held weapon (barrel along +X, grip down).",
+ "leak": {
+  "cull": true,
+  "gap": false,
+  "inside": false,
+  "see_through_block": true,
+  "floor_exclude": [],
+  "floor_pct": 0.5,
+  "slit": false
+ },
+ "regions": [
+  {
+   "name": "left",
+   "summary": "left side (camera at +Y): receiver, sights, stock",
+   "cameras": [
+    {
+     "az": 0,
+     "el": 4,
+     "ortho": true
+    }
+   ]
+  },
+  {
+   "name": "right",
+   "summary": "right side (camera at -Y): receiver, ejection port, stock",
+   "cameras": [
+    {
+     "az": 180,
+     "el": 4,
+     "ortho": true
+    }
+   ]
+  },
+  {
+   "name": "muzzle",
+   "summary": "muzzle end: bore, front sight, barrel shroud",
+   "box": {
+    "x": [
+     0.72,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 90,
+     "el": 6
+    },
+    {
+     "az": 55,
+     "el": 15
+    }
+   ]
+  },
+  {
+   "name": "grip",
+   "summary": "grip, trigger, guard, magazine",
+   "box": {
+    "x": [
+     0.15,
+     0.7
+    ],
+    "z": [
+     0.0,
+     0.65
+    ]
+   },
+   "cameras": [
+    {
+     "az": 20,
+     "el": 8
+    },
+    {
+     "az": 160,
+     "el": 8
+    }
+   ]
+  },
+  {
+   "name": "top",
+   "summary": "top: sights, rails, receiver cover",
+   "cameras": [
+    {
+     "az": 0,
+     "el": 80
+    }
+   ]
+  }
+ ]
+}

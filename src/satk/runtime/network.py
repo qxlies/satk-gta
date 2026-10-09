@@ -52,6 +52,9 @@ ALLOWED: dict[str, tuple[frozenset[str], str]] = {
                                  "satk engine setup downloads pinned MTA build dependencies (explicit command)"),
     "src/satk/release/fetch.py": (frozenset({"urllib.request"}),
                                   "satk dev release downloads pinned files from python.org/PyPI (explicit command)"),
+    "src/satk/imagegen/client.py": (frozenset({"urllib.request", "urllib.error"}),
+                                    "satk imagegen generate/icon-set call the image endpoint with the user's own key "
+                                    "(explicit commands, CLI only); redirects are not followed"),
     "src/satk/notes/db.py": (frozenset({"urllib.request"}),
                              "pathname2url only (file: URI for SQLite); no connection"),
 }
@@ -62,7 +65,8 @@ SCAN_DIRS: tuple[str, ...] = ("src", "vendor", "blender", "scripts", "packaging"
 #: One line for ``satk doctor`` and the bug report.
 POLICY = ("network: none by default (no internet access, no telemetry); loopback 127.0.0.1 only for the "
           "viewer, the game and SAAP; downloads only on explicit commands "
-          "(satk engine setup, satk dev release, bootstrap -Deps)")
+          "(satk engine setup, satk dev release, bootstrap -Deps) and image generation with the user's own key "
+          "(satk imagegen generate, icon-set)")
 
 
 @dataclass(frozen=True)

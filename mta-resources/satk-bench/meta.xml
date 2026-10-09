@@ -1,0 +1,13 @@
+<meta>
+    <!-- satk-bench (MIT): the frame-time and memory bench of the sa-engine loop (`satk ingame bench`). A client
+         scene runner: satk sends one stage at a time (environment, camera, client-side vehicles and peds,
+         warm-up, sample) through the satk-agent bridge (lua.exec -> export `bench`) and reads the result back
+         as JSON. Written from scratch; no code of other test resources. Loopback servers only. -->
+    <info author="satk" name="satk-bench" version="1.0.0" type="script"
+          description="satk bench: per-frame timing, VA, streaming and engine counters per scene"/>
+
+    <script src="stats.lua" type="client"/>
+    <script src="client.lua" type="client"/>
+
+    <export function="bench" type="client"/>
+</meta>

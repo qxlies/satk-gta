@@ -36,3 +36,30 @@ def test_call_on_a_missing_named_session(satk_home, run_cli):
     assert r.json["error"]["hint"] == "satk blender session start --name car"
     r = run_cli(["blender", "methods", "--session", "car"])
     assert r.json["error"]["code"] == "NOT_READY"
+
+
+def test_call_params_file(satk_home, run_cli, tmp_path):
+    f = tmp_path / "steps.json"
+    f.write_text('﻿{"steps": [{"method": "scene.info"}]}', encoding="utf-8")   # a BOM is fine
+    r = run_cli(["blender", "call", "batch", "--params-file", str(f), "--session", "car"])
+    assert r.json["error"]["code"] == "NOT_READY"                                  # read, then no session
+    r = run_cli(["blender", "call", "batch", "--params-file", str(tmp_path / "nope.json"), "--session", "car"])
+    assert r.json["error"]["code"] == "NOT_FOUND" and "nope.json" in r.json["error"]["msg"]
+    bad = tmp_path / "bad.json"
+    bad.write_text("[1, 2]", encoding="utf-8")
+    r = run_cli(["blender", "call", "batch", "--params-file", str(bad), "--session", "car"])
+    assert r.json["error"]["code"] == "BAD_PARAMS" and "JSON object" in r.json["error"]["msg"]
+    from satk.studio.ops import _read_params
+
+    assert _read_params(str(f)) == {"steps": [{"method": "scene.info"}]}
+    names = [x.name for x in get_op("blender.call").params]
+    assert "params_file" in names
+
+
+def test_prepare_makes_string_paths_absolute_only(tmp_path, monkeypatch):
+    from satk.studio import api
+
+    monkeypatch.chdir(tmp_path)
+    p = api.prepare("python", {"code": "x", "out": "dump.json"})
+    assert p["out"] == str(tmp_path / "dump.json")
+    assert api.prepare("mesh.flare", {"object": "b", "out": 0.03})["out"] == 0.03

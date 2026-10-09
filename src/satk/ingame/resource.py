@@ -23,11 +23,13 @@ from ..core import paths
 from ..core.errors import SatkError
 from . import spots as SP
 
-__all__ = ["LOGIC", "CONTENT", "lua", "logic_source", "install_logic", "content_files", "manifest",
-           "build_content", "sha256"]
+__all__ = ["LOGIC", "CONTENT", "BENCH", "lua", "logic_source", "install_logic", "bench_source", "install_bench",
+           "content_files", "manifest", "build_content", "sha256"]
 
 LOGIC = "satk-testdrive"
 CONTENT = "satk-testdrive-mod"
+BENCH = "satk-bench"
+BENCH_DFF = "gen/probe.dff"
 _LUA_RESERVED = frozenset("and break do else elseif end false for function if in local nil not or repeat return "
                           "then true until while".split())
 
@@ -124,6 +126,40 @@ def install_logic(resources: Path) -> dict[str, Any]:
         if _write_if_changed(dst / rel, data):
             changed.append(rel)
     return {"dir": paths.jpath(dst), "changed": changed, "sha": digest.hexdigest()[:12]}
+
+
+def bench_source() -> Path:
+    """``mta-resources/satk-bench`` of this checkout."""
+    from ..core.config import REPO_ROOT
+
+    return REPO_ROOT / "mta-resources" / BENCH
+
+
+def install_bench(resources: Path) -> dict[str, Any]:
+    """Copy ``satk-bench`` into ``resources/satk-bench`` and add the generated probe DFF of the loader scene.
+
+    The DFF (:mod:`satk.ingame.benchdff`, about 2 MiB) is written to ``gen/probe.dff`` and listed in the installed
+    ``meta.xml`` only, so the repository copy stays free of models and lints clean. ``changed`` lists rewritten files.
+    """
+    from .benchdff import synthetic_dff
+
+    src = bench_source()
+    if not (src / "meta.xml").is_file():
+        raise SatkError("NOT_READY", f"resource source missing: {paths.jpath(src)}")
+    dst = resources / BENCH
+    changed = []
+    for f in sorted(p for p in src.rglob("*") if p.is_file()):
+        rel = f.relative_to(src).as_posix()
+        data = f.read_bytes()
+        if rel == "meta.xml":
+            text = data.decode("utf-8")
+            line = f'    <file src="{BENCH_DFF}"/>' + chr(10)
+            data = text.replace("</meta>", line + "</meta>").encode("utf-8")
+        if _write_if_changed(dst / rel, data):
+            changed.append(rel)
+    if _write_if_changed(dst / BENCH_DFF, synthetic_dff()):
+        changed.append(BENCH_DFF)
+    return {"dir": paths.jpath(dst), "changed": changed}
 
 
 def content_files(specs) -> tuple[dict[str, bytes], dict[str, dict[str, str]]]:

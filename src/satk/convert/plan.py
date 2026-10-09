@@ -16,8 +16,13 @@ from ..core import paths, resources
 from ..core.errors import SatkError
 
 FORMAT = "satk.convert-plan/1"
-VERSION = 3
-_REQUEST_KEYS = ("version", "kind", "group", "like", "name", "tier", "dims", "profile", "budget", "bands",
+VERSION = 4
+#: Engine safety cap of the reduction (triangles in one conversion): a geometry holds at most 65,535 vertices and
+#: a triangle needs at most 3 of its own, so the converted mesh can never break that limit. It is not a style
+#: target: below it the source keeps its detail (planar dissolve only).
+ENGINE_MAX_VERTS = 65_535
+MAX_TRIS = ENGINE_MAX_VERTS // 3
+_REQUEST_KEYS = ("version", "kind", "group", "like", "name", "tier", "dims", "profile", "limit", "bands",
                  "presets", "texture_distribution", "template", "style_class")
 _DEVICE = re.compile(r"(?:con|prn|aux|nul|com[1-9]|lpt[1-9])", re.I)
 
@@ -178,9 +183,9 @@ def validate(plan: dict, path: Path) -> None:
                 raise ValueError("invalid input fingerprint")
         if plan["presets"] != resources.read_json("convert", "presets.json"):
             raise ValueError("conversion settings have changed")
-        budget = plan["budget"]
-        if not 4 <= budget["lo"] <= budget["target"] <= budget["hi"]:
-            raise ValueError("invalid triangle budget")
+        limit = plan["limit"]
+        if not (isinstance(limit["max_tris"], int) and 4 <= limit["max_tris"] <= MAX_TRIS):
+            raise ValueError("invalid triangle safety cap")
         template = plan["template"]
         if template["name"] != plan["name"]:
             raise ValueError("template name differs")
@@ -274,20 +279,14 @@ def prepare(model: str, *, kind: str = "prop", like: str | None = None, tier: st
     if not like and C.family(cls) == "map":
         target = C.peer_key(cls, C.size_bucket(max(dims)))
     metric = "veh.hd_tris" if group == "vehicle" and kind != "vehicle_upgrade" else "geo.tris"
-    bands = S.profile(target, tier, metrics=[metric, "geo.tris", "part.tris[wheel]", "part.tris[chassis]",
-                                            "shade.normal_bend", "shade.flat_share"],
-                      profile_name=profile)
-    band = bands.get(metric)
-    if not band:
-        raise SatkError("NOT_READY", f"no {metric} style band for {target}", hint="satk style build")
-    lo, hi = max(4, math.ceil(band["lo"])), math.floor(band["hi"])
-    budget = {"metric": metric, "lo": lo, "hi": hi, "target": round(lo + 0.7 * (hi - lo)),
-              "peer_set": band["peer_set"], "status": band["status"]}
+    # shading numbers are the class reference; triangle counts are never a target (only the engine cap below)
+    bands = S.profile(target, tier, metrics=["shade.normal_bend", "shade.flat_share"], profile_name=profile)
+    limit = {"metric": metric, "max_tris": MAX_TRIS, "why": f"engine: {ENGINE_MAX_VERTS} vertices per geometry"}
     dist = vanilla(profile)
     # The values behind the percentile estimates are not needed in Blender or the conversion manifest.
     dist = {"roles": {r: {"n": d["n"], "metrics": d["metrics"]} for r, d in dist["roles"].items()}}
     request = {"version": VERSION, "source": fingerprints(dependencies(source)), "kind": kind, "group": group, "like": like,
-               "name": name, "tier": tier, "dims": dims, "profile": profile, "budget": budget,
+               "name": name, "tier": tier, "dims": dims, "profile": profile, "limit": limit,
                "bands": bands, "presets": presets, "texture_distribution": dist, "template": template,
                "style_class": target}
     key = hashlib.sha256(json.dumps(request, sort_keys=True).encode("utf-8")).hexdigest()

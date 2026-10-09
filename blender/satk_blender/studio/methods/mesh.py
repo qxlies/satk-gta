@@ -5,16 +5,18 @@
 # License, or (at your option) any later version. See LICENSE in this directory.
 """``mesh.*``: geometry building blocks with explicit density (no default segment counts for round shapes).
 
-Shapes: ``primitive``, ``loft`` (sections along an axis, optionally mirrored halves), ``lathe`` (a profile
-spun around an axis, with cylindrical UVs), ``curve`` (poly or smooth curves, tubes). Edits on a face selection:
-``extrude``, ``inset``, ``solidify``, ``transform``, ``bevel``, ``subdivide``, ``delete``, ``normals``, ``group``, ``mark``; on the
-whole mesh: ``loopcut`` (cuts at exact positions along an axis), ``bisect``, ``symmetrize``, ``bridge``,
-``merge``, ``dissolve`` (limited, planar by default).
+Shapes: ``primitive`` (also ``rounded_box`` and ``capsule``, smooth-shaded), ``lathe`` (a profile spun around an
+axis, with cylindrical UVs), ``curve`` (poly or smooth curves, tubes); ``loft`` and ``sweep`` live in
+:mod:`.form`. Edits on a face selection: ``extrude``, ``inset``, ``solidify``, ``transform`` (with a soft
+``falloff``), ``bevel``, ``subdivide``, ``delete``, ``normals``, ``group``, ``mark``; on the whole mesh:
+``loopcut`` (cuts at exact positions along an axis), ``bisect``, ``symmetrize``, ``bridge``, ``merge``,
+``dissolve`` (limited, planar by default).
 
 Face selector ``select`` (keys combine with AND; object space; default every face)::
 
     {"side": "+z", "within": 30}   {"normal": [0, 0.7, 0.7], "within": 20}   {"where": ["z>0.4", "y<-1.2"]}
     {"box": [[x0, y0, z0], [x1, y1, z1]]}   {"group": "roof"}   {"material": "glass"}   {"invert": true}
+    {"near": {"point": [x, y, z], "radius": r}}   {"loop": {"point": [x, y, z], "dir": "z", "ring": false}}   {"grow": 1}
 
 ``save_group`` stores the new faces' vertices as a vertex group, so later steps select by name
 (``{"group": "roof"}``) instead of by coordinates.
@@ -35,7 +37,7 @@ from mathutils import Euler, Matrix, Vector
 
 from satk.core.errors import SatkError
 from satk.studio.core import readonly
-from satk.studio.mock import primitive_counts, primitive_dims
+from satk.studio.mock import SOFT_KINDS, primitive_counts, primitive_dims, soft_mesh
 
 from . import _util as U
 from .uv import cylinder_uvs
@@ -88,8 +90,37 @@ def _build(bm, kind: str, p: dict, dims: list[float]) -> None:
                                 segments=int(p["segments"]), radius=float(p.get("radius", 0.5)), calc_uvs=uv)
 
 
+def _build_soft(bm, kind: str, p: dict) -> None:
+    """``rounded_box`` / ``capsule`` from :mod:`satk.studio.shapes`: smooth faces, box-projected or cylindrical UVs."""
+    verts, faces = soft_mesh(kind, p)
+    bv = [bm.verts.new(v) for v in verts]
+    for f in faces:
+        bm.faces.new([bv[i] for i in f])
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    uvl = bm.loops.layers.uv.active
+    if kind == "capsule":
+        cylinder_uvs(bm, list(bm.faces), uvl, 2)
+    else:  # box projection by the dominant normal axis, one metre = one UV unit over the largest side
+        ext = max(max(abs(c) for c in v) for v in verts) * 2 or 1.0
+        for f in bm.faces:
+            n = f.normal
+            ax = max(range(3), key=lambda i: abs(n[i]))
+            a, b = [i for i in range(3) if i != ax]
+            for lp in f.loops:
+                lp[uvl].uv = (0.5 + lp.vert.co[a] / ext, 0.5 + lp.vert.co[b] / ext)
+    smooth = U.flag(p, "smooth", "mesh.primitive", True)
+    for f in bm.faces:
+        f.smooth = smooth
+
+
 def primitive(ctx, p: dict) -> dict:
-    """Add a primitive with explicit density: plane, grid (x/y_segments), cube, cylinder/cone/circle (segments), uv_sphere (segments, rings), ico_sphere (subdivisions)."""
+    """Add a primitive with explicit density: plane, grid, cube, cylinder/cone/circle (segments), uv_sphere, ico_sphere, rounded_box (size, radius, segments per corner), capsule (radius, depth, segments, rings).
+
+    ``rounded_box``: a box of ``size`` [x, y, z] whose edges and corners are rounded by ``radius`` (m, default a
+    quarter of the smallest side) in ``segments`` steps per quarter (1 = a chamfer, 2-4 = soft SA corners).
+    ``capsule``: a cylinder with round ends along z, ``depth`` = the whole length, ``segments`` around, ``rings``
+    steps per round end. Both are smooth-shaded (``smooth``: false for flat) and welded, with UVs.
+    """
     kind = p.get("kind")
     want_v, want_t = primitive_counts(kind, p)  # validates kind and the density parameters
     dims = primitive_dims(kind, p)
@@ -99,7 +130,10 @@ def primitive(ctx, p: dict) -> dict:
     bm = bmesh.new()
     try:
         bm.loops.layers.uv.new("UVMap")
-        _build(bm, kind, p, dims)
+        if kind in SOFT_KINDS:
+            _build_soft(bm, kind, p)
+        else:
+            _build(bm, kind, p, dims)
         me = bpy.data.meshes.new(name)
         bm.to_mesh(me)
     finally:
@@ -116,97 +150,6 @@ def primitive(ctx, p: dict) -> dict:
 
 
 # --------------------------------------------------------------------------- shapes from profiles
-
-
-def _resample(pts: list[Vector], m: int, closed: bool) -> list[Vector]:
-    """``m`` points spaced evenly by arc length along the polyline (from its first point)."""
-    seq = list(pts) + ([pts[0]] if closed else [])
-    seg = [(seq[i + 1] - seq[i]).length for i in range(len(seq) - 1)]
-    total = sum(seg)
-    if total < 1e-12:
-        return [pts[0].copy() for _ in range(m)]
-    targets = [total * k / m for k in range(m)] if closed else [total * k / (m - 1) for k in range(m)]
-    out, i, acc = [], 0, 0.0
-    for t in targets:
-        while i < len(seg) - 1 and acc + seg[i] < t - 1e-12:
-            acc += seg[i]
-            i += 1
-        f = 0.0 if seg[i] < 1e-12 else min(1.0, max(0.0, (t - acc) / seg[i]))
-        out.append(seq[i].lerp(seq[i + 1], f))
-    return out
-
-
-def _plane_pt(ax: int, at: float, a: float, b: float) -> Vector:
-    """A 2D section point (a, b) on the plane ``axis = at``: y -> (x, z), x -> (y, z), z -> (x, y)."""
-    if ax == 1:
-        return Vector((a, at, b))
-    if ax == 0:
-        return Vector((at, a, b))
-    return Vector((a, b, at))
-
-
-def loft(ctx, p: dict) -> dict:
-    """Skin a new mesh through sections along an axis: sections=[{at, points:[[a,b],..]}], samples, mirror, cap.
-
-    Axis y (default): a section lies in the x-z plane at y = at, a point is [x, z]. With ``mirror`` the
-    points are the +x half from the top centre (x = 0) down to the bottom centre (x = 0); the -x half is
-    mirrored. Every section is resampled to ``samples`` points by arc length from its first point, so
-    sections may have different point counts. ``closed`` (default true) makes loops; ``cap`` fills the ends.
-    """
-    M = "mesh.loft"
-    ax = U.axis(p, "axis", M, "y")
-    secs = p.get("sections")
-    if not isinstance(secs, list) or not 2 <= len(secs) <= 256:
-        raise U.bad(M, "'sections' must be a list of 2-256 {\"at\": number, \"points\": [[a, b], ...]}",
-                    hint="axis y: a = x (across), b = z (up); give the +x half with mirror=true")
-    samples = U.integer(p, "samples", M, lo=3, hi=512, required=True)
-    closed = U.flag(p, "closed", M, True)
-    mirror = U.flag(p, "mirror", M, False)
-    cap = U.flag(p, "cap", M, closed)
-    name = U.text(p, "name", M, "loft")
-    rings: list[list[Vector]] = []
-    last_at = None
-    for i, s in enumerate(secs):
-        if not isinstance(s, dict):
-            raise U.bad(M, f"section {i + 1} must be an object")
-        at = U.num(s, "at", M, required=True)
-        if last_at is not None and at == last_at:
-            raise U.bad(M, f"sections {i} and {i + 1} are at the same position {at}")
-        last_at = at
-        pts = U.points2(s, "points", M, min_n=2 if mirror else 3)
-        if mirror:
-            pts = pts + [(-a, b) for a, b in reversed(pts[1:-1])]
-        loop = [_plane_pt(ax, at, a, b) for a, b in pts]
-        rings.append(_resample(loop, samples, closed))
-    bm = bmesh.new()
-    try:
-        uvl = bm.loops.layers.uv.new("UVMap")  # before any element: a new layer invalidates element references
-        vrings = [[bm.verts.new(v) for v in ring] for ring in rings]
-        n, last = samples, max(1, len(vrings) - 1)
-        for i, (r0, r1) in enumerate(zip(vrings, vrings[1:])):
-            for k in range(n if closed else n - 1):
-                k1 = (k + 1) % n
-                f = bm.faces.new((r0[k], r0[k1], r1[k1], r1[k]))
-                du = n if closed else n - 1
-                for lp, uv in zip(f.loops, ((k / du, i / last), ((k + 1) / du, i / last),
-                                            ((k + 1) / du, (i + 1) / last), (k / du, (i + 1) / last))):
-                    lp[uvl].uv = uv  # a simple strip map: u around the section, v along the axis
-        if cap and closed:
-            for ring in (vrings[0], vrings[-1]):
-                f = bm.faces.new(ring)
-                ext = [v.co for v in ring]
-                lo = [min(c[i] for c in ext) for i in range(3)]
-                hi = [max(c[i] for c in ext) for i in range(3)]
-                a, b = [i for i in range(3) if i != ax]
-                for lp in f.loops:
-                    lp[uvl].uv = ((lp.vert.co[a] - lo[a]) / max(hi[a] - lo[a], 1e-9),
-                                  (lp.vert.co[b] - lo[b]) / max(hi[b] - lo[b], 1e-9))
-        bmesh.ops.remove_doubles(bm, verts=list(bm.verts), dist=1e-6)
-        bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
-        ob = U.new_mesh_object(ctx, name, bm, p.get("collection"))
-    finally:
-        bm.free()
-    return {"object": ob.name, **U.counts(ob), "changed": [ob.name]}
 
 
 def _lathe_pt(ax: int, r: float, h: float) -> Vector:
@@ -558,8 +501,61 @@ def _pivot(verts, how, method: str) -> Vector:
     raise U.bad(method, "'pivot' must be median, bounds, origin or [x, y, z]")
 
 
+#: Falloff curves of ``mesh.transform`` (t = 1 at the selection, 0 at the radius), as Blender's proportional edit.
+FALLOFF = {"smooth": lambda t: t * t * (3.0 - 2.0 * t), "sphere": lambda t: math.sqrt(max(0.0, 2.0 * t - t * t)),
+           "root": lambda t: math.sqrt(t), "linear": lambda t: t, "sharp": lambda t: t * t, "constant": lambda t: 1.0}
+
+
+def falloff_weights(bm, verts, spec: dict, method: str) -> dict:
+    """``{vert: weight 0..1}`` of the vertices around ``verts`` within ``spec.radius`` (the selection itself is not
+    included): straight-line distance, or along the edges with ``connected``."""
+    if not isinstance(spec, dict) or set(spec) - {"radius", "curve", "connected"}:
+        raise U.bad(method, "'falloff' must be {\"radius\": m, \"curve\": smooth|sphere|root|linear|sharp|constant, "
+                    "\"connected\": bool}")
+    rad = U.num(spec, "radius", method, required=True, lo=1e-6)
+    fn = FALLOFF[U.text(spec, "curve", method, "smooth", choices=tuple(FALLOFF))]
+    sel = set(verts)
+    dist: dict = {}
+    if U.flag(spec, "connected", method, False):
+        import heapq
+
+        heap = [(0.0, v.index, v) for v in sel]
+        best = {v: 0.0 for v in sel}
+        heapq.heapify(heap)
+        while heap:
+            d, _, v = heapq.heappop(heap)
+            if d > best.get(v, math.inf) or d > rad:
+                continue
+            for e in v.link_edges:
+                w = e.other_vert(v)
+                nd = d + e.calc_length()
+                if nd <= rad and nd < best.get(w, math.inf):
+                    best[w] = nd
+                    heapq.heappush(heap, (nd, w.index, w))
+        dist = {v: d for v, d in best.items() if v not in sel}
+    else:
+        from mathutils.kdtree import KDTree
+
+        kd = KDTree(len(sel))
+        for i, v in enumerate(sel):
+            kd.insert(v.co, i)
+        kd.balance()
+        for v in bm.verts:
+            if v in sel:
+                continue
+            _co, _i, d = kd.find(v.co)
+            if d is not None and d < rad:
+                dist[v] = d
+    return {v: fn(max(0.0, min(1.0, 1.0 - d / rad))) for v, d in dist.items()}
+
+
 def transform(ctx, p: dict) -> dict:
-    """Move/rotate/scale the vertices of the selected faces (translate, rotate deg, scale; pivot median|bounds|origin)."""
+    """Move/rotate/scale the selected vertices (translate, rotate deg, scale; pivot median|bounds|origin); falloff {radius, curve, connected} bends the surface around them softly.
+
+    ``falloff`` = soft selection: vertices within ``radius`` (m) of the selection follow it with a weight from
+    ``curve`` (smooth default, sphere, root, linear, sharp, constant); ``connected`` measures along the edges, so
+    a nearby but separate surface stays put. An edge ``loop`` selector moves only the loop's own vertices.
+    """
     M = "mesh.transform"
     o = U.mesh_obj(ctx, p, M)
     t = U.vec(p, "translate", M)
@@ -568,8 +564,8 @@ def transform(ctx, p: dict) -> dict:
     if t is None and r is None and s is None:
         raise U.bad(M, "give 'translate', 'rotate' (degrees) and/or 'scale'")
     with U.edit_mesh(o) as bm:
-        faces = U.require_faces(U.select_faces(o, bm, p.get("select"), M), M, p.get("select"))
-        verts = list({v for f in faces for v in f.verts})
+        faces, verts = U.select_verts(o, bm, p.get("select"), M)
+        U.require_faces(faces, M, p.get("select"))
         c = _pivot(verts, p.get("pivot"), M)
         mat = Matrix.Translation(c)
         if r is not None:
@@ -579,9 +575,15 @@ def transform(ctx, p: dict) -> dict:
         mat = mat @ Matrix.Translation(-c)
         if t is not None:
             mat = Matrix.Translation(Vector(t)) @ mat
+        soft = falloff_weights(bm, verts, p["falloff"], M) if p.get("falloff") is not None else {}
         for v in verts:
             v.co = mat @ v.co
-    return {"verts": len(verts), "changed": [o.name]}
+        for v, w in soft.items():
+            v.co = v.co.lerp(mat @ v.co, w)
+    out = {"verts": len(verts), "changed": [o.name]}
+    if soft:
+        out["soft"] = len(soft)
+    return out
 
 
 def _uv_border(bm, edges, uvl) -> list:
@@ -917,7 +919,7 @@ def info(ctx, p: dict) -> dict:
     return {k: v for k, v in out.items() if v not in ([], {}, None)}
 
 
-METHODS = {"mesh.primitive": primitive, "mesh.loft": loft, "mesh.lathe": lathe, "mesh.curve": curve,
+METHODS = {"mesh.primitive": primitive, "mesh.lathe": lathe, "mesh.curve": curve,
            "mesh.convert": convert, "mesh.extrude": extrude, "mesh.inset": inset, "mesh.solidify": solidify,
            "mesh.transform": transform,
            "mesh.bevel": bevel, "mesh.subdivide": subdivide, "mesh.delete": delete, "mesh.normals": normals,

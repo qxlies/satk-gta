@@ -1,0 +1,62 @@
+{
+ "kind": "vehicle_upgrade",
+ "version": 1,
+ "summary": "Close-up review regions of a tuning part (attached at a ug_* frame).",
+ "leak": {
+  "cull": false,
+  "gap": true,
+  "inside": false,
+  "floor_exclude": [],
+  "floor_pct": 0.5,
+  "slit": false
+ },
+ "regions": [
+  {
+   "name": "sides",
+   "summary": "the four sides",
+   "cameras": [
+    {
+     "az": 0,
+     "el": 10
+    },
+    {
+     "az": 90,
+     "el": 10
+    },
+    {
+     "az": 180,
+     "el": 10
+    },
+    {
+     "az": -90,
+     "el": 10
+    }
+   ]
+  },
+  {
+   "name": "top",
+   "summary": "top: the visible face on the car",
+   "cameras": [
+    {
+     "az": 30,
+     "el": 65
+    }
+   ]
+  },
+  {
+   "name": "mount",
+   "summary": "the face that sits on the car: flush, closed, no open edges",
+   "ground": false,
+   "cameras": [
+    {
+     "az": 30,
+     "el": -55
+    },
+    {
+     "az": 210,
+     "el": -55
+    }
+   ]
+  }
+ ]
+}

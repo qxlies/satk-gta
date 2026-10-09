@@ -97,28 +97,56 @@ BAD_BRIEF = """# Brief
 - One command rebuilds the car from nothing.
 """
 
+#: The wording of the briefs behind the boxy SUV and the band-chasing Suburban (paraphrased).
+BOX_BRIEF = """# Brief
+- The boxy two-box body with the high flat bonnet, slab sides and squared-off wheel arches.
+- "San Andreas style" means the measured bands of satk, not adjectives; the class bands decide.
+- Every out-of-band row has a fix. Keep the whole car low-poly, at most 4,500 triangles.
+- Read the pixels from the grid copy of the photo; grime painted in.
+- The grille and the lamp detail are texture or flush details, not geometry.
+"""
+
 GOOD_BRIEF = """# Asset brief
 - Kind: automobile; tier sa_plus; like model:426.
-- Shape: silhouette first; panels stay soft; split normals at seams and designed creases.
-- Surfaces: own textures small and photo-like; licensed photographs may be used.
-- Budgets: the tier band of the class (style.profile). Do not set triangle floors or ceilings in the brief.
+- Design: an upright early-90s SUV drawn the SA way: soft, rounded corners in plan and section, crowned roof
+  and bonnet, the glasshouse leaning in; bumpers wrap into the arches, flares grow out of the fenders.
+- Detail: lamps in recesses, grille surround, mirrors on stalks, interior and engine bay, in the same soft style.
+- Surfaces: own textures small, soft and photo-like; licensed photographs may be used; paint a clean key colour.
+- References: a true side view may be measured; three-quarter photos are described.
 """
 
 
 def test_brief_check_flags_anti_patterns():
-    rows = B.check_text(BAD_BRIEF, label="b.md", p50={"veh.hd_tris": 2168, "part.tris[wheel]": 158})
+    rows = B.check_text(BAD_BRIEF, label="b.md", p50={"veh.hd_tris": 2168})
     terms = [r[0] for r in rows]
     for t in ("real_scale", "clean_shapes", "flat_colour", "crisp", "no_photos", "hard_edges", "dam_lighter",
-              "tri_floor", "from_nothing"):
+              "tri_numbers", "from_nothing"):
         assert t in terms, (t, terms)
-    assert terms.count("tri_floor") == 1                 # wheel floor 120 is below its p50
+    assert terms.count("tri_numbers") == 2               # any triangle number, whatever its size
     assert all(r[1].startswith("b.md:") for r in rows)
     no_photo = next(r for r in rows if r[0] == "no_photos")
     assert no_photo[1] == "b.md:4"                       # the phrase wraps over two lines
 
 
+def test_brief_check_flags_box_words_and_style_as_numbers():
+    rows = B.check_text(BOX_BRIEF, label="b.md")
+    terms = [r[0] for r in rows]
+    assert terms.count("box_risk") >= 3 and terms.count("style_numbers") >= 3
+    for t in ("tri_numbers", "low_poly", "measure_photo", "dirty", "detail_texture"):
+        assert t in terms, (t, terms)
+    box = next(r for r in rows if r[0] == "box_risk")
+    assert "rounded corners" in box[4] and box[1] == "b.md:2"
+
+
 def test_brief_check_clean_template():
-    assert B.check_text(GOOD_BRIEF, p50={"veh.hd_tris": 2168}) == []
+    assert B.check_text(GOOD_BRIEF) == []
+
+
+def test_published_asset_role_prompts_are_clean():
+    from satk.core.config import REPO_ROOT
+
+    path = REPO_ROOT / "docs" / "agent" / "briefs" / "asset-roles.md"
+    assert B.check_text(path.read_text(encoding="utf-8"), label=path.name) == []
 
 
 def test_brief_terms_are_english_with_fixes():

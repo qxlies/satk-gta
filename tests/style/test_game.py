@@ -163,3 +163,46 @@ def test_texture_interiors_in_band():
     d = texture.vanilla("vanilla")
     assert d["roles"]["interior"]["n"] >= 50
     assert texture.loo(d)["interior"]["in_share"] >= GOLDEN["loo"]["texture_interior"]
+
+
+@pytest.mark.slow
+def test_vanilla_models_of_every_class_show_no_defect():
+    """Calibration (data/style/defects.json ``calibration``): vanilla shows 0 defects in every class; here three
+    models per class (first, middle, last by id) and the mesh/form/fit rows of each: warnings are allowed (real
+    flaws vanilla has), defects are not."""
+    from satk.style import check, subject
+
+    c, _ = _cache()
+    by: dict = {}
+    for mid, (_name, cls, _b) in sorted(c.data["models"].items(), key=lambda kv: int(kv[0])):
+        by.setdefault(cls, []).append(int(mid))
+    seen = 0
+    for cls, ids in sorted(by.items()):
+        for mid in sorted({ids[0], ids[len(ids) // 2], ids[-1]}):
+            r = check.check_subject(subject.load_sid(f"model:{mid}"), c, w2=False)
+            bad = [row[:2] + [row[7][:120]] for row in r["rows"] if row[6] == "defect"]
+            assert not bad, (cls, mid, bad)
+            assert "mesh" in r["sections"] and "coverage" in r["sections"], (cls, mid, r["sections"])
+            seen += 1
+    assert seen >= 80
+
+
+def test_every_kit_kinds_exemplar_passes_strict():
+    """The exemplar (``like``) of every kit kind passes ``asset.check --strict`` (a builder who matches vanilla is
+    not blocked by vanilla traits: data/style/strict.json), and most vanilla peers of a few families too."""
+    from satk.core.registry import invoke
+    from satk.core.resources import read_json
+
+    _cache()
+    kinds = read_json("kit", "kinds.json")["kinds"]
+    bad = {}
+    for kind, k in sorted(kinds.items()):
+        env = invoke("asset.check", {"target": k["like"], "strict": True})
+        assert env["ok"], (kind, env.get("error"))
+        if not env["done"]:
+            bad[kind] = env["blocking"][:3]
+    assert not bad, bad
+    for ids, share in (([416, 426, 445, 466, 467, 492, 507, 540, 546, 547, 550, 551, 560, 562, 580, 585], 0.75),
+                       ([346, 347, 348, 349, 350, 351, 352, 353, 355, 356, 357, 358, 372], 0.9)):
+        done = sum(bool(invoke("asset.check", {"target": f"model:{i}", "strict": True})["done"]) for i in ids)
+        assert done >= share * len(ids), (ids, done)

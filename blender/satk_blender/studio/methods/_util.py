@@ -15,6 +15,16 @@
     {"group": "roof"}                  # faces whose vertices are all in the vertex group
     {"material": "glass"}              # material name or slot index
     {"faces": [0, 5, 6]}, {"invert": true}
+    {"near": {"point": [0.9, 1.4, 0.5], "radius": 0.3}}   # face centres within radius of the point
+    {"loop": {"point": [0.9, 1.4, 0.5], "dir": "z"}}      # the edge loop through the edge nearest the point
+    {"loop": {"point": [0.9, 1.4, 0.5], "ring": true}}    # the strip of quads across that edge (a face ring)
+    {"grow": 2}                                           # then grow the selection by 2 rings of faces
+    {"linked": true}                                      # then the whole welded pieces the faces belong to
+    {"item": "I05"}                                       # faces tagged with an inventory item (scene.tag)
+
+``loop`` picks the edge nearest to ``point`` (``dir`` x|y|z or a vector: only edges running within 45 deg of
+it) and walks the loop through 4-valent vertices; for vertex edits (``mesh.transform``, ``mesh.relax``) an edge
+loop means its own vertices, for face edits the faces on both sides of it. ``invert`` applies before ``grow``.
 
 Methods that make new geometry take ``save_group`` and store the result as a vertex group, so the
 next step can address it by name instead of by coordinates.
@@ -35,7 +45,44 @@ from satk.core.errors import SatkError
 _AXES = {"x": 0, "y": 1, "z": 2}
 _SIDES = {"+x": (1, 0, 0), "-x": (-1, 0, 0), "+y": (0, 1, 0), "-y": (0, -1, 0), "+z": (0, 0, 1), "-z": (0, 0, -1)}
 _WHERE = re.compile(r"^\s*([xyz])\s*(>=|<=|>|<)\s*(-?\d+(?:\.\d+)?(?:e-?\d+)?)\s*$", re.IGNORECASE)
-SELECT_KEYS = frozenset({"all", "side", "normal", "within", "where", "box", "group", "material", "faces", "invert"})
+SELECT_KEYS = frozenset({"all", "side", "normal", "within", "where", "box", "group", "material", "faces", "invert",
+                         "near", "loop", "grow", "linked", "item"})
+#: Inventory tags (contract K6): object property with the ids on the object, face attribute, id list property.
+ITEM_PROP = "satk_item"
+ITEM_ATTR = "satk_item_idx"
+ITEM_IDS = "satk_item_ids"
+
+
+def parse_ids(v) -> list[str]:
+    """Ids of a ``satk_item`` value: ``"I05"``, ``"I05,I06"`` or a list."""
+    if v is None:
+        return []
+    if isinstance(v, str):
+        parts = v.replace(";", ",").split(",")
+    else:
+        try:
+            parts = [str(x) for x in list(v)]
+        except TypeError:
+            return []
+    out: list[str] = []
+    for x in parts:
+        x = x.strip()
+        if x and x not in out:
+            out.append(x)
+    return out
+
+
+def item_registry(scene=None) -> list[str]:
+    """The scene's append-only id list (face values index it, 1-based)."""
+    scene = scene or bpy.context.scene
+    return parse_ids(scene.get(ITEM_IDS))
+
+
+def item_ids(o) -> list[str]:
+    """The id list ``o``'s face values index: the longer of its own list and the scene registry (prefixes of one)."""
+    own = parse_ids(o.get(ITEM_IDS))
+    reg = item_registry()
+    return reg if len(reg) >= len(own) else own
 
 
 def bad(method: str, msg: str, **kw) -> SatkError:
@@ -106,6 +153,14 @@ def vec(p: dict, key: str, method: str, default=None, *, n: int = 3, required: b
     if not isinstance(v, (list, tuple)) or len(v) != n or not all(is_num(x) for x in v):
         raise bad(method, f"'{key}' must be a list of {n} numbers, got {v!r}")
     return [float(x) for x in v]
+
+
+def require(p: dict, key: str, method: str, hint: str | None = None):
+    """``p[key]`` or ``BAD_PARAMS`` (marks the key required in the generated reference)."""
+    v = p.get(key)
+    if v is None:
+        raise bad(method, f"'{key}' is required", hint=hint)
+    return v
 
 
 def points2(p: dict, key: str, method: str, *, min_n: int = 2, max_n: int = 4096) -> list[tuple[float, float]]:
@@ -227,7 +282,132 @@ def _material_index(o, ref, method: str) -> int:
 
 def select_faces(o, bm, sel: dict | None, method: str) -> list:
     """Faces of ``bm`` chosen by the selector (see the module doc)."""
+    return _select(o, bm, sel, method)[0]
+
+
+def select_verts(o, bm, sel: dict | None, method: str) -> tuple[list, list]:
+    """``(faces, verts)`` of the selector: the vertices a vertex edit moves (an edge loop: its own vertices)."""
+    faces, loop_verts = _select(o, bm, sel, method)
+    fv = {v for f in faces for v in f.verts}
+    if loop_verts is not None:
+        verts = [v for v in loop_verts if v in fv]
+    else:
+        verts = sorted(fv, key=lambda v: v.index)
+    return faces, verts
+
+
+def _point(d: dict, key: str, method: str) -> Vector:
+    return Vector(vec(d, key, method, required=True))
+
+
+def _dir(v, method: str) -> Vector | None:
+    if v is None:
+        return None
+    if isinstance(v, str) and v.lower().lstrip("+-") in _AXES:
+        d = Vector((0.0, 0.0, 0.0))
+        d[_AXES[v.lower().lstrip("+-")]] = 1.0
+        return d
+    d = Vector(vec({"v": v}, "v", method))
+    if d.length < 1e-9:
+        raise bad(method, "select.loop.dir must not be zero")
+    return d.normalized()
+
+
+def _seg_dist(p: Vector, a: Vector, b: Vector) -> float:
+    ab = b - a
+    t = 0.0 if ab.length_squared < 1e-18 else max(0.0, min(1.0, (p - a).dot(ab) / ab.length_squared))
+    return (p - (a + ab * t)).length
+
+
+def nearest_edge(bm, point: Vector, direction: Vector | None = None, *, edges=None):
+    """The edge nearest to ``point`` (only edges within 45 deg of ``direction`` when given), or ``None``."""
+    best, bd = None, math.inf
+    for e in (edges if edges is not None else bm.edges):
+        a, b = e.verts[0].co, e.verts[1].co
+        if direction is not None:
+            d = b - a
+            if d.length < 1e-12 or abs(d.normalized().dot(direction)) < 0.7071:
+                continue
+        dist = _seg_dist(point, a, b)
+        if dist < bd - 1e-12:
+            best, bd = e, dist
+    return best
+
+
+def _next_loop_edge(e, v):
+    """The edge that continues the loop of ``e`` through ``v`` (4-valent vertex, or along an open border)."""
+    others = [x for x in v.link_edges if x is not e]
+    if e.is_boundary:
+        nxt = [x for x in others if x.is_boundary]
+        return nxt[0] if len(nxt) == 1 else None
+    if len(v.link_edges) != 4 or any(len(f.verts) != 4 for f in v.link_faces):
+        return None
+    ef = set(e.link_faces)
+    nxt = [x for x in others if not (set(x.link_faces) & ef)]
+    return nxt[0] if len(nxt) == 1 else None
+
+
+def edge_loop(e0) -> list:
+    """The edges of the loop through ``e0`` (ordered from one end; a closed loop starts at ``e0``)."""
+    fwd, back = [], []
+    seen = {e0}
+    for v0, acc in ((e0.verts[1], fwd), (e0.verts[0], back)):
+        e, v = e0, v0
+        while True:
+            n = _next_loop_edge(e, v)
+            if n is None or n in seen:
+                break
+            seen.add(n)
+            acc.append(n)
+            v = n.other_vert(v)
+            e = n
+    return list(reversed(back)) + [e0] + fwd
+
+
+def edge_ring(e0) -> list:
+    """The faces of the quad strip across ``e0`` (an edge ring), in both directions."""
+    faces, seen = [], set()
+    for f0 in e0.link_faces:
+        e, f = e0, f0
+        while f is not None and f not in seen and len(f.verts) == 4:
+            seen.add(f)
+            faces.append(f)
+            opp = next((x for x in f.edges if not (set(x.verts) & set(e.verts))), None)
+            if opp is None:
+                break
+            nxt = [x for x in opp.link_faces if x is not f]
+            e, f = opp, (nxt[0] if len(nxt) == 1 else None)
+    return faces
+
+
+def _loop_sel(bm, spec, method: str) -> tuple[set, list | None]:
+    """``(faces, loop vertices | None)`` of a ``loop`` selector."""
+    if not isinstance(spec, dict):
+        raise bad(method, "select.loop must be {\"point\": [x, y, z], \"dir\"?: x|y|z, \"ring\"?: bool}")
+    extra = set(spec) - {"point", "dir", "ring"}
+    if extra:
+        raise bad(method, f"select.loop: unknown key(s) {sorted(extra)}")
+    pt = _point(spec, "point", method)
+    e0 = nearest_edge(bm, pt, _dir(spec.get("dir"), method))
+    if e0 is None:
+        raise SatkError("NOT_FOUND", f"{method}: no edge runs along select.loop.dir",
+                        hint="drop 'dir' or use another axis")
+    if flag(spec, "ring", method, False):
+        return set(edge_ring(e0)), None
+    edges = edge_loop(e0)
+    verts: list = []
+    seen: set = set()
+    for e in edges:
+        for v in e.verts:
+            if v not in seen:
+                seen.add(v)
+                verts.append(v)
+    return {f for e in edges for f in e.link_faces}, verts
+
+
+def _select(o, bm, sel: dict | None, method: str) -> tuple[list, list | None]:
     sel = check_select(sel, method)
+    loop_verts = None
     faces = list(bm.faces)
     if sel.get("faces") is not None:
         idx = sel["faces"]
@@ -277,10 +457,67 @@ def select_faces(o, bm, sel: dict | None, method: str) -> list:
     if sel.get("material") is not None:
         mi = _material_index(o, sel["material"], method)
         faces = [f for f in faces if f.material_index == mi]
+    if sel.get("near") is not None:
+        nr = sel["near"]
+        if not isinstance(nr, dict) or set(nr) - {"point", "radius"}:
+            raise bad(method, "select.near must be {\"point\": [x, y, z], \"radius\": m}")
+        c = _point(nr, "point", method)
+        rad = num(nr, "radius", method, required=True, lo=0.0)
+        faces = [f for f in faces if (f.calc_center_median() - c).length <= rad + 1e-9]
+    if sel.get("loop") is not None:
+        lf, loop_verts = _loop_sel(bm, sel["loop"], method)
+        faces = [f for f in faces if f in lf]
+    if sel.get("item") is not None:
+        faces = [f for f in faces if f in _item_faces(o, bm, sel["item"], method)]
     if sel.get("invert"):
-        keep = {f.index for f in faces}
-        faces = [f for f in bm.faces if f.index not in keep]
-    return faces
+        keep = set(faces)
+        faces = [f for f in bm.faces if f not in keep]
+        loop_verts = None
+    grow = integer(sel, "grow", method, 0, lo=0, hi=64)
+    if grow:
+        have = set(faces)
+        ring = set(faces)
+        for _ in range(grow):
+            nxt = {g for f in ring for v in f.verts for g in v.link_faces} - have
+            if not nxt:
+                break
+            have |= nxt
+            ring = nxt
+        faces = sorted(have, key=lambda f: f.index)
+        loop_verts = None
+    if sel.get("linked"):
+        have = set(faces)
+        todo = list(faces)
+        while todo:
+            f = todo.pop()
+            for v in f.verts:
+                for g in v.link_faces:
+                    if g not in have:
+                        have.add(g)
+                        todo.append(g)
+        faces = sorted(have, key=lambda f: f.index)
+        loop_verts = None
+    return faces, loop_verts
+
+
+def _item_faces(o, bm, item, method: str) -> set:
+    """Faces tagged with the inventory item ``item`` (face attribute, or the object's single ``satk_item``)."""
+    if not isinstance(item, str) or not item:
+        raise bad(method, "select.item must be an inventory id such as I05")
+    layer = bm.faces.layers.int.get(ITEM_ATTR)
+    ids = item_ids(o)
+    if layer is not None and item in ids:
+        v = ids.index(item) + 1
+        hit = {f for f in bm.faces if f[layer] == v}
+        if hit:
+            return hit
+    own = parse_ids(o.get(ITEM_PROP))
+    if item in own:
+        present = {ids[f[layer] - 1] for f in bm.faces if 0 < f[layer] <= len(ids)} if layer is not None else set()
+        rest = [i for i in own if i not in present]
+        if rest == [item]:
+            return {f for f in bm.faces if layer is None or f[layer] == 0}
+    return set()
 
 
 def require_faces(faces: list, method: str, sel) -> list:

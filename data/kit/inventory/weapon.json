@@ -1,0 +1,223 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "weapon",
+ "summary": "hand-held weapon built from its side profile: receiver, barrel, grip and the separate pieces that touch it, a muzzle flash and a soft photo texture; hero adds rails, sights and controls as geometry.",
+ "regions": {
+  "overall": {
+   "summary": "the whole weapon, side both ways and 3/4",
+   "views": []
+  },
+  "muzzle": {
+   "summary": "barrel end, front sight, flash",
+   "views": [
+    "muzzle"
+   ]
+  },
+  "receiver": {
+   "summary": "receiver, slide or bolt, ejection port",
+   "views": [
+    "left",
+    "right"
+   ]
+  },
+  "grip": {
+   "summary": "grip, trigger, guard, magazine",
+   "views": [
+    "grip"
+   ]
+  },
+  "stock": {
+   "summary": "stock and buttplate",
+   "views": [
+    "left",
+    "right"
+   ]
+  },
+  "sights": {
+   "summary": "sights and optics",
+   "views": [
+    "top"
+   ]
+  },
+  "details": {
+   "summary": "controls, rails, screws close up",
+   "views": [
+    "left",
+    "right",
+    "top"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "receiver",
+   "name": "Receiver or body",
+   "region": "receiver",
+   "category": "shell",
+   "construction": "the side outline extruded, then rounded where the hand goes; never a stretched box",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "barrel",
+   "name": "Barrel",
+   "region": "muzzle",
+   "category": "weapon_part",
+   "construction": "mesh.lathe tube with an open dark muzzle",
+   "attaches_to": "receiver",
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "grip",
+   "name": "Grip",
+   "region": "grip",
+   "category": "weapon_part",
+   "construction": "pistol grip or handle rounded for the hand",
+   "attaches_to": "receiver",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "trigger_guard",
+   "name": "Trigger and guard",
+   "region": "grip",
+   "category": "weapon_part",
+   "construction": "trigger blade inside a guard loop",
+   "attaches_to": "receiver",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "magazine",
+   "name": "Magazine",
+   "region": "grip",
+   "category": "weapon_part",
+   "construction": "magazine pushed into the well (waive for melee or a tube-fed gun)",
+   "attaches_to": "receiver",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "muzzle_flash",
+   "name": "Muzzle flash",
+   "region": "muzzle",
+   "category": "effect",
+   "construction": "crossed planes on the flash texture at the muzzle (gunflash frame; waive for melee)",
+   "attaches_to": "barrel",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "gunflash"
+  },
+  {
+   "key": "texture",
+   "name": "Photo texture",
+   "region": "overall",
+   "category": "decal",
+   "construction": "small soft photo texture on both sides",
+   "attaches_to": "receiver",
+   "stage": "G4",
+   "detail": "simple"
+  },
+  {
+   "key": "stock",
+   "name": "Stock",
+   "region": "stock",
+   "category": "weapon_part",
+   "construction": "stock lofted from the profile with a buttplate (waive for a pistol)",
+   "attaches_to": "receiver",
+   "stage": "G2",
+   "detail": "standard"
+  },
+  {
+   "key": "sights",
+   "name": "Sights",
+   "region": "sights",
+   "category": "weapon_part",
+   "construction": "front post and rear notch as separate small pieces",
+   "attaches_to": [
+    "receiver",
+    "barrel"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "count": 2
+  },
+  {
+   "key": "slide_bolt",
+   "name": "Slide or bolt",
+   "region": "receiver",
+   "category": "weapon_part",
+   "construction": "slide or bolt as its own piece with serrations and an ejection port",
+   "attaches_to": "receiver",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "handguard",
+   "name": "Handguard or fore-end",
+   "region": "receiver",
+   "category": "weapon_part",
+   "construction": "handguard around the barrel",
+   "attaches_to": [
+    "receiver",
+    "barrel"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "required": false
+  },
+  {
+   "key": "rails",
+   "name": "Rails",
+   "region": "details",
+   "category": "accessory",
+   "construction": "rail strips swept from a toothed profile",
+   "attaches_to": "receiver",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "optic",
+   "name": "Optic or scope",
+   "region": "sights",
+   "category": "accessory",
+   "construction": "scope tube with lenses on mounts",
+   "attaches_to": "receiver",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "controls",
+   "name": "Controls",
+   "region": "details",
+   "category": "weapon_part",
+   "construction": "safety, mag release, charging handle, selector",
+   "attaches_to": "receiver",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "sling_mounts",
+   "name": "Sling mounts and screws",
+   "region": "details",
+   "category": "accessory",
+   "construction": "loops and screw heads",
+   "attaches_to": [
+    "receiver",
+    "stock"
+   ],
+   "stage": "G3",
+   "detail": "hero"
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/weapon.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

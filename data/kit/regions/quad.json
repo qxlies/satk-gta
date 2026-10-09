@@ -1,0 +1,147 @@
+{
+ "kind": "quad",
+ "version": 1,
+ "summary": "Close-up review regions of a quad bike.",
+ "leak": {
+  "cull": false,
+  "gap": false,
+  "inside": true,
+  "floor_exclude": [
+   "wheel*"
+  ],
+  "floor_pct": 1.0,
+  "slit": false
+ },
+ "regions": [
+  {
+   "name": "front",
+   "summary": "front: lamps, bumper bars, front rack, suspension",
+   "box": {
+    "y": [
+     0.55,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 0,
+     "el": 8
+    },
+    {
+     "az": 38,
+     "el": 18
+    }
+   ]
+  },
+  {
+   "name": "rear",
+   "summary": "rear: lamp, rack, exhaust, rear axle",
+   "box": {
+    "y": [
+     0.0,
+     0.45
+    ]
+   },
+   "cameras": [
+    {
+     "az": 180,
+     "el": 8
+    },
+    {
+     "az": 142,
+     "el": 18
+    }
+   ]
+  },
+  {
+   "name": "left",
+   "summary": "left side: profile, doors, sills, arches, mirror",
+   "cameras": [
+    {
+     "az": -90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": -90,
+     "el": 22
+    }
+   ]
+  },
+  {
+   "name": "right",
+   "summary": "right side: profile, doors, sills, arches, mirror",
+   "cameras": [
+    {
+     "az": 90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": 90,
+     "el": 22
+    }
+   ]
+  },
+  {
+   "name": "cockpit",
+   "summary": "rider view: handlebars, seat, tank",
+   "box": {
+    "y": [
+     0.4,
+     0.9
+    ],
+    "z": [
+     0.5,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 180,
+     "el": 35
+    },
+    {
+     "az": -50,
+     "el": 30
+    }
+   ]
+  },
+  {
+   "name": "wheels",
+   "summary": "each wheel: hub, suspension arm, fender above it",
+   "frames": [
+    "wheel_*_dummy"
+   ],
+   "radius_h": 0.5,
+   "cameras": [
+    {
+     "az": "out",
+     "el": 6,
+     "az_off": 15
+    },
+    {
+     "az": "out",
+     "el": 20,
+     "az_off": -30
+    }
+   ]
+  },
+  {
+   "name": "underside",
+   "summary": "underbody seen from below: floor, axles, exhaust, tank; nothing open into the body",
+   "ground": false,
+   "leak_inside": false,
+   "cameras": [
+    {
+     "az": 30,
+     "el": -50
+    },
+    {
+     "az": 210,
+     "el": -50
+    }
+   ]
+  }
+ ]
+}

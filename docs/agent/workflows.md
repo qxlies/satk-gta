@@ -6,8 +6,8 @@
      generic tools (not yet in workflow-cost). Measured 2026-10-05 (0.2.0 preview; S17-S24 after 0.2.1, with the
      packages added since) with the indexes vanilla/installed/samp, the symbol DB, the knowledge base and the model
      descriptions built.
-     S25-S26 (asset creation): every operation is registered; their call and token costs are targets, not
-     measurements, until `workflow-cost` runs them (the S26 preview time is measured).
+     S25-S26 (asset creation): every operation is registered; creation has no call or time targets (a gate
+     passes on its sheet and its defects); the S26 preview time is measured.
      S27-S28 (MTA resources, animations): measured by hand through the CLI on 2026-10-06 (answers are real).
      S29 (viewer scene, in-game checks): the viewer steps are measured on the mock target, the game steps are
      targets (an agent never starts the game client). -->
@@ -43,7 +43,7 @@ Re-measure S1-S8 after changes: `satk dev workflow-cost` (all) or `satk dev work
 | S22 | Check a mod before release (recipe) | 1-2 | ~230-490 | ~1 s | works |
 | S23 | Add a street light to a model (2dEffect) | 2 | ~240 | < 1 s each | works |
 | S24 | Generate collision for a model | 2-3 | ~180-300 | < 1 s each | works |
-| S25 | Create an asset of any kind (vanilla or SA+), gates G0-G5 | ~40-80 (G1 by ~12) | target: <= 150K context at the first export | target: G1 by 15 min, export by 20 min | operations registered; costs not measured yet |
+| S25 | Create an asset of any kind (vanilla or SA+), gates G0 design .. G5 finish | varies with the asset | keep research in files; one sheet per gate | no time targets | operations registered |
 | S26 | Visual QA round: one sheet against vanilla peers | 3-4 | ~1 500 | preview 5.4 s cold, ~1.1 s in a live session | works (preview measured) |
 
 A session usually starts with `satk_status` (~600 tokens) and, if needed, one `satk_help(topic)` (500-1 050).
@@ -357,123 +357,195 @@ edit -> `script.check` -> `script.asm` {"file": ..., "compare": "<original .cs>"
 
 ## S25. Create an asset (vanilla or SA+)
 
-The question: "make a new car / prop / building / weapon ... that looks like San Andreas". Model IN Blender
-through the live session (methods with stats after every step), never with hand-typed coordinates. Default tier
-`sa_plus` for new assets; `vanilla` when a replacement must blend into traffic or a district. Style numbers:
-`satk_help("style")` + ONE class topic (`style_vehicle`, `style_world`, `style_ped_weapon`); the full guides are in
-`docs/agent/style/`. Every gate is recorded in `asset.json` (`asset.status --record`), so a new session resumes
-from `asset.status` (<= 1 KB) instead of an old context. The shortest path with exact commands for a car, prop,
-building with LOD, weapon and ped re-skin: `satk_help("creation")` (`docs/agent/creation-quickstart.md`).
+The question: "make a new car / prop / building / weapon ... that looks like San Andreas". SA style is a look,
+not a polygon count: soft, rounded, simplified forms composed into one joined whole, crisp lines only on seams,
+small soft photo-like textures, clean key-colour paint, plus the engine's hard rules (`docs/agent/style/README.md`).
+Detail is free in that language; vanilla numbers are reference, never targets or gates. Build IN Blender through
+the live session from rounded sections and sweeps (methods with stats after every step), never vertex by vertex.
+Default tier `sa_plus` for new assets; `vanilla` when a replacement must blend into traffic or a district. Read
+`satk_help("style")`, `satk_help("style_construction")` and ONE class topic (`style_vehicle`, `style_world`,
+`style_ped_weapon`); `style_references` for a real object. Every gate is recorded in `asset.json`
+(`asset.status --record`), so a new session resumes from `asset.status` (<= 1 KB) instead of an old context. The
+shortest path with exact commands: `satk_help("creation")` (`docs/agent/creation-quickstart.md`).
+
+There are no time targets. A gate passes when its sheet looks right to the reviewer (the user, or a critic in a
+harness), its defects are fixed and its inventory items are built. Show the sheet at every gate; WAIT for the
+user's answer at G1 (form) and G3 (detail), where changes are cheapest.
+
+The task is the INVENTORY and the builder never declares itself done (`docs/agent/style/done.md`, help topic
+`done`). The asset is done only when `asset.inventory` is complete, `asset.check --strict` answers `done: true`,
+every close-up region sheet was reviewed and the reviewer passed the final sheets. At every stage: tag each new
+piece with its item id (`scene.tag` in the same batch), end the stage with `asset.inventory <project>` (no
+`missing` or `unattached` item of that stage), and from G2 on read every region sheet of
+`blender.preview --regions`, one line per region in `notes.md`. Kinds other than cars (frames, moving parts,
+items, regions): `docs/agent/style/kinds.md`, help topic `style_kinds`.
 
 Session limits (the same for every step below): a `blender.call` step has a 90 s budget (`blender.methods` 60 s, a
 session preview 60 s, a cold preview 300 s). `TIMEOUT` = the step ran too long and the session is usable: split
 it; `BUSY` = Blender is stuck inside its own code: `blender.session stop`, then `start` (the newest checkpoint is
-reopened). A batch of two or more mutating steps writes one checkpoint (`checkpoint: false` skips it); a step
-snapshot takes `look: "game"` (the SA look, no raw fallback). `blender.methods` with an exact name returns the
-parameter table of that method; all methods in one line each: `docs/agent/studio-methods.md`.
+reopened). A batch of two or more mutating steps writes one checkpoint (`checkpoint: false` skips it); long
+parameters go into a file (`params_file`); a step snapshot takes `look: "game"` (the SA look). `blender.methods`
+with an exact name returns the parameter table of that method; all methods: `docs/agent/studio-methods.md`.
 
-**G0 Setup** (~6 calls, target 5 min)
+**G0 Design**
 1. `satk_op(op="asset.init", args={"dir": "<project>", "kind": "automobile", "intent": "replace", "like": "model:426", "tier": "sa_plus", "target": "sp"})`
-   -> `asset.json` with kind, intent, tier, target, gates.
-2. `satk_op(op="style.profile", args={"like": "model:426", "tier": "sa_plus"})` -> bands p10/p50/p90 with the
-   peer set, exemplars, anchors (<= 3 KB). `satk_op(op="asset.anatomy", args={"target": "model:426", "md": true})`
-   -> frames with positions, parts, materials, COL, TXD (<= 4 KB).
-3. Photos: `satk_op(op="ref.import", args={"photo": "<file>"})` -> JPEG <= 1,600 px + grid sheet.
-4. A brief from the user: `satk_op(op="style.brief_check", args={"brief": "<brief.md>"})`; ask about each flag
+   -> `asset.json` with kind, intent, tier, target, gates. `satk_op(op="asset.anatomy", args={"target":
+   "model:426", "md": true})` -> frames with positions, parts, materials, COL, TXD of the model you replace.
+2. The real object: the spec sheet (length, width, height, wheelbase, track, tyre) -> a ratio card and one scale
+   factor from the wheel (`docs/agent/style/references.md`).
+3. Photos: `satk_op(op="ref.import", args={"photo": "<file>", "view": "side|front|rear|top|3q|detail"})` -> a JPEG
+   <= 1,600 px; write `<project>/refs/features.md` (10-20 design features per photo, identity items first; describe, never
+   measure a three-quarter photo); `satk_op(op="ref.board", ...)` -> one labelled sheet. Missing views (the
+   rear, a true side view): ask the user for photos now.
+4. Lineup peers of the same body type (hatchback, wagon, upright SUV, pickup), not only the spawn class.
+5. A brief from the user: `satk_op(op="style.brief_check", args={"brief": "<brief.md>"})`; ask about each flag
    (template: `docs/agent/briefs/asset-brief.md`). Adding instead of replacing: `id.free` for the kind first.
+6. The inventory `<project>/design/inventory.json` (`kind`, `detail` = `hero` unless the brief says `standard` or
+   `simple`, `items` [{`id`, `name`, `region`, `category`, `construction`, `attaches_to`, `stage`, `required`}]):
+   the kind's starter list for that level, plus one item per feature of `<project>/refs/features.md` and of the
+   design, left and right apart; "interior" is split into seats, dash, wheel, door cards ... A starter item the
+   design does not have is removed with a waiver (`"waived": [{"key": "<key>", "why": "<reason>"}]`);
+   `satk_op(op="inventory.validate", args={"target": "<project>", "strict": true})` has no errors;
+   `satk_op(op="asset.inventory", args={"dir": "<project>", "plan": true})` lists every item.
+Show: the board, the design description and the inventory (item count per region and stage).
 
-**G1 Blockout + scale lineup** (target: by 15 min; HUMAN CHECKPOINT)
+**G1 Form** (HUMAN CHECKPOINT)
 1. `satk_op(op="blender.session", args={"action": "start", "name": "<asset>"})`, then
    `satk_op(op="blender.methods")` once.
 2. `satk_op(op="kit.template", args={"like": "model:426", "tier": "sa_plus", "ghost": true, "session": "<asset>"})`
-   -> frames, dummies at the class dims, slots, material presets, a never-exported ghost.
-3. `satk_op(op="kit.blank", args={"kind": "automobile", "like": "model:426", "name": "<model>", "session": "<asset>"})`
-   -> a clean low-poly quad base from the class numbers (`satk_op(op="kit.blank")` lists the kinds: automobile, bike,
-   boat, heli, plane, prop_box, prop_cyl, building_box): half shell with a MIRROR modifier, loops at arches, belt
-   line, pillars and bumpers, part regions, UV seams. Shape it with `mesh.transform` (faces chosen by `where`,
-   `side`, `box`; never move vertices on x = 0), `mesh.*`, `modifier.*` and `ref.*` steps; send several steps in one
-   `blender.call` (one checkpoint, one snapshot). Watch `stats.dims` against the class band.
+   -> frames, dummies at the class dims, slots, material presets, a never-exported ghost (structure only).
+3. The main volumes, several steps per `blender.call`: `mesh.loft` with section shapes (`crown`, `exp`,
+   `tumble`; `interp` smooth; `half` with MIRROR; `parts` for the later cuts), `mesh.sweep`, `mesh.lathe`,
+   `mesh.primitive` `rounded_box`/`capsule`; soft moves (`mesh.transform` with `falloff`; `select` `near`,
+   `loop`, `grow`), `mesh.relax`, `mesh.deform`. `kit.blank` (`satk_op(op="kit.blank")` lists the kinds and
+   bodies, `kit.blank_split` cuts its regions later) is an optional quick start for a plain body of a listed type:
+   reshape it, never keep its generic profile. `kit.wheel` at `wheel_scale`. Everything smooth-shaded: shape
+   lofts, sweeps and rounded primitives are; point lofts need `smooth: true`, lathes `shade.basic`. Coordinates
+   are the template's model space (the like model's frames; `kit.info` `frames: true`). A tested car in
+   batches: `docs/agent/style/modelling.md`.
 4. `satk_op(op="blender.preview", args={"subject": "session:<asset>", "lineup": "class", "passes": "game,clay"})`
-   -> ONE sheet (a project session takes `like` from `asset.json`; the peers share a name word with the like
-   model, then are nearest in shape and triangles). Show it to the user and ask about proportions and silhouette
-   before detailing.
+   -> ONE sheet (a project session takes `like` from `asset.json`; `ref` + `ref_view` put a true side view behind
+   the side cell). Show it with the board; ask about identity, proportions and silhouette before composing.
 
-**G2 Shape and shading** (HUMAN CHECKPOINT)
-- Detail where the outline turns at the tier's segment counts; `blender.call kit.blank_split` {"fill": true} cuts
-  the blank's parts (doors per side) into their slots, then `kit.wheel` and `kit.shade`; gate: `shade.normal_bend`,
-  `shade.flat_share`, `dff.verts_per_tri`, `part.tris`, `geo.median_dihedral`, `geo.largest_piece_share`,
-  `geo.sliver_share` inside the band (the step stats use the same code as `asset.check`; an untouched sedan blank
-  plus a few shaping steps is inside it). The step stats judge every object against the whole class: a wheel or a
-  small part flags `shade.flat_share` or `dff.verts_per_tri` rows meant for the body, so read its `part.*` rows
-  and `asset.check` instead. Second sheet (game + clay + wire) to the user.
+**G2 Compose**
+- One welded shell; panels cut from it (`kit.blank_split` {"fill": true} along the loft parts or blank regions,
+  doors per side); arches with liners or welded flares (`mesh.flare`); bumpers wrapped arch to arch (`mesh.sweep`
+  + `mesh.attach` snap); glasshouse welded to the body (`mesh.attach` weld); pillars and window frames as trim
+  faces of the shell and doors; doors thickened with jambs; mirrors on stalks, handles, rails on feet touching.
+- Loose pieces into their slots: `kit.fill` {`slot`, `objects`, `append`} (bumpers, mirrors).
+- Refit the dummies (`kit.info` with `frames: true` writes them to `frames_file`; move them with `scene.transform`):
+  lamps on the lenses, exhaust on the pipe tip, petrol cap on the surface, hinges on the part edges, wheels centred
+  in the arches, seat and steering where the seated pose expects them; bikes: the steering axis through the headset
+  inside the body, seat, footrest and grips at the rider's contact points.
+- Moving parts of other kinds (rotors, propellers, control surfaces, forks, pedals, suspension arms, bogies):
+  each in its frame's space, pivot at the frame origin, centred, clear through its motion (`kinds.md`).
+- Gate: the `form` rows of the step stats and `asset.check` (`form`, `fit`, `symmetry`) without open defects; a
+  clay sheet from a LOW three-quarter camera (`camera.add` {`location`, `target`}, then `--snapshot <camera>`)
+  shows one joined whole; `satk_op(op="look.leak", args={"subject": "session:<asset>"})` finds no gap that is
+  not a designed opening; every G1-G2 item `built`; the region sheets (`blender.preview session:<asset>
+  --regions all`) read one by one.
 
-**G3 Parts**: cut parts into their slots along edges (jambs, hinges at dummy origins); `kit.wheel`, `kit.damage`,
-`kit.vlo` / `kit.lod`, `kit.col` (or `col.gen` + `col.check` on the exported DFF; `col.surface <texture>` explains
-a surface); preview `--states ok,dam,vlo,col`. Map models with lamps, smoke or an entry: copy the 2dEffects of a
-vanilla model of the class (`fx2d.copy` with `filter`, then `fx2d.check`; S23).
+**G3 Detail** (HUMAN CHECKPOINT)
+- The class checklist (`asset.check` `coverage` rows): lamp buckets with flat lenses, grille surround with bars or
+  teeth, bumper grooves and intakes, plate recess, mirrors, handles, wipers, mouldings; interior (shaped seats,
+  dash with gauge hood, steering wheel, door cards, console); engine bay when the bonnet opens; underbody;
+  bikes: headset, levers, indicators, shock, stand, rack. Richer than vanilla is welcome in the same soft
+  language. Map models with lamps, smoke or an entry: copy the 2dEffects of a vanilla model of the class
+  (`fx2d.copy` with `filter`, then `fx2d.check`; S23).
+- Every G3 item of the inventory, built in the same soft language and tagged; then a second pass: the inventory,
+  the features list and the region sheets once more, and new items for what is still missing.
+- Sheet: the region sheets (`--regions`) next to a vanilla peer; `asset.inventory` with no G3 item missing.
 
-**G4 UV and textures**: `kit.uv_region` (shared atlas regions), `kit.material_preset`, own textures: `texture.new`
-(a flat base with `rect` and `gradient`), `kit.bake` (`size` N, [w, h] or "WxH"), `texture.finish` {`mask`, `edge`,
-`role`} (lands in the `style.texture` band; a mask of another size is resized, warn `RESIZED_MASK`); `uv.fit`
-(`keep_aspect` is false by default), `uv.texel` (px per metre), `mesh.solidify` closes a free sheet into a slab;
-`style.texture` per own texture; gate `uv.zero_area_share` in band.
+**G4 Surface**: `kit.material_preset` (paint on `vehiclegrunge256` + UV2 sheen, lamp keys, glass alpha 128,
+chrome, trim, interior, plate), `kit.uv_region` (shared atlas regions; paint up faces in the clean zone, V
+follows height on the sides), tiling UVs at the class texel density for map models; own textures small, soft and
+clean: paint at 4x, `texture.new`, `kit.bake` (`size` N, [w, h] or "WxH"), `texture.finish` {`mask`, `edge`,
+`role`, `grime` 0, `supersample`}; `style.texture` per own texture (reference), crops at native size after DXT1;
+`uv.fit` (`keep_aspect` false by default), `uv.texel`; `kit.shade` (seams and named creases hard, corners soft).
+Sheet: the game look at dirt 2 (and 0); the region sheets again (seams, stretch, z-fighting stripes, dark faces).
 
-**G5 Export, check, package**
-1. `satk_op(op="kit.export", args={"replace": "model:426", "session": "<asset>"})` (or `"add": true`: `mod.add`
+**G5 Finish, export, check, package**
+1. `kit.damage` (visible dents; inner panels behind the skin), `kit.vlo` (`method` sections or decimate) /
+   `kit.lod`, `kit.col` (`contact` faces under the top; or `col.gen` + `col.check` on the exported DFF;
+   `col.surface <texture>` explains a surface); preview `--states ok,dam,vlo,col`.
+2. `satk_op(op="kit.export", args={"replace": "model:426", "session": "<asset>"})` (or `"add": true`: `mod.add`
    picks a free id and writes the data lines) -> DFF (frame-local bounding spheres, split normals, UV2), COL
    `<model>_col`, TXD of own textures (DXT, one level), Mod Loader folder + readme, re-import diff. Props and
    buildings also get prelight (ray cast, no Cycles), a primitive COL by the class rule (`col`: box, boxes,
    spheres, hull or mesh), the LOD DFF (`kit.template --lod`, `kit.lod`; name `lod` + name from its 4th letter,
    its own IDE line, draw 800) and, with `"place": [x, y, z]`, the IPL pair. Check that the id is not in the
    weapon range 321-373.
-2. `satk_op(op="asset.check", args={"target": "<folder>", "like": "model:426", "tier": "sa_plus", "md": true})`:
-   0 structure or semantic errors; each out-of-band row fixed or explained.
-3. `satk_op(op="asset.lint", args={"target": "<folder>", "preset": "sa_plus", "baseline": "vanilla"})`,
+3. `satk_op(op="asset.check", args={"target": "<folder>", "like": "model:426", "tier": "sa_plus", "md": true})`:
+   no `engine` errors, no open `form`/`fit`/`mesh` defects; the `reference` section is information. Then the
+   polish loop: `satk_op(op="look.leak", args={"subject": "<dff>", "package": "<dff folder>"})` (writes
+   `<package>/checks/<stem>.leak.json` for this export, model and LOD) -> `asset.check` with `"strict": true` (`done`, `blocking`; it reads the
+   inventory sidecar `kit.export` wrote) -> fix the first `blocking` rows (most visible first) -> `kit.export` -> the
+   region sheets of the parts you touched -> again, until `done: true`. Never delete, simplify or reject a built
+   item to pass; a blocking row that needs a missing tool is an open issue with evidence.
+4. `satk_op(op="asset.lint", args={"target": "<folder>", "preset": "sa_plus", "baseline": "vanilla"})`,
    `satk_op(op="mod.check", args={"path": "<folder>"})`, `satk_op(op="texture.audit", args={"target": "<folder>"})`
    (TXD bytes; `texture.optimize` only for what it flags, one mip level for vehicles, peds and weapons); a final
    S26 round; the report from `asset.status`.
-4. The hybrid loop (S29): a context look in the viewer (`view.vehicle`, `view.place` or `view.ped` with the export's
+5. The hybrid loop (S29): a context look in the viewer (`view.vehicle`, `view.place` or `view.ped` with the export's
    `files.dff` and `files.txd`, `watch: true`, then `view_capture(marks=6)`), then behaviour in the real game
    (`ingame.start` {`mod`: [the folder `package.out`]}, the user starts the client once, `ingame.check`
-   {`suite`}); fix, `kit.export` again, `ingame.reload`. Record the verdicts with `asset.status --record`.
+   {`suite`}: lights, doors, damage; bikes: the rider seated and the steering at full lock); fix, `kit.export`
+   again, `ingame.reload`. Record the verdicts with `asset.status --record`.
 
 Per kind:
 
-| Kind | Template and anchor | Gate checks that matter most | Data lines |
+| Kind | Template and anchor | What to look at most | Data lines |
 |---|---|---|---|
-| automobile, bike, bmx, quad, boat, heli, plane, trailer, train, mtruck | `kit.template --like <same type>` + `kit.blank`; wheel = IDE `wheel_scale` | `dims.*_rel`, `veh.hd_tris`, `shade.*`, `dam.ok_ratio`, COL3 + shadow, every `ug_*` frame | `mod.add` (IDE, handling, carcols, carmods, cargrp) |
-| prop, breakable | `--kind prop` + `kit.blank --kind prop_box`/`prop_cyl`; ped height | size-bucket `geo.tris`, `uv.texel_px_m`, prelight and primitive COL from `kit.export`, draw <= 100 | `mod.add` through `kit.export --add` (objs line, object.dat; `--place` the IPL pair) |
-| building with LOD | `--kind building` + `kit.blank --kind building_box`; ped height | `geo.tris`, tiling `uv.span`, prelight + warm night, `lod.ratio`, draw <= 299, mesh COL | IDE lines of HD and LOD; `--place` writes the IPL pair |
+| automobile, mtruck, quad | `kit.template --like <same type>`; body from lofts or a matching `kit.blank`; wheel = IDE `wheel_scale` | likeness to the features list, rounded joined body, lined arches, refitted dummies, every `ug_*` frame, COL3 + shadow, visible damage, interior and bay | `mod.add` (IDE, handling, carcols, carmods, cargrp) |
+| bike, bmx | `kit.template --like model:461` / `model:481`; lofts per body part or tube sweeps | steering axis through the headset or head tube, rider contact points, chainset and pedals turning clear, joints closed | `mod.add` (anim group of the like model) |
+| boat | `kit.template --like model:452`; hull loft | hull closed below the waterline, deck on the sheer line, propellers on their frames, cockpit floor | `mod.add` |
+| heli, plane | `kit.template --like model:487` / `model:593`; fuselage loft, wing and fin sweeps | rotors and propellers centred on their frame origins, control surfaces hinged flush in their notches, skids or gear on the ground, wing roots closed | `mod.add` |
+| trailer, train | `kit.template --like model:435` / `model:537` | `hookup` where the tractor couples; bogies and wheel dummies on the gauge; couplers at the like height | `mod.add` |
+| prop, breakable | `--kind prop` + closed primitives (or `kit.blank --kind prop_box`/`prop_cyl`); ped height | pieces that touch, chamfered caps, prelight and primitive COL from `kit.export`, draw <= 100 | `mod.add` through `kit.export --add` (objs line, object.dat; `--place` the IPL pair) |
+| building with LOD | `--kind building` + one main shell (or `kit.blank --kind building_box`); ped height | massing, roof and ledges on the shell, tiling `uv.span`, prelight + warm night, draw <= 299, mesh COL | IDE lines of HD and LOD; `--place` writes the IPL pair |
 | interior shell or prop | `--kind interior_shell` / `interior_prop` | prelight, normals on props, floor surfaces | interior IDE |
-| weapon | `--kind weapon` (gunflash atomic) | `geo.tris[weapon]`, length against the ped, muzzle flash | `weapon.dat` binding of the replaced weapon |
+| weapon | `--kind weapon` (gunflash atomic); built from the side profile | length against the ped, rounded grip, muzzle flash | `weapon.dat` binding of the replaced weapon |
 | ped | `--kind ped` (bone names only) | 32-bone skin, <= 4 weights, one material | `ped.dat`, `pedgrp.dat` of the replaced ped |
-| pickup, vehicle upgrade | `--kind pickup` / `vehicle_upgrade` | the class row of `style_world`, `ug_*` frame names | `carmods.dat` for upgrades |
+| pickup, vehicle upgrade | `--kind pickup` / `vehicle_upgrade` | the class row of `style_world`, `ug_*` frame names, seated on the body | `carmods.dat` for upgrades |
 
-Fallbacks when the Blender session cannot start (`DEPENDENCY`, `EXTERNAL_TOOL`): cold `blender_job` steps (`import_model`, `render`,
-`export`), `satk_op(op="blender.game_ready", ...)` for map models, `model_image` of the exported file; say so in
-the report. Targets (re-measured once `workflow-cost` runs S25): research <= 10 min, first export <= 20 min,
-agent-written geometry code <= 300 lines (the session journal replaces it), context at the first export <= 150K
-tokens, `asset.check` with 0 unexplained out-of-band rows.
+Fallbacks when the Blender session cannot start (`DEPENDENCY`, `EXTERNAL_TOOL`): cold `blender_job` steps
+(`import_model`, `render`, `export`), `satk_op(op="blender.game_ready", ...)` for map models, `model_image` of the
+exported file; say so in the report.
 
-Stop when: the user approved the G1 and G2 sheets, `asset.check` has no structure or semantic errors, lint at the
-tier preset is clean, the package is under `work/out/` and `asset.status` shows G5 passed.
+Never: vertex-by-vertex meshes or a private mesh library; measuring code for photos (grids, solved cameras,
+back-projection, overlay chasing); private metric scripts; geometry changes that only move a number (dissolve,
+decimate, subdivide); rebuilding a blank from edited numbers after G1.
+
+Stop when (and only when): the user approved the G1 and G3 sheets, `asset.inventory` is complete (every
+required item `built`), `asset.check --strict` answers `done: true`, every region sheet
+was reviewed, lint has no errors, the package is under `work/out/` and `asset.status` shows G5 passed. Otherwise
+report the stage, the `blocking` rows, the inventory counts and the open regions; never "done".
 
 ## S26. Visual QA round
 
 1. `satk_op(op="blender.preview", args={"subject": "<SID, dff, mod folder or session:NAME>", "like": "model:426", "passes": "game,clay,wire", "states": "ok,dam,vlo,col", "dirt": 2})`
-   -> ONE JPEG sheet (<= 1,024 px, <= 300 KB) + stats (the same metrics as `asset.check`). `"lineup": "class"`
-   adds two class peers at the same scale; for `session:NAME` of an asset project `like` comes from `asset.json`.
-   A session scene gets the wheel on every wheel dummy and the like vehicle's paint, for the render only. A
-   building's LOD slot is the `vlo` state: `ok` draws the HD model alone.
-2. Read the sheet once: silhouette and stance, size, density (clay + wire), shading (soft panels, crisp seams),
-   materials (dirt band, white lamps, a dark interior behind alpha glass), texture look.
-3. `satk_op(op="asset.check", args={"target": "<file>", "like": "model:426", "md": true})` -> rows `[check, part,
-   value, p10, p50, p90, verdict, hint, style_ref]`.
+   -> ONE JPEG sheet (<= 1,024 px, <= 300 KB) + counts. `"lineup": "class"` adds two peers of the body type at the
+   same scale; for `session:NAME` of an asset project `like` comes from `asset.json`. A session scene gets the
+   wheel on every wheel dummy and a real paint colour for the render only. A building's LOD slot is the `vlo`
+   state: `ok` draws the HD model alone.
+2. Read the sheet once, next to the reference board and `<project>/refs/features.md`: identity (each listed feature
+   present, missing or wrong), proportions and stance, form (rounded, crowned, no flat walls or hard boxes),
+   composition (one joined whole, nothing floating or see-through), detail (the class checklist), shading (seams
+   hard, corners soft), materials (clean paint, white lamps, a dark interior behind alpha glass), texture look
+   (small, soft, photo-like).
+3. `satk_op(op="asset.check", args={"target": "<file>", "like": "model:426", "md": true})` -> sections `engine`
+   (errors), `form`, `fit`, `symmetry` (located defects), `coverage` (present and missing details), `reference`
+   (vanilla numbers, information); with `"strict": true` also `done` and `blocking`. For an asset project:
+   `asset.inventory` (missing, unattached, rejected items) and the region sheets (`"regions": ["all"]` on the
+   preview: one close-up sheet `preview-NNN-<region>.jpg` per region of the kind), each read on its own;
+   `look.leak` for gaps.
 4. Textures changed: lossless native-scale crops + `style.texture`. World assets: also `"time": "23:00"`.
-5. Verdict: at most 10 fixes, most visible first, recorded with `asset.status --record`; at G1, G2 and G5 the user
-   sees the sheet.
-- Never calibrate on a raw import render (opaque glass, black lamp codes, full grime): the preview's game look
-  models alpha glass, white lamps, dirt level 2 and the sheen. Image rules: SKILL.md section 7.
+5. Verdict: every missing or unattached inventory item, then at most 8 fixes, most visible first, each with
+   part, problem, evidence and an instruction (`asset.status --record`); per region pass or fix; the user sees
+   the sheet at the gates. The critic's order and the pass rule: `docs/agent/style/done.md` section 8.
+- Never calibrate on a raw import render (opaque glass, black lamp codes, full grime, the neon paint key): the
+  preview's game look models alpha glass, white lamps, a real paint colour, dirt level 2 and the sheen. Image
+  rules: SKILL.md section 7.
 
 
 ## S27. MTA resource: write, check, pack, load

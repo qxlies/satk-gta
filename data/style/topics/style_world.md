@@ -1,25 +1,29 @@
 # SA style: map objects (props, buildings, LODs, terrain, interiors, vegetation, pickups)
 
-About 100-500 triangles WHATEVER the size; detail from tiling 128/256 px DXT1 photo textures and baked vertex
-colours; NO normals; collision far simpler than the mesh; HD with collision drawn to <= 299 m; LOD ~0.2 of the
-tris, 32-64 px textures, drawn to ~800 m. Bands p10 / p50 / p90 over models of the class; sa_plus = PROPOSAL.
+Simple closed forms: props are kits of closed primitives that touch or push into each other (chamfered caps,
+8-sided cylinders, boxes with a lip); buildings are one main shell with a roof slab and small volumes on it
+(`style_construction`). The look comes from tiling 128/256 px DXT1 photo textures and baked vertex colours; NO
+normals; collision far simpler than the mesh; HD with collision drawn to <= 299 m (hard rule); LOD drawn to
+~800 m. Numbers below are vanilla reference (p10 / p50 / p90), never targets. Worked guidance for buildings
+with LOD, interiors, props and pickups, with their items and close-up regions: `style_kinds`; done: `done`.
 
-## Size buckets (largest bbox side; tris p10 / p50 / p90, texel px/m p50, median edge m)
+## Vanilla size buckets (largest bbox side; tris p10 / p50 / p90, texel px/m p50, median edge m)
 - 0.5-1 m (389): 26 / 128 / 560, 228 px/m, 0.15 m, texture 128, 2 mats, draw 35.
 - 1-2 m (685): 12 / 128 / 352, 138 px/m, 0.28 m. 2-4 m (673): 12 / 133 / 432, 94 px/m, 0.41 m.
 - 4-8 m (464): 12 / 137 / 817, 72 px/m. 8-16 m (666): 24 / 212 / 1,150, 64 px/m, 3 mats.
 - 16-32 m (860): 46 / 342 / 1,399, 53 px/m, 5 mats, col faces 25. 32-64 m (1,089): 53 / 440 / 1,257, 35 px/m.
 - 64-128 m (1,554): 72 / 353 / 1,411, 37 px/m, texture 256. 128-256 m (1,697): 71 / 280 / 1,065, 33 px/m.
-- sa_plus: tris up to 2x the bucket p90; texel 1.5-2x the bucket p50; texture 256 typical, 512 only for terrain
-  or a landmark. A uniform 32 px/m is right for buildings/terrain, 3-7x too low for props.
+- sa_plus: more modelled detail where it reads (ledges, cornices, porches, prop caps and lips); texel up to
+  1.5-2x the bucket p50; texture 256 typical, 512 only for terrain or a landmark; mind streaming memory. A
+  uniform 32 px/m is right for buildings/terrain, 3-7x too low for props.
 
-## Classes (tris p10 / p50 / p90, materials p50)
+## Vanilla classes (tris p10 / p50 / p90, materials p50)
 street_prop (699) 10 / 84 / 324, 1; building_small (734) 21 / 210 / 752, 4; building_medium (1,117) 72 / 484 /
 1,163, 7; building_large (1,371) 78 / 504 / 1,643, 6; terrain_road (2,179) 66 / 236 / 745, 4; vegetation (314)
 40 / 148 / 336; interior_prop (1,413) 26 / 144 / 570; interior_shell (672) 59 / 647 / 2,918; lod (4,349) 12 / 60
 / 262; pickup (28) 40 / 159 / 224; vehicle_upgrade (194) 31 / 161 / 575 (normals, no prelight).
-Never above ~3,000 tris in a map model. Silhouette only: median edge ~1/10 of the size; windows, frames, bolts,
-panel gaps, brickwork are texture. One geometry, one atomic; material colour white; 1 texture per material.
+Model the massing and what reads at distance; windows, frames, bolts, panel gaps, brickwork are texture. Props:
+no gaps, no floating pieces. One geometry, one atomic; material colour white; 1 texture per material.
 
 ## Textures
 DXT1 128 (props, small buildings) or 256 (large buildings, terrain), 64 for details and pickups; DXT3 for real
@@ -43,7 +47,7 @@ street props 1 model / 2 textures / 16 KB; buildings 2-3 models / 7-13 textures;
 - Big-building rule: LOD children or `1.0 x draw > 300` -> collision OFF and never streamed out. HD with collision:
   draw <= 299 (1,090 vanilla models sit at 299). Draw p50: props 100 (interior 30), buildings 100-150, terrain 200.
 - LOD for exterior models from ~30 m (72-74 % of medium/large buildings, 95 % of terrain): `lod.ratio` 0.05 /
-  0.21 / 0.70, 32-64 px DXT1 in a shared LOD TXD, no collision, prelight + night, name `lod` + HD name[3:],
+  0.21 / 0.70, 32-64 px DXT1 in a shared LOD TXD, no collision, prelight + night, name `lod` + the HD name (a replacement keeps the vanilla LOD name),
   draw 450 / 800 / 1,500 (`kit.lod`).
 
 ## Collision

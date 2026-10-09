@@ -425,6 +425,10 @@ def test_help_topics_for_generic_access():
 #: whose operations are all missing in this checkout is skipped until their package is merged).
 EVAL: list[tuple[str, tuple[str, ...]]] = [
     ("make txd from png", ("texture.pack",)),
+    ("is my model complete", ("asset.inventory",)),
+    ("missing parts of my car", ("asset.inventory",)),
+    ("find gaps and see-through holes in my model", ("look.leak",)),
+    ("close-up regions of my asset", ("blender.preview",)),
     ("create vehicle", ("kit.template", "blender.session", "mod.add")),
     ("new car mod", ("kit.template", "blender.session", "mod.add")),
     ("build a prop", ("kit.template", "blender.session")),

@@ -1,0 +1,360 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "plane",
+ "summary": "fixed-wing plane: a lofted fuselage, wings and tail with separate control surfaces, landing gear and a propeller or jets; hero adds flaps, gear doors, a cabin and antennas.",
+ "regions": {
+  "overall": {
+   "summary": "the whole plane, 3/4 views, side and top",
+   "views": []
+  },
+  "nose": {
+   "summary": "nose, propeller, cowling",
+   "views": [
+    "nose"
+   ]
+  },
+  "cockpit": {
+   "summary": "canopy or windscreen, seats, panel",
+   "views": [
+    "cockpit"
+   ]
+  },
+  "wings": {
+   "summary": "wings, ailerons, flaps, wingtips, struts",
+   "views": [
+    "wings"
+   ]
+  },
+  "tail": {
+   "summary": "fin, rudder, tailplane, elevators",
+   "views": [
+    "tail"
+   ]
+  },
+  "fuselage": {
+   "summary": "fuselage sides, doors, windows",
+   "views": [
+    "left",
+    "right"
+   ]
+  },
+  "gear": {
+   "summary": "gear legs, wheels, fairings",
+   "views": [
+    "gear"
+   ]
+  },
+  "underside": {
+   "summary": "from below",
+   "views": [
+    "underside"
+   ]
+  },
+  "engine": {
+   "summary": "engines, nacelles, exhausts",
+   "views": [
+    "nose",
+    "wings"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "fuselage",
+   "name": "Fuselage",
+   "region": "fuselage",
+   "category": "shell",
+   "construction": "lofted from round or superellipse sections, nose to tail cone, welded",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "chassis"
+  },
+  {
+   "key": "wings",
+   "name": "Wings",
+   "region": "wings",
+   "category": "shell",
+   "construction": "aerofoil section swept or lofted along the span, rounded tips, root faired into the fuselage",
+   "attaches_to": "fuselage",
+   "stage": "G1",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "tail_fin",
+   "name": "Fin",
+   "region": "tail",
+   "category": "shell",
+   "construction": "vertical fin lofted from aerofoil sections",
+   "attaches_to": "fuselage",
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "tailplane",
+   "name": "Tailplane",
+   "region": "tail",
+   "category": "shell",
+   "construction": "horizontal stabilisers",
+   "attaches_to": "fuselage",
+   "stage": "G1",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "ailerons",
+   "name": "Ailerons",
+   "region": "wings",
+   "category": "panel",
+   "construction": "cut from the wing trailing edge, hinge on the line",
+   "attaches_to": "wings",
+   "stage": "G2",
+   "detail": "simple",
+   "count": 2,
+   "frame": [
+    "aileron_l",
+    "aileron_r"
+   ]
+  },
+  {
+   "key": "elevators",
+   "name": "Elevators",
+   "region": "tail",
+   "category": "panel",
+   "construction": "cut from the tailplane trailing edge",
+   "attaches_to": "tailplane",
+   "stage": "G2",
+   "detail": "simple",
+   "count": 2,
+   "frame": [
+    "elevator_l",
+    "elevator_r"
+   ]
+  },
+  {
+   "key": "rudder",
+   "name": "Rudder",
+   "region": "tail",
+   "category": "panel",
+   "construction": "cut from the fin trailing edge",
+   "attaches_to": "tail_fin",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "rudder"
+  },
+  {
+   "key": "canopy",
+   "name": "Canopy or windscreen",
+   "region": "cockpit",
+   "category": "glass",
+   "construction": "glass fitted to the cockpit opening",
+   "attaches_to": "fuselage",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "engine",
+   "name": "Engine cowling or nacelles",
+   "region": "engine",
+   "category": "engine",
+   "construction": "cowling or nacelles faired in",
+   "attaches_to": [
+    "fuselage",
+    "wings"
+   ],
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "engine"
+  },
+  {
+   "key": "propeller",
+   "name": "Propeller (static and moving)",
+   "region": "nose",
+   "category": "mechanism",
+   "construction": "spinner with blades (static_prop) and a blurred disc card (moving_prop); waive for a jet",
+   "attaches_to": "engine",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": [
+    "static_prop",
+    "moving_prop"
+   ]
+  },
+  {
+   "key": "landing_gear",
+   "name": "Landing gear",
+   "region": "gear",
+   "category": "running_gear",
+   "construction": "gear legs with fairings carrying the wheels (gear frames)",
+   "attaches_to": [
+    "fuselage",
+    "wings"
+   ],
+   "stage": "G2",
+   "detail": "simple",
+   "count": 3
+  },
+  {
+   "key": "wheel",
+   "name": "Wheel",
+   "region": "gear",
+   "category": "wheel",
+   "construction": "lathe tyre and hub",
+   "attaches_to": "landing_gear",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "wheel"
+  },
+  {
+   "key": "cockpit_interior",
+   "name": "Cockpit: seats and controls",
+   "region": "cockpit",
+   "category": "interior",
+   "construction": "seats, a yoke or stick and a panel seen through the canopy",
+   "attaches_to": "fuselage",
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "nav_lights",
+   "name": "Navigation lights",
+   "region": "wings",
+   "category": "lamp",
+   "construction": "wingtip and tail lights",
+   "attaches_to": [
+    "wings",
+    "tail_fin"
+   ],
+   "stage": "G3",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "doors",
+   "name": "Doors",
+   "region": "fuselage",
+   "category": "panel",
+   "construction": "cut from the fuselage (door frames)",
+   "attaches_to": "fuselage",
+   "stage": "G2",
+   "detail": "standard",
+   "frame": [
+    "door_lf_ok",
+    "door_rf_ok"
+   ],
+   "required": false
+  },
+  {
+   "key": "windows",
+   "name": "Cabin windows",
+   "region": "fuselage",
+   "category": "glass",
+   "construction": "inset windows along the fuselage",
+   "attaches_to": "fuselage",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "instrument_panel",
+   "name": "Instrument panel",
+   "region": "cockpit",
+   "category": "control",
+   "construction": "panel with gauge cards and a glare shield",
+   "attaches_to": "cockpit_interior",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "exhausts",
+   "name": "Exhausts",
+   "region": "engine",
+   "category": "engine",
+   "construction": "stubs or pipes from the cowling",
+   "attaches_to": "engine",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "wing_struts",
+   "name": "Wing struts",
+   "region": "wings",
+   "category": "structure",
+   "construction": "struts from the fuselage to the wing",
+   "attaches_to": [
+    "wings",
+    "fuselage"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "required": false
+  },
+  {
+   "key": "flaps",
+   "name": "Flaps",
+   "region": "wings",
+   "category": "panel",
+   "construction": "inboard flaps cut from the trailing edge",
+   "attaches_to": "wings",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "gear_doors",
+   "name": "Gear doors and wells",
+   "region": "gear",
+   "category": "panel",
+   "construction": "wells and doors for the gear",
+   "attaches_to": [
+    "fuselage",
+    "landing_gear"
+   ],
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "antennas",
+   "name": "Antennas and pitot",
+   "region": "fuselage",
+   "category": "fixture",
+   "construction": "blade antennas and a pitot tube",
+   "attaches_to": [
+    "fuselage",
+    "wings"
+   ],
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "cabin_interior",
+   "name": "Cabin seats and floor",
+   "region": "cockpit",
+   "category": "interior",
+   "construction": "seat rows and the floor",
+   "attaches_to": "fuselage",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "markings",
+   "name": "Registration and markings",
+   "region": "fuselage",
+   "category": "decal",
+   "construction": "texture on own faces",
+   "attaches_to": [
+    "fuselage",
+    "tail_fin"
+   ],
+   "stage": "G4",
+   "detail": "hero"
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/plane.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

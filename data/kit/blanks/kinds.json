@@ -17,15 +17,17 @@
       },
       "split": "kit.blank_split cuts the parts out (doors per side) and fills the kit slots",
       "notes": [
-        "shape the body by moving loops (mesh.transform with a face selector) and by modifiers; the part regions follow the loops",
-        "tier sets the density: vanilla about 1,300 triangles in the chassis, sa_plus about 2,400"
+        "a quick start, never the required path: build the body from your own lofted sections when the blank does not fit the design",
+        "bodies: sedan, coupe, sports, suv, van, hatchback, wagon, suv_boxy, pickup (kit.blank --body); --wheel-d sets the wheel diameter; --dims is L,W,H in metres",
+        "shape the body with soft moves (mesh.transform with falloff) and modifiers; the part regions follow the loops",
+        "the tier sets the density of the loops and arch segments"
       ]
     },
     "bike": {
       "group": "vehicle",
       "kit_kind": "bike",
       "peer": "bike",
-      "summary": "Half body of a motorbike (tank, seat, tail, fairing loops) with a MIRROR modifier, fork, handlebar and two wheel discs at the wheelbase.",
+      "summary": "Motorbike or scooter (body sport|scooter): a lofted half body with a MIRROR modifier, fork, handlebar and wheels; the scooter is built around the like model's frames (steering axis inside the leg shield).",
       "dims": {
         "L": 2.31,
         "W": 0.77,
@@ -62,6 +64,14 @@
           "rows": 8,
           "sides": 16
         }
+      },
+      "bodies": {
+        "sport": "sport bike: tank, seat, tail and fairing loops, a straight fork and bar",
+        "scooter": "scooter or moped: rear cowl and floorboard in one loft, a leg shield around the steering axis, seat 10 cm under the rider dummy, headset with lamp and bars, fender and fork arm on the front wheel, engine and muffler ending at the exhaust dummy, rimmed wheels"
+      },
+      "like_body": {
+        "faggio": "scooter",
+        "pizzaboy": "scooter"
       }
     },
     "boat": {

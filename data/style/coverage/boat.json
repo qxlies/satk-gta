@@ -1,0 +1,79 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "boat",
+ "ref": "style_vehicle",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (10; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "glass",
+   "what": "windows: glass with alpha below 255 (windscreen part, doors or body)",
+   "how": {
+    "glass": true
+   },
+   "fix": "glass panes on the generic glass region of vehiclegeneric256 with alpha 128 (windscreen_ok, door and body windows)",
+   "optional": true,
+   "vanilla": "9/10"
+  },
+  {
+   "id": "hull",
+   "what": "the hull",
+   "how": {
+    "frame_geom": {
+     "parts": "^boat",
+     "min_tris": 100
+    }
+   },
+   "fix": "build the hull as the main atomic 'boat'",
+   "optional": true,
+   "vanilla": "8/10"
+  },
+  {
+   "id": "moving",
+   "what": "moving parts (flaps, rudder or propeller)",
+   "how": {
+    "frame_geom": "^(boat_moving|boat_flap|boat_rearflap|static_prop|moving_prop|rudder)"
+   },
+   "fix": "build the rudder/flaps (boat_flap_*, boat_rearflap_*) or the propeller (boat_moving) the game animates",
+   "optional": true,
+   "vanilla": "9/10"
+  },
+  {
+   "id": "engine",
+   "what": "the engine frame",
+   "how": {
+    "frames": "^engine$"
+   },
+   "fix": "add the engine frame at the outboard or the engine hatch",
+   "optional": true,
+   "vanilla": "6/10"
+  },
+  {
+   "id": "seat",
+   "what": "a seat or cockpit region",
+   "how": {
+    "frames": "^ped_frontseat$"
+   },
+   "fix": "add ped_frontseat on the helm seat",
+   "vanilla": "10/10"
+  },
+  {
+   "id": "steering_wheel",
+   "what": "a steering wheel",
+   "how": {
+    "texture": [
+     "vehiclesteering128"
+    ]
+   },
+   "fix": "a steering wheel card on vehiclesteering128 at the helm",
+   "optional": true,
+   "vanilla": "3/10"
+  }
+ ]
+}

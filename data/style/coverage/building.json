@@ -1,0 +1,61 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "building",
+ "ref": "style_world",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (3170; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "prelight",
+   "what": "prelit vertex colours (the baked day light of map models)",
+   "how": {
+    "flags": "prelit"
+   },
+   "fix": "bake the prelight (kit.bake / blender prelight)",
+   "vanilla": "3170/3170"
+  },
+  {
+   "id": "night",
+   "what": "night vertex colours",
+   "how": {
+    "flags": "night"
+   },
+   "fix": "bake the night colours (extra vertex colours)",
+   "vanilla": "3128/3170"
+  },
+  {
+   "id": "collision",
+   "what": "a collision model",
+   "how": {
+    "flags": "collision"
+   },
+   "fix": "generate the collision (kit.col, satk col gen)",
+   "vanilla": "3169/3170"
+  },
+  {
+   "id": "textured",
+   "what": "every material textured",
+   "how": {
+    "flags": "textured"
+   },
+   "fix": "give every material a texture from the model's TXD",
+   "vanilla": "3035/3170"
+  },
+  {
+   "id": "lod",
+   "what": "a LOD model for far distances",
+   "how": {
+    "lod_model": true
+   },
+   "fix": "build the LOD (kit.lod) and place it as the LOD of the building",
+   "optional": true,
+   "vanilla": "2030/3170"
+  }
+ ]
+}

@@ -37,10 +37,10 @@ _HANIM, _EXT, _FRAMELIST, _CLUMP, _FRAMENAME = 0x11E, 0x03, 0x0E, 0x10, 0x253F2F
 
 
 def lod_name(name: str) -> str:
-    """Name of a model's LOD: ``lod`` + the name without its first 3 characters (the vanilla form, 95 % of LOD names), at
-    most 19 characters; names of 3 or fewer characters get ``lod`` in front."""
+    """Name of a model's LOD: ``lod`` + the whole name, at most 19 characters (unique like the name: the vanilla form
+    ``lod`` + the name without its first 3 characters makes ``vbld`` and ``abld`` both ``lodd``)."""
     n = str(name).lower()
-    return ("lod" + (n[3:] if len(n) > 3 else n))[:19]
+    return ("lod" + n)[:19]
 
 
 def check_name(name: str, group: str) -> str:
@@ -336,7 +336,8 @@ def template_plan(like: str | None = None, kind: str | None = None, name: str | 
                 uvs = max(uvs, len(m.uv))
                 for mt in scene.materials[p.geom]:
                     rr = role_of(mt.rgba, mt.texture, group,
-                                 part="gunflash" if part == "gunflash" else ("weapon" if kind_name == "weapon" else ""))
+                                 part="gunflash" if part == "gunflash" else
+                                 ("weapon" if kind_name in ("weapon", "weapon_melee") else ""))
                     if rr not in mats:
                         mats.append(rr)
             row["roles"] = mats
@@ -378,7 +379,9 @@ def template_plan(like: str | None = None, kind: str | None = None, name: str | 
                         hint="vehicles carry their _vlo state; satk kit kinds --kind " + kind_name)
     if kind_name == "building" or (lod and group == "world"):
         pair = _lod_of(db, src.model_id)
-        lod_d["name"] = lod_name(new)
+        # a replacement keeps the vanilla LOD's name; a new model gets a unique one
+        lod_d["name"] = (str(pair["like_name"]).lower() if pair and pair.get("like_name")
+                         and new.lower() == str(like_name).lower() else lod_name(new))
         if pair:
             lod_d["like"], lod_d["like_name"], lod_d["like_draw"] = pair["like"], pair["like_name"], pair["draw"]
     # own textures and IDE

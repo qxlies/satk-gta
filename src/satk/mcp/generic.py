@@ -400,6 +400,17 @@ INTENTS: tuple[tuple[str, tuple[frozenset[str], ...], tuple[str, ...]], ...] = (
      ("fx2d.dump", "fx2d.check", "fx2d.apply")),
     ("streaming memory", (frozenset({"streaming", "memory", "budget", "vram"}),),
      ("texture.budget", "texture.audit")),
+    ("is my asset complete", (frozenset({"complete", "completed", "finished", "done", "inventory", "checklist",
+                                         "missing", "parts", "items", "item", "tag", "tags"}),
+                              frozenset({"model", "asset", "inventory", "parts", "part", "items", "item",
+                                         "vehicle", "car", "prop", "building", "dff", "list"})),
+     ("asset.inventory", "asset.check", "inventory.starter", "inventory.mark")),
+    ("gaps and see-through", (frozenset({"gap", "gaps", "leak", "leaks", "see-through", "seethrough", "hole",
+                                         "holes"}),),
+     ("look.leak", "asset.check", "blender.preview")),
+    ("close-up review regions", (frozenset({"region", "regions", "close-up", "closeup", "closeups",
+                                            "close-ups"}),),
+     ("blender.preview", "look.leak")),
 )
 
 

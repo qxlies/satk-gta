@@ -22,13 +22,16 @@ from typing import Any
 from ..core.errors import SatkError
 from .core import AuthorCore, AuthorWorld, Journal, readonly
 
-__all__ = ["KINDS", "ROUND_KINDS", "primitive_counts", "primitive_dims", "MockScene", "MockHost", "METHODS",
+__all__ = ["KINDS", "ROUND_KINDS", "SOFT_KINDS", "soft_mesh", "primitive_counts", "primitive_dims", "MockScene", "MockHost", "METHODS",
            "MockStudioWorld"]
 
 #: ``mesh.primitive`` kinds.
-KINDS: tuple[str, ...] = ("plane", "grid", "cube", "cylinder", "cone", "uv_sphere", "ico_sphere", "circle")
+KINDS: tuple[str, ...] = ("plane", "grid", "cube", "cylinder", "cone", "uv_sphere", "ico_sphere", "circle",
+                          "rounded_box", "capsule")
 #: Kinds whose density must be given explicitly (``segments``/``rings``/``subdivisions``).
-ROUND_KINDS: frozenset[str] = frozenset({"cylinder", "cone", "uv_sphere", "circle"})
+ROUND_KINDS: frozenset[str] = frozenset({"cylinder", "cone", "uv_sphere", "circle", "rounded_box", "capsule"})
+#: Kinds built by :mod:`satk.studio.shapes` (smooth-shaded by default).
+SOFT_KINDS: frozenset[str] = frozenset({"rounded_box", "capsule"})
 
 
 def _int(p: dict, key: str, lo: int, hi: int, default: int | None = None) -> int:
@@ -58,10 +61,34 @@ def _vec(p: dict, key: str, n: int, default: float) -> list[float]:
     return [float(x) for x in v]
 
 
+def soft_mesh(kind: str, p: dict) -> tuple[list, list]:
+    """``(verts, faces)`` of a ``rounded_box`` (size, radius, segments per quarter) or a ``capsule`` (radius, depth =
+    total length >= 2 radius, segments around, rings per hemisphere) before location and rotation."""
+    from . import shapes
+
+    if kind == "rounded_box":
+        size = _vec(p, "size", 3, 1.0)
+        n = _int(p, "segments", 1, 16)
+        r = p.get("radius", min(size) / 4)
+        if isinstance(r, bool) or not isinstance(r, (int, float)) or not 0 < r <= min(size) / 2 + 1e-9:
+            raise SatkError("BAD_PARAMS", f"mesh.primitive rounded_box: 'radius' must be > 0 and at most half the "
+                            f"smallest side ({min(size) / 2:g}), got {r!r}", hint="a soft corner: 0.02-0.1 m")
+        return shapes.rounded_box(size, float(r), n)
+    r = _num(p, "radius", 0.5)
+    depth = _num(p, "depth", max(1.0, 2 * r))
+    if depth < 2 * r - 1e-9:
+        raise SatkError("BAD_PARAMS", f"mesh.primitive capsule: 'depth' (total length) {depth:g} is shorter than "
+                        f"2 x radius ({2 * r:g})", hint="depth = the whole length including both round ends")
+    return shapes.capsule(r, depth, _int(p, "segments", 3, 512), _int(p, "rings", 1, 64))
+
+
 def primitive_counts(kind: str, p: dict) -> tuple[int, int]:
     """``(verts, tris)`` of ``mesh.primitive`` (validates the density parameters)."""
     if kind not in KINDS:
         raise SatkError("BAD_PARAMS", f"mesh.primitive: unknown kind {kind!r}", data={"kinds": list(KINDS)})
+    if kind in SOFT_KINDS:
+        v, f = soft_mesh(kind, p)
+        return len(v), sum(len(x) - 2 for x in f)
     if kind == "plane":
         return 4, 2
     if kind == "grid":
@@ -94,9 +121,11 @@ def primitive_dims(kind: str, p: dict) -> list[float]:
     if kind in ("plane", "grid"):
         s = _vec(p, "size", 2, 1.0)
         return [s[0], s[1], 0.0]
-    if kind == "cube":
+    if kind in ("cube", "rounded_box"):
         return _vec(p, "size", 3, 1.0)
     r = _num(p, "radius", 0.5)
+    if kind == "capsule":
+        return [2 * r, 2 * r, _num(p, "depth", max(1.0, 2 * r))]
     if kind in ("uv_sphere", "ico_sphere"):
         return [2 * r, 2 * r, 2 * r]
     if kind == "circle":
@@ -214,7 +243,7 @@ def scene_clear(ctx: MockCtx, p: dict) -> dict:
 
 
 def mesh_primitive(ctx: MockCtx, p: dict) -> dict:
-    """Add a mesh primitive with explicit density: plane grid cube cylinder cone uv_sphere ico_sphere circle."""
+    """Add a mesh primitive with explicit density: plane grid cube cylinder cone uv_sphere ico_sphere circle rounded_box capsule."""
     kind = p.get("kind")
     verts, tris = primitive_counts(kind, p)
     dims = primitive_dims(kind, p)

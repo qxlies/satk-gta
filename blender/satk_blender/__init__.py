@@ -165,8 +165,9 @@ class SATK_Props(bpy.types.PropertyGroup):
     export_name: StringProperty(name="Name", default="", description="Folder/resource name (default: first model)")
     gr_name: StringProperty(name="Name", default="",
                             description="Model name, 1-21 characters a-z 0-9 _ (default: the active object's name)")
-    gr_budget: IntProperty(name="Budget", default=1040, min=12, max=60000,
-                           description="HD triangle budget (vanilla map models: p50 216, p90 1040)")
+    gr_budget: IntProperty(name="Reduce to", default=0, min=0, max=60000,
+                           description="Optional HD triangle reduction; 0 keeps every triangle (only the engine cap of "
+                                       "65,535 vertices per geometry applies)")
     gr_tex: EnumProperty(name="Texture", default="256", description="Largest texture side",
                          items=[(s, s, "") for s in ("64", "128", "256", "512", "1024")])
     gr_prelight: EnumProperty(name="Prelight", default="bake", items=[

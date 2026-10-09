@@ -12,11 +12,12 @@ the output folder ``work/out/blender/<name>/``:
 * packs ``tex/*.png`` into ``<name>.txd`` with the texture packer of M2-03 (``satk.texmod``) when it is
   installed; otherwise leaves the PNGs and writes ``TODO-txd.txt`` (warning ``TXD_PENDING``);
 * writes ``<name>.ide`` (``objs`` lines for the model and its LOD, ID ``-1`` = to be assigned);
-* re-reads the DFF/COL with :mod:`satk.formats` and adds the ``checks`` table (budget, prelight, COL
+* re-reads the DFF/COL with :mod:`satk.formats` and adds the ``checks`` table (vertex cap, prelight, COL
   name and ±256 m range, name lengths, power-of-two textures).
 
-Budgets come from report 22 §3.1 (vanilla map models, triangles p50 / p90): HD 216 / 1 040, LOD
-60 / 262 (LOD ≈ 25 % of HD), draw distance HD 130 / 299, LOD 800 / 1 500.
+Triangle counts are reference only (report 22 §3.1, vanilla map models p50 / p90: HD 216 / 1 040, LOD 60 / 262,
+LOD ≈ 25 % of HD): the HD mesh keeps its triangles unless a reduction is asked; the checks enforce the engine
+limits (65,535 vertices per geometry). Draw distance HD 130 / 299, LOD 800 / 1 500.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ from ..core.paths import atomic_write, cfg, ensure_removable, ensure_writable, j
 __all__ = ["BUDGETS", "LOD_DRAW", "BIG_BUILDING_DRAW", "MANIFEST", "out_dir", "ide_text", "pack_txd", "verify",
            "finalize"]
 
-#: Triangle budgets of vanilla models by class (report 22 §3.1): ``(p50, p90, max)``.
+#: Triangles of vanilla models by class (report 22 §3.1): ``(p50, p90, max)`` - reference numbers, never a target.
 BUDGETS: dict[str, tuple[int, int, int]] = {
     "map_hd": (216, 1040, 10442),
     "map_lod": (60, 262, 1640),
@@ -193,8 +194,10 @@ def verify(man: dict) -> tuple[list[list], dict]:
         else:
             budget = int(args.get("budget") or 0)
             st.update(tris=info.tris, verts=info.verts, materials=len(info.materials))
-            add("dff", info.tris <= budget and info.verts <= MAX_VERTS and info.rw_version == 0x36003,
-                f"RW 0x{info.rw_version:X}, {info.tris} tris (budget {budget}), {info.verts} verts")
+            # the engine limits only (65,535 vertices per geometry, RW 3.6); a requested reduction is reported
+            add("dff", info.verts <= MAX_VERTS and info.rw_version == 0x36003 and (not budget or info.tris <= budget),
+                f"RW 0x{info.rw_version:X}, {info.tris} tris" + (f" (reduction to {budget} asked)" if budget else "")
+                + f", {info.verts} verts (cap {MAX_VERTS})")
             want = args.get("prelight", "bake") != "none"
             pre = bool(info.flags & F_PRELIT), bool(info.flags & F_NIGHT)
             add("prelight", pre == (want, want) if want else None,

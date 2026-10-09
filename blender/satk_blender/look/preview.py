@@ -5,6 +5,10 @@
 # License, or (at your option) any later version. See LICENSE in this directory.
 """The preview job behind ``satk blender preview`` (cold job ``preview``) and the studio method ``look.preview``.
 
+``spec["ref"]`` (``--ref``): a true-view photo placed behind the subject for its view (``side``, ``front`` or
+``rear``) at 30 %, in the game pass only; its object box spans the subject's length (or width) and stands on the
+subject's ground (:mod:`.silhouette`).
+
 Spec (built by ``satk.look.ops``)::
 
     {"entries": [{"key": "e0", "label": "premier.dff", "plan": {<model plan>}}, {"key": "scene", "scene": true}],
@@ -37,7 +41,8 @@ from . import api
 from . import lights as Lt
 from . import materials as M
 
-__all__ = ["STATES", "run", "set_state", "is_col", "is_low", "default_hidden", "col_proxies", "remove_proxies"]
+__all__ = ["STATES", "run", "set_state", "is_col", "is_low", "default_hidden", "col_proxies", "remove_proxies",
+           "scene_prepare", "scene_restore"]
 
 STATES = ("ok", "dam", "vlo", "col")
 ENTRY = "SATK_look_entry"
@@ -109,7 +114,8 @@ def _entry_objects(key: str) -> list:
 
 def _scene_objects(scene) -> list:
     return [o for o in scene.objects if not o.get("satk_look_aux") and not o.get("satk_ghost")
-            and not o.get("satk_look_entry") and o.type in ("MESH", "EMPTY", "ARMATURE", "FONT", "CURVE")]
+            and not o.get("satk_look_entry") and not o.get("satk_ref")
+            and o.type in ("MESH", "EMPTY", "ARMATURE", "FONT", "CURVE")]
 
 
 def is_helper(o) -> bool:
@@ -125,11 +131,21 @@ def is_low(o) -> bool:
     return _base(o.name).endswith("_vlo") or o.get("satk_slot") == "lod"
 
 
+#: Atomics the game shows only while a rotor or a propeller spins fast (the blurred disc); a parked vehicle shows
+#: its static rotor or prop instead.
+_SPINNING = ("moving_rotor", "moving_rotor2", "moving_prop", "moving_prop2")
+
+
+def is_spinning(o) -> bool:
+    return _base(o.name) in _SPINNING
+
+
 def default_hidden(o) -> bool:
-    """Hidden in the ``ok`` state: damage/LOD variants, collision, breakables, gun flashes, 2DFX helpers."""
+    """Hidden in the ``ok`` state: damage/LOD variants, collision, breakables, gun flashes, 2DFX helpers and the
+    spinning-rotor discs (the parked state)."""
     n = _base(o.name)
     return (n.endswith("_dam") or is_low(o) or is_col(o) or bool(o.get("satk_breakable"))
-            or G.is_gunflash(o.name) or is_helper(o))
+            or G.is_gunflash(o.name) or is_helper(o) or n in _SPINNING)
 
 
 def set_state(objs, state: str) -> dict:
@@ -182,10 +198,27 @@ def _import(entry: dict, first: bool, args: dict) -> list:
     from .. import importer
 
     plan = {"model": entry["plan"], "source": entry.get("source") or "file", "profile": entry.get("profile")}
+    if first:
+        # clean before taking the names: a part named like a startup object (the weapon "camera") gets the name of
+        # the deleted startup object and would not count as new
+        from .. import common
+
+        common.clean_scene()
     before = {o.name for o in bpy.data.objects}
-    r = importer.import_model(plan, {"clean": first, "col": bool(args.get("col")),
+    r = importer.import_model(plan, {"clean": False, "col": bool(args.get("col")),
                                      "balance": float(args.get("balance") or 0.0)})
     new = [o for o in bpy.data.objects if o.name not in before]
+    if entry.get("lod_of"):
+        # the LOD model of a map model: part of its subject, drawn only in the vlo state (satk_slot lod)
+        owner = entry["lod_of"]
+        root = bpy.data.objects.get(f"{ENTRY}.{owner}")
+        for o in new:
+            o["satk_look_entry"] = owner
+            o["satk_slot"] = "lod"
+            o.hide_render = True
+            if o.parent is None and root is not None:
+                o.parent = root
+        return [w for w in (r.get("warnings") or [])]
     key = entry["key"]
     root = bpy.data.objects.new(f"{ENTRY}.{key}", None)
     bpy.context.scene.collection.objects.link(root)
@@ -204,7 +237,7 @@ def _import(entry: dict, first: bool, args: dict) -> list:
     return [w for w in (r.get("warnings") or [])]
 
 
-def _scene_prepare(scene, ent: dict) -> tuple[list, list[str]]:
+def scene_prepare(scene, ent: dict) -> tuple[list, list[str]]:
     """A session scene as the game shows it, for the render only: the wheel on every wheel dummy and the
     like vehicle's paint (``ent["paint"]``). Returns ``(temporary objects, objects given a paint)``."""
     from .. import importer
@@ -228,7 +261,7 @@ def _scene_prepare(scene, ent: dict) -> tuple[list, list[str]]:
     return tmp, painted
 
 
-def _scene_restore(tmp: list, painted: list[str]) -> None:
+def scene_restore(tmp: list, painted: list[str]) -> None:
     alive = [o for o in tmp if _alive(o)]
     if alive:
         bpy.data.batch_remove(alive)
@@ -241,6 +274,8 @@ def _scene_restore(tmp: list, painted: list[str]) -> None:
 def _groups(scene, entries: list) -> list[tuple[str, list]]:
     out = []
     for e in entries:
+        if e.get("lod_of"):
+            continue                    # imported into its owner's group
         if e.get("scene"):
             out.append((e["key"], _scene_objects(scene)))
         else:
@@ -349,8 +384,8 @@ def _check(spec: dict) -> tuple[list, list, list, list]:
         if s not in STATES:
             raise ValueError(f"unknown state {s!r}; one of {', '.join(STATES)}")
     for p in passes:
-        if p not in G.LOOKS:
-            raise ValueError(f"unknown pass {p!r}; one of {', '.join(G.LOOKS)}")
+        if p not in G.LOOKS + ("leak",):
+            raise ValueError(f"unknown pass {p!r}; one of {', '.join(G.LOOKS + ('leak',))}")
     times = list(spec.get("times") or [spec.get("time") or "12:00"])
     return views, passes, states, times
 
@@ -416,7 +451,7 @@ def run(spec: dict, out_dir: str, *, session: bool = False) -> dict:
     if session and not area:
         for ent in entries:
             if ent.get("scene"):
-                scene_tmp, painted = _scene_prepare(scene, ent)
+                scene_tmp, painted = scene_prepare(scene, ent)
     if area:
         focus, extra_pts = _area(spec, warn)
         groups = [("area", focus)]
@@ -427,7 +462,8 @@ def run(spec: dict, out_dir: str, *, session: bool = False) -> dict:
             if ent.get("scene"):
                 continue
             warn += _import(ent, first, {"col": "col" in states, "balance": envs[0].get("balance", 0.0)})
-            imported.append(ent["key"])
+            if not ent.get("lod_of"):
+                imported.append(ent["key"])
             first = False
         groups = _groups(scene, entries)
         if "col" in states:
@@ -435,12 +471,27 @@ def run(spec: dict, out_dir: str, *, session: bool = False) -> dict:
             groups = [(k, objs + col_proxies(objs)) for k, objs in groups]
     t_imp = time.perf_counter() - t_imp
     all_objs = [o for _k, objs in groups for o in objs]
+    ref = spec.get("ref") if not area else None
+    ref_ob = None
+    if ref:
+        from . import silhouette as SIL
+
+        subj = [o for o in groups[0][1] if o.type == "MESH" and not default_hidden(o) and not o.get("satk_ref")]
+        try:
+            ref_ob = SIL.ref_plane(scene, subj, ref)
+        except (RuntimeError, ValueError, KeyError) as e:
+            warn.append(f"BAD_PARAMS: the reference photo could not be placed ({type(e).__name__}: {e})"[:200])
+        if ref_ob is not None:
+            ref_ob.hide_render = True
     saved_vis = {o.name: o.hide_render for o in all_objs}  # a session scene gets its visibility back
     cells: list = []
     cell_s: list = []
     stats: dict = {}
     rows: list[str] = []
-    cols = [v if isinstance(v, str) else f"v{i}" for i, v in enumerate(views)]
+    regions = spec.get("regions") if not area else None
+    leak_cfg = dict(spec.get("leak") or {})
+    leak_views: list[dict] = []
+    view_meta: list[dict] = []
     t_render = time.perf_counter()
     try:
         if not area:
@@ -454,34 +505,93 @@ def run(spec: dict, out_dir: str, *, session: bool = False) -> dict:
                     for ent, (key, objs) in zip(entries, groups):
                         if ent.get("scene"):  # files and SIDs: satk computes K1 from the DFF bytes
                             stats[key] = _stats([o for o in objs if not o.get("satk_look_tmp")])
+        if regions:
+            from . import regions as RG
+
+            for key, objs in groups:
+                set_state(objs, "ok")
+            subj = groups[0][1]
+            vis0 = [o for o in subj if o.type == "MESH" and not o.hide_render]
+            views, notes = RG.expand(regions, vis0, ref=spec.get("region_ref"), frame_objs=subj)
+            warn += notes
+            if not views:
+                raise ValueError("no region view could be framed")
+            # a region may ask for more states (a building's lod region: ok and vlo); a state the subject does not
+            # have is left out with a note, never drawn as an empty cell
+            extra = [x for v in views for x in (v.get("states") or []) if x not in states]
+            for x in dict.fromkeys(extra):
+                if set_state(subj, x).get("missing"):
+                    warn.append(f"NOT_FOUND: {entries[0].get('label') or 'the subject'} has no {x} model: the "
+                                "region shows the other states only")
+                    views = [dict(v, states=[s_ for s_ in v["states"] if s_ != x]) if v.get("states") else v
+                             for v in views]
+                else:
+                    states = list(states) + [x]
+            set_state(subj, "ok")
+            view_meta = [{k: v[k] for k in ("label", "region", "az", "el", "ortho", "fov", "inside", "leak")
+                          if k in v} for v in views]
+        cols = [v if isinstance(v, str) else (str(v.get("label")) if isinstance(v, dict) and v.get("label")
+                                              else f"v{i}") for i, v in enumerate(views)]
         ri = 0
         for st in states:
             if not area:
                 for key, objs in groups:
                     set_state(objs, st)
+            leak_sc = None
             for ps in passes:
                 for tm, e in zip(times, envs):
                     rows.append("/".join([st, ps] + ([e.get("time") or str(tm)] if len(times) > 1 else [])))
-                    api.apply(scene, ps, dirt=dirt, lights=lights, env=e, ground=False,
-                              objects=None if area else [o for o in all_objs if o.type == "MESH"],
-                              groups=None if area else [objs for _k, objs in groups])
+                    if ps != "leak":
+                        api.apply(scene, ps, dirt=dirt, lights=lights, env=e, ground=False,
+                                  objects=None if area else [o for o in all_objs if o.type == "MESH"],
+                                  groups=None if area else [objs for _k, objs in groups])
                     for ci, v in enumerate(views):
+                        vst = v.get("states") if isinstance(v, dict) else None
+                        if vst and st not in vst or (not vst and regions and st not in (spec.get("states") or ["ok"])):
+                            continue
+                        if ps == "leak" and isinstance(v, dict) and v.get("leak") is False:
+                            continue
                         if not area:
                             _layout(groups, v, gap)
-                        vis = [o for _k, objs in groups for o in objs if o.type == "MESH" and not o.hide_render]
-                        if ps == "game" and not area:
-                            Lt.ground(scene, api.footprints(vis), M.ground_material(e),
-                                      shadows=(ps == "game" and st != "col"))
-                        tc = time.perf_counter()
-                        p = api.render_views(scene, [v], size, fmt="png", out_dir=out_dir, prefix=f"r{ri:02d}c{ci:02d}",
-                                             objects=vis, extra_points=extra_pts)[0]
+                        if ref_ob is not None:                 # the photo only behind its own view, game look
+                            ref_ob.hide_render = not (ps == "game" and _ref_view(v) == ref.get("view"))
+                        hidden = _view_hide(groups[0][1] if groups else [], v)
+                        glass = _view_glass(v) if ps == "game" else []
+                        try:
+                            vis = [o for _k, objs in groups for o in objs if o.type == "MESH" and not o.hide_render]
+                            tc = time.perf_counter()
+                            if ps == "leak":
+                                if leak_sc is None or len(groups) > 1:   # a lineup moves the entries per view
+                                    leak_sc = _leak_scene(groups, leak_cfg)
+                                p, lv = _leak_cell(scene, leak_sc, v, groups, size, out_dir, f"r{ri:02d}c{ci:02d}",
+                                                   leak_cfg)
+                                lv.update(view=cols[ci], state=st)
+                                if isinstance(v, dict) and v.get("region"):
+                                    lv["region"] = v["region"]
+                                leak_views.append(lv)
+                            else:
+                                if ps == "game" and not area and not (isinstance(v, dict) and v.get("ground") is False):
+                                    Lt.ground(scene, api.footprints(vis), M.ground_material(e),
+                                              shadows=(ps == "game" and st != "col"))
+                                elif ps == "game":
+                                    Lt.remove_ground()
+                                p = api.render_views(scene, [v], size, fmt="png", out_dir=out_dir,
+                                                     prefix=f"r{ri:02d}c{ci:02d}", objects=vis,
+                                                     extra_points=extra_pts)[0]
+                        finally:
+                            _unhide(hidden)
+                            _unglass(glass)
                         cells.append([ri, ci, p])
                         cell_s.append(round(time.perf_counter() - tc, 2))
                     ri += 1
     finally:
+        if ref_ob is not None:
+            from . import silhouette as SIL
+
+            SIL.remove_ref(ref_ob)
         api.restore(scene)
         remove_proxies()
-        _scene_restore(scene_tmp, painted)
+        scene_restore(scene_tmp, painted)
         all_objs = [o for o in all_objs if _alive(o)]
         for o in all_objs:
             if o.name in saved_vis:
@@ -491,10 +601,107 @@ def run(spec: dict, out_dir: str, *, session: bool = False) -> dict:
                     pass
         if session:
             _cleanup(imported)
-    return {"cells": cells, "rows": rows, "cols": cols, "stats": stats, "warnings": warn,
+    out_extra: dict = {}
+    if view_meta:
+        out_extra["views"] = view_meta
+    if leak_views:
+        from . import leak as LK
+
+        out_extra["leak"] = {"views": [{k: v for k, v in lv.items() if k != "cell"} for lv in leak_views],
+                             "gaps": LK.merge(leak_views), "info": LK.merge(leak_views, blocking=False),
+                             "params": leak_cfg}
+    return {**out_extra, "cells": cells, "rows": rows, "cols": cols, "stats": stats, "warnings": warn,
             "seconds": {"import": round(t_imp, 2), "render": round(time.perf_counter() - t_render, 2),
                         "total": round(time.perf_counter() - t0, 2), "cells": cell_s},
             "env": [{k: e.get(k) for k in ("time", "balance", "weather", "source")} for e in envs]}
+
+
+def _ref_view(v) -> str | None:
+    """The reference view a preview view shows (``side``/``left`` = side, ``front``, ``rear``)."""
+    if not isinstance(v, str):
+        return None
+    return {"side": "side", "left": "side", "front": "front", "rear": "rear"}.get(v)
+
+
+def _view_hide(objs, v) -> list:
+    """Hide the objects a region view names in ``hide`` (doors of an interior cutaway); returns them."""
+    if not isinstance(v, dict) or not v.get("hide"):
+        return []
+    from .regions import objects_matching
+
+    out = [o for o in objects_matching(objs, v["hide"]) if not o.hide_render]
+    for o in out:
+        o.hide_render = True
+    return out
+
+
+def _unhide(objs) -> None:
+    for o in objs:
+        try:
+            o.hide_render = False
+        except ReferenceError:
+            pass
+
+
+def _view_glass(v) -> list:
+    """``glass: hide`` of a region view: glass materials of the game look drawn fully transparent."""
+    if not isinstance(v, dict) or v.get("glass") != "hide":
+        return []
+    out = []
+    for m in bpy.data.materials:
+        g = m.node_tree.nodes.get(M.PREFIX) if m.get("satk_look") and m.node_tree else None
+        if g is None or "Material Alpha" not in g.inputs:
+            continue
+        a = g.inputs["Material Alpha"]
+        if float(a.default_value) < 0.995:
+            out.append((m, float(a.default_value)))
+            a.default_value = 0.0
+    return out
+
+
+def _unglass(saved) -> None:
+    for m, val in saved:
+        try:
+            m.node_tree.nodes[M.PREFIX].inputs["Material Alpha"].default_value = val
+        except (KeyError, ReferenceError, AttributeError):
+            pass
+
+
+def _leak_scene(groups, cfg: dict):
+    from . import leak as LK
+
+    subj = [o for o in groups[0][1] if o.type == "MESH" and not o.hide_render and not is_helper(o)]
+    return LK.build(subj, cull=bool(cfg.get("cull")), floor_exclude=tuple(cfg.get("floor_exclude") or ()),
+                    floor_pct=float(cfg.get("floor_pct", 1.0)),
+                    inside_exclude=tuple(cfg.get("inside_exclude", ("wheel*",)) or ()))
+
+
+def _leak_cell(scene, sc, v, groups, size, out_dir: str, prefix: str, cfg: dict) -> tuple[str, dict]:
+    """The leak cell of one view (the subject only, framed as in the other passes) and its gaps."""
+    from . import leak as LK
+
+    subj = [o for o in groups[0][1] if o.type == "MESH" and not o.hide_render]
+    pts = v.get("points") if isinstance(v, dict) and v.get("points") is not None else api.frame_points(subj)
+    cam = api.place_camera(scene, v, pts, aspect=size[0] / size[1])
+    bpy.context.view_layer.update()            # matrix_world of the moved camera
+    name = v if isinstance(v, str) else str(v.get("label") or "view") if isinstance(v, dict) else "view"
+    path = os.path.join(out_dir, f"{prefix}_leak_{name}.png")
+    os.makedirs(out_dir, exist_ok=True)
+    vin = not (isinstance(v, dict) and v.get("leak_inside") is False)
+    region = v.get("region") if isinstance(v, dict) else None
+    kinds = {"gap": bool(cfg.get("gap", True)), "inside": bool(cfg.get("inside", False)) and not sc.cull and vin,
+             "slit": (bool(v["slit"]) if isinstance(v, dict) and v.get("slit") is not None else
+                      bool(cfg.get("slit", True)) and not (isinstance(v, dict) and (v.get("inside")
+                                                                                    or float(v.get("el", 0)) < -10))),
+             "slit_max_m": cfg.get("slit_max_m"), "slit_min_cm2": cfg.get("slit_min_cm2"),
+             "inside_block": region in (cfg.get("inside_regions") or ()),
+             "see_through_block": bool(cfg.get("see_through_block", True)),
+             "escape_max_m": cfg.get("escape_max_m"),
+             "see_through": sc.cull, "inside_depth": float(cfg.get("inside_depth", 1.0)),
+             "inside_cm2": float(cfg.get("inside_cm2", 60.0))}
+    r = LK.run_view(scene, sc, cam, size, inside=bool(isinstance(v, dict) and v.get("inside")), kinds=kinds,
+                    min_px=int(cfg.get("min_px", 6)), min_cm2=float(cfg.get("min_cm2", 2.0)), path=path)
+    return r["cell"], r
 
 
 def _alive(o) -> bool:

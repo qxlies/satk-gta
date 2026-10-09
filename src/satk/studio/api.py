@@ -206,8 +206,9 @@ def _check_snapshot(res: dict) -> None:
         C.check_paths({"files": [res["snapshot"]]}, "author.call")
 
 
-#: Parameters holding file paths: made absolute here (Blender runs in another working directory).
-PATH_KEYS = ("image", "texture", "dff", "txd")
+#: Parameters holding file paths: made absolute here (Blender runs in another working directory). Only strings are
+#: touched (``mesh.flare`` takes a number ``out``).
+PATH_KEYS = ("image", "texture", "dff", "txd", "out")
 
 
 def _abs_paths(params: dict) -> dict:

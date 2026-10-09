@@ -36,7 +36,14 @@ What comes back from `doctor` (abridged, as JSON):
 | `satk engine gen` | — | `premake5 vs2026` with `DXSDK_DIR` → `Build\MTASA.sln` (about 5 s) |
 | `satk engine build [--project P] [--platform Win32\|x64] [--config Release\|Debug\|Nightly] [--target T] [--jobs N] [--toolset v143]` | `engine` (`cmd=build`) | build; `P` = `server`, `client`, `all`, `changed` or a project name (`"Game SA"`) |
 | `satk engine server-smoke` | — | starts the x64 server on `127.0.0.1:22103/22105`, waits until it is ready, `shutdown` |
+| `satk engine sites-check [--fork PATH] [--manifest PATH]` | — | every check of the sa-engine patch-site manifest against the stock exe and the research data (see "Patch sites") |
+| `satk engine sites-gen [--fork PATH] [--manifest PATH]` | — | writes `Shared/sdk/satk/generated/SaeSites.gen.h` of the fork from `docs/sae/patch-sites.toml` |
+| `satk engine sites-scan --base B --size S --stride T [--only CLASS] [--flag FLAG]` | — | candidate operands of a static array, classified (never patch `variable-after-array`) |
+| `satk engine test [--no-build] [--filter F] [--config Release\|Debug] [--suite auto\|client\|satk\|all] [--platform Win32\|x64\|both]` | — | builds and runs `Tests_Client` (Win32) and, when the fork has `Tests/satk`, `Tests_Satk` on x86 and x64; failures come back as rows `suite, test, file, line, message` |
+| `satk engine worktree create\|list\|remove [--path P] [--branch B] [--base REV] [--profile server\|full]` | — | light second checkouts of the fork under `work\wt`; see "A second checkout" |
 | `satk engine run CMD --args JSON` | `engine` | the single MCP tool: `status`, `doctor`, `build` |
+
+Every row except `setup`, `rc-test` and `run` takes `--fork PATH`: another checkout of the fork (a worktree), see "A second checkout" below. Default: the configured fork.
 
 More `build` options: `--no-deps` (with a project name, do not build referenced projects), `--regen auto|always|never`
 (regenerate the projects with premake), `--max-errors` (errors returned; the log has all).
@@ -75,6 +82,202 @@ Timings on the reference machine (Release): x64 server from scratch 3:00, Win32 
 **Neon.** `engine\mtasa\docs\porting\neon-ledger.toml` is the porting ledger (waves 0-3, PR ranges, predicted
 conflicts); `engine\mtasa\docs\limits.toml` lists the engine limits: vanilla / our trunk / Neon.
 
+## A second checkout: `--fork` and `engine worktree`
+
+The configured fork (`engine\mtasa`) is one working tree, so only one lane can build in it at a time. A **worktree** is
+a second checkout of the same repository, with its own branch, `Build\` and `Bin\`. Every operation that works on the
+fork takes `--fork PATH`: `doctor`, `status`, `gen`, `build`, `test`, `server-smoke`, `sites-check`, `sites-gen` and
+`sites-scan` (the last one reads the stock exe and the Ghidra export only; the option is accepted for symmetry).
+Without `--fork` everything works exactly as before; `--fork` with the configured path is the same as no option.
+
+```powershell
+satk engine worktree create --path <workspace>\work\wt\sae2-srv --branch feat/sae2-srv-base
+satk engine build --fork <workspace>\work\wt\sae2-srv --project server --platform x64
+satk engine build --fork <workspace>\work\wt\sae2-srv --project Tests_Client --platform Win32
+satk engine test  --fork <workspace>\work\wt\sae2-srv --no-build
+satk engine worktree list --sizes
+satk engine worktree refresh <workspace>\work\wt\sae2-srv
+satk engine worktree remove --path <workspace>\work\wt\sae2-srv --force
+```
+
+**`worktree create`** runs `git worktree add --no-checkout -b <branch> <path> <base>` (`--base` defaults to `main`; the
+branch must not exist), then a sparse checkout of the profile, then `git read-tree -m -u HEAD`. Every git command
+runs with `GIT_NO_LAZY_FETCH=1` and nothing is fetched. The path must be `<workspace>\work\wt\<name>` (one level,
+letters, digits and `._-`); anything else, and a junction that leads out of `work\wt`, is refused. A failed create
+removes what it made (the worktree and its branch). The first sparse checkout in a repository makes git switch on
+`extensions.worktreeConfig` in the repository config (so the sparse flag belongs to one worktree); the answer carries
+a `REPO_CONFIG` warning when that happens.
+
+**Profiles.** `--profile server` (default) checks out what the x64 server and the included test projects need; the
+folder list is computed from the premake files of the base revision, not written by hand:
+
+| Rule | Example result |
+|---|---|
+| the `include` lines of the root `premake5.lua` outside the `os.target() == "windows"` block, whole | `Server\*`, `Shared`, `Shared\XML`, the server-side `vendor\*` libraries |
+| every included test project, even inside the Windows block, and its transitive `include`/`links` dependencies | `Tests\client`, `Tests\satk`, `Tests\opennet`, `Shared\opennet`, `vendor\googletest` |
+| the folders named by relative paths in the premake files of those folders (`"../../vendor/sparsehash/src"` stands for `vendor\sparsehash`; the include root `vendor` itself is skipped) | `Client\sdk`, `vendor\sparsehash`, `vendor\mysql`, `vendor\bochs` |
+| the client projects and their libraries keep their premake scripts and recursively included scripts, so premake can write the solution | `Client\core\premake5.lua`, `Client\core\satk\premake5.lua`, `vendor\cegui-0.4.0-custom\premake5.lua` |
+| the premake actions and binary, and `docs\` (the patch-site manifest lives there) | `utils\buildactions`, `utils\premake5.exe`, `docs` |
+
+`--profile full` is a normal checkout. The profile is recorded in `work\engine\forks\<fork-id>.json` together with the
+list of projects whose sources are present; `doctor`, `status` and `build` read it. `worktree create` also copies the
+pinned x64 `net.dll` from `engine\deps` into `Bin\server\x64` (checked against `deps-lock.json`, never downloaded;
+without a pin it is skipped with a note).
+
+**`worktree refresh PATH`** recomputes the recorded profile using the worktree's current `HEAD` and reapplies it.
+Use it after updating an older sparse worktree: new test projects and nested premake includes are materialised
+without editing `info/sparse-checkout` by hand. It preserves the branch, local modifications and untracked files;
+git errors are reported without forcing the checkout. A running build blocks refresh. The project registry is
+updated and the next `engine build` regenerates the solution. Refresh reads committed premake files; commit new
+include changes before refreshing. It accepts existing worktrees created by satk under `work\wt` and keeps their
+recorded `server` or `full` profile.
+
+**What `--fork` changes.** The fork shares `engine\deps`, `deps-lock.json`, the premake wrapper and the shims with the
+configured fork. Its own:
+
+| Thing | Where |
+|---|---|
+| solution and outputs | `<fork>\Build`, `<fork>\Bin` |
+| premake | `premake5 --file=engine\satk-premake.lua vs2026` with `SATK_FORK=<fork>` and `SATK_OFFLINE=1`: the install actions read `engine\deps` and cannot download (the configured fork still runs its own `premake5.lua` directly) |
+| MSBuild | the same call; `Directory.Build.targets` is imported with `-p:DirectoryBuildTargetsPath` and `-p:SatkForkRoot=<fork>\`, so the `afxres.h` shim applies to the worktree too |
+| logs | `work\engine\build\logs\<fork-id>\`; test reports in `work\engine\test\<fork-id>\` |
+| change tracking | `work\engine\build\state.<fork-id>.json`: `--project changed` compares with the last build of this fork |
+| lock and temp | `build-<fork-id>` (two forks build side by side; one fork gets `BUSY`) and `work\tmp\engine-build-<fork-id>` |
+
+`<fork-id>` is the folder name for a checkout directly under `work\wt`, otherwise the name plus a 6-character hash of
+the path. In a `server`-profile fork the solution still lists the client libraries (they have no sources there), so
+`--project server` and `--project all` build the executables and DLLs of the projects that are present (MSBuild builds
+their static libraries through the project references); `--project client` is refused. A project name works as usual.
+`doctor` and `status` expect the server outputs and `Tests_Client` only.
+
+Measured on the reference machine (Release, other builds running): `worktree create` 3 s (6000 files, 263 MB), x64 server from scratch 2:45-3:40, `Tests_Client` 1:25 (313 tests pass), `server-smoke` ready in 1.7 s, no-op x64 rebuild 18 s (one MSBuild call per executable or DLL); the finished tree takes about 2.0 GB.
+
+**`worktree list`** shows every worktree of the fork repository (`--sizes` adds file counts and megabytes);
+**`worktree remove --path P`** runs `git worktree remove` (`--force` also drops uncommitted changes), refuses the
+configured fork, paths outside `work\wt` and a fork with a running build, and keeps the branch unless
+`--delete-branch` (`git branch -d`, only for the branch that `create` made). The operation is CLI-only for agents
+(`satk_op` answers `CONSENT_REQUIRED`): it changes the git metadata of the fork repository.
+
+## Patch sites (sa-engine)
+
+The sa-engine patcher in the fork writes exe bytes only at **sites** listed in `docs/sae/patch-sites.toml` (schema 1:
+groups with a report id and a phase, sites with address, length, kind and the stock bytes that must be there before
+the write). `satk engine sites-*` keeps that file honest. The tools read the stock exe (`[paths] game`),
+`work/re/ghidra/` (`symbols/hoodlum_map.json`, `export/functions.jsonl`, `calls.jsonl`, `xrefs_data.jsonl`) and the
+symbol DB (`work/re/symdb.sqlite`, trunk patches); they write only the generated header and
+`work/re/securom_keys.json`.
+
+```powershell
+satk engine sites-check                       # default manifest: <fork>\docs\sae\patch-sites.toml
+satk engine sites-gen                         # rewrite SaeSites.gen.h (same commit as every manifest change)
+satk engine sites-scan --base 0xC3E058 --size 0xF00 --stride 0x3C --limit 60
+satk engine test
+```
+
+**`sites-check`** returns the group table when everything passes; otherwise `CHECK_FAILED` with the findings as rows
+`check, where, va, msg` (up to 60; `error.data.total` has the count). Finding codes:
+
+| Code | Meaning |
+|---|---|
+| `TOML_PARSE`, `SCHEMA` | not valid TOML, unknown key, wrong type, wrong `schema`, bad `phase` or `kind` |
+| `DUP_GROUP_ID`, `DUP_SITE_ID`, `DUP_REPORT_ID`, `BAD_ID`, `REPORT_ID_RANGE` | ids are unique and `[a-z0-9_.]` (and valid C++ names once dots become underscores); report ids lie in 91000..91999 |
+| `KIND_LEN` | `imm8` is 1 byte; `imm32`, `f32`, `absref`, `data32` are 4; `hook` is at least 5; every site is 1..16 |
+| `GOLDEN_WINDOW`, `ALT_BAD`, `ARRAY_BAD`, `ACCEPT_BAD` | the golden window (at most 24 bytes) covers the written range; `alt` has as many tokens as `golden`; `array` only for `absref`; `accept_*` only for `data32` |
+| `EXE_SHA`, `GOLDEN_MISMATCH`, `GOLDEN_UNBACKED` | the manifest hash is the checked exe; golden bytes equal the exe; the window is backed by file data |
+| `ARRAY_RANGE` | the stock operand of an `absref` lies in `[base, base + size + stride]` |
+| `OVERLAP_KEY` | the written range touches one of the 256 SecuROM key windows (4 bytes each) |
+| `OVERLAP_STOLEN` | it touches one of the 745 HOODLUM stolen-instruction sites (`jmp stub` plus padding) |
+| `SITE_IN_RELOCATED_FUNCTION` | it lies in the `.text` slot of one of the 500 functions relocated into `.HOODLUM` |
+| `OVERLAP_TRUNK` | it overlaps a trunk patch of the fork (symdb `patch` table, origin `trunk`) |
+| `OVERLAP_SITE` | two sites write the same byte |
+| `HEADER_MISSING`, `HEADER_STALE` | the generated header does not exist or differs from what `sites-gen` would write |
+
+Warnings (`warn`): `ALLOW_UNUSED` (an `allow_overlap` entry matches nothing). `allow_overlap` takes `trunk:0xADDR`
+(address of the trunk patch), `key:0xADDR`, `stolen:0xADDR`, `reloc:0xADDR` (entry of the relocated function) and
+`site:<group>/<site>`. Sites of the group `id.anchors` and sites marked `readonly = true` are only read: they get the
+structural and golden checks but no overlap checks (the exe identity anchors include the relocated entry stub itself).
+
+*SecuROM keys.* The protected exe hides constants behind `op reg, [KEY]` computations next to a table read in
+`.HOODLUM` (0x1557000..0x1562000). `satk.engine.securom` finds the keys with a built-in x86 length decoder: it sweeps
+`.text` and the `.HOODLUM` bodies; a table read takes the first other absolute operand within the next 4 instructions
+(stopping at `popfd`, `xchg`, `ret`, `jmp`, `call`), else within the 2 before it. The stock exe must give exactly
+**256** distinct addresses (302 table reads, 2 without a key); the result is cached in `work/re/securom_keys.json` by
+exe hash.
+
+*Relocated functions.* Their entry is a 5-byte `jmp` into `.HOODLUM`; the bytes behind it up to the next real function
+start are a dead leftover (SecuROM keeps stolen-instruction stubs there), so golden bytes still match but a patch has
+no effect. The slot is `[entry, next function start)` from `functions.jsonl`; a start counts if it is a relocated
+entry, a function named from gta-reversed or plugin-sdk, or a function with a `call` edge in `calls.jsonl`.
+
+**`sites-gen`** writes the C++ tables, deterministic and byte-stable (LF line endings). Layout, all in `namespace sae`:
+
+```cpp
+// generated by satk engine sites-gen from docs/sae/patch-sites.toml sha256=<hex>; do not edit
+#pragma once
+
+#include "../SaePatchPlan.h"
+
+#include <cstddef>
+#include <cstdint>
+
+namespace sae::sites
+{
+    inline constexpr const char* kManifestSha256 = "<hex>";
+    inline constexpr const char* kExeSha256 = "<exe sha256>";
+
+    // group cap.pools: report 91101, phase ctor, lane E2
+    enum class cap_pools : std::uint16_t
+    {
+        pool_ped,
+        COUNT
+    };
+
+    inline constexpr sae::SiteDef kSites_cap_pools[] = {
+        {"pool.ped", 0x550FF2, 4, sae::SiteKind::Imm32, 0x550FF1, 8, {0x68, 0x8C, 0x00, 0x00, 0x00, 0x8B, 0xC8, 0xE8}, 0, {}, {}, 0x0, 0x0, 0x0, 0x00000000, 0x00000000},
+    };
+
+    inline constexpr sae::GroupDef kGroups[] = {
+        {"cap.pools", 91101, sae::Phase::Ctor, kSites_cap_pools, 1},
+    };
+    inline constexpr std::size_t kGroupCount = sizeof(kGroups) / sizeof(kGroups[0]);
+
+    static_assert(std::size_t(cap_pools::COUNT) == sizeof(kSites_cap_pools) / sizeof(kSites_cap_pools[0]));
+}
+```
+
+The fields of a site are, in order: id, va, len, kind, golden va, golden length, golden bytes, alt length, alt bytes,
+alt mask, array base, size, stride, accept mask, accept value. Groups and sites keep the manifest order (the enum
+order is the site order). The hash in the first line is the SHA-256 of the TOML with line endings folded to LF, so a
+CRLF checkout hashes the same; `sites-check` compares the whole file.
+
+**`sites-scan`** lists the 32-bit operands of `.text` and `.HOODLUM` instructions that hold an address in
+`[base, base + size + stride]` and have a Ghidra data xref 1-7 bytes before them, classified by the instruction:
+
+| Class | Meaning |
+|---|---|
+| `operand-in-array` | below `base + size`: an element address, rewrite it when the array moves or grows |
+| `true-end` | exactly `base + size` in a compare (`81 /7`, `3D`) or `lea`: a loop bound |
+| `end-plus-field` | in `(base + size, base + size + stride]` in a compare or `lea`: a bound biased by a field offset |
+| `variable-after-array` | at or beyond the end in any other form (memory access, `mov reg, imm`, `push imm`): the next object, **never patch** |
+
+Flags: `static-init` (the function has no code caller: CRT static constructors and destructors, callbacks),
+`in-hoodlum`, `in-relocated-function`, `no-array-ref-in-function` (a bound in a function that never touches the array
+itself: probably the bound of the next object) and `unclassified` (instruction form not recognised). The answer always
+carries the per-class `counts`; `--only CLASS`, `--flag FLAG`, `--limit` and `--offset` page through the rows.
+
+**`satk engine test`** builds `Tests_Client` (Win32) through `engine build`, runs
+`Bin\tests\Tests_Client.exe --gtest_output=json:work\engine\test\<timestamp>.json` and returns green as `ok` with the
+counts, any failure as `CHECK_FAILED` with rows `suite, test, file, line, message` (a crash, a timeout or a missing
+report is one row `(process)`). `--no-build` runs the existing binary, `--filter` is a googletest filter.
+
+`--suite` picks the projects: `client` = `Tests_Client` (Win32) only, the original behaviour; `satk` = `Tests_Satk`
+(`Tests/satk` of the fork: one translation unit per sa-engine header, the `Satk_*` tests and the POD/handle interface
+rule, see the fork's `docs/sae/core-x64.md`) on `--platform Win32`, `x64` or `both` (default); `all` = both projects;
+`auto` (default) = `client` plus `satk` when the checkout has `Tests/satk/premake5.lua`, so a fork that predates the
+project behaves exactly as before. With several runs the answer carries a `runs` list (project, platform, counts,
+report path) and failure rows are prefixed `Tests_Satk x64: <suite>`. The exe-identity test of the `Satk_*` suite reads
+`gta-sa-clean\gta_sa.exe` (read only) through `SAE_STOCK_EXE`, which the command sets when the file exists.
+
 ## Limitations and known issues
 
 - `satk engine` does not start the MTA client. The first client run needs a one-time setup by an administrator; see
@@ -86,6 +289,10 @@ conflicts); `engine\mtasa\docs\limits.toml` lists the engine limits: vanilla / o
 - Every Win32 build relinks `core.dll` (upstream's `gen_language_list` always rewrites its header).
 - Low disk space: `satk engine doctor` warns below 12 GB free on the fork's drive; `Build\obj` (about 4.7 GB) can
   be deleted, it is rebuilt.
+- A `server`-profile worktree contains the x64 server and included test projects (`Tests_Client`, `Tests_Satk`, `Tests_OpenNet` when present). Client libraries outside their dependencies have only generation scripts. The runtime data of `install_data` (`net_arm64.dll`, `netc.dll`) is not installed.
+- `engine worktree create` needs the blobs of the base revision in the fork repository (the fork is a partial clone and nothing is fetched); a missing blob is reported by git, not downloaded.
+- `sites-scan` and the relocated-function check rest on the Ghidra export in `work/re/ghidra/`: a reference Ghidra
+  missed is not listed, and the slot of a relocated function is an approximation (see above).
 - Other answers are in [troubleshooting.md](troubleshooting.md).
 
 ## Python API
@@ -94,4 +301,9 @@ conflicts); `engine\mtasa\docs\limits.toml` lists the engine limits: vanilla / o
 from satk.engine.build import build, plan, parse_msbuild_log   # build and MSBuild log parsing
 from satk.engine.doctor import run_checks, status               # checks and state
 from satk.engine.setup import fork_info, manifest, load_lock    # fork and dependencies
+from satk.engine.worktree import compute_profile, create, refresh  # sparse profile, worktrees
+from satk.engine.common import layout                          # layout(fork) = paths of a second checkout
+from satk.engine.sites_check import check_manifest              # patch-site checks
+from satk.engine.sites_scan import scan_array                   # array operand scan
+from satk.engine.securom import load_keys                       # SecuROM key set
 ```

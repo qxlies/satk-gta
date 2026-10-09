@@ -101,7 +101,7 @@ def kit_template(like: str | None = None, kind: str | None = None, name: str | N
         textures: give shared atlas textures their vanilla pixels in the scene (preview only, never exported).
         profile: game profile.
         timeout: seconds to wait for Blender.
-        lod: give a map model that is not a building (a prop) a LOD slot too (lod<name[3:]>, filled by kit.lod).
+        lod: give a map model that is not a building (a prop) a LOD slot too (lod<name>, filled by kit.lod).
     """
     import json
     import time
@@ -217,29 +217,33 @@ def kit_scene_spec(kind: str | None = None) -> dict:
 
 
 @op("kit.blank",
-    summary="Body blank for a kind (automobile, bike, boat, heli, plane, prop_box, prop_cyl, building_box): a clean "
-            "low-poly quad base mesh from class dimensions and anchors (--like, --dims, --tier), loops at arches, "
-            "belt line, pillars, bumpers, MIRROR, part boundaries, UV seams. Session or one-shot .blend.",
+    summary="Optional quick-start body blank (car: sedan coupe sports suv van hatchback wagon suv_boxy pickup; "
+            "bike: sport scooter; boat, heli, plane, props, building): soft-shaded quads from dimensions and the "
+            "like model's frames, round arches with liners, part regions, clean paint UVs. Session or .blend.",
     summary_ru="Заготовка кузова любого вида (машина, мотоцикл, лодка, вертолёт, самолёт, коробка, цилиндр, здание): "
                "чистая низкополигональная квадовая сетка по габаритам и якорям, петли у арок, пояса и бамперов, "
                "зеркало, границы деталей, швы UV.",
     mcp=False, group="blender", long_running=True,
     examples=("satk kit blank", "satk kit blank --kind automobile --like model:426 --name mycar --session default",
+              "satk kit blank --kind automobile --body hatchback --dims 4.6,2.1,1.5 --wheel-d 0.66 --plan-only",
+              "satk kit blank --kind bike --body scooter --like model:462 --plan-only",
               "satk kit blank --kind prop_cyl --dims 0.6,0.6,1.1 --plan-only"))
 def kit_blank(kind: str | None = None, like: str | None = None, name: str | None = None,
               dims: list[float] | None = None, tier: Tier = "sa_plus", body: str | None = None, split: bool = False,
               fill: bool = False, interior: bool = True, session: str | None = None, out: str | None = None,
               plan_only: bool = False, replace: bool = False, profile: str = "vanilla",
-              timeout: float = 300.0) -> dict:
+              timeout: float = 300.0, wheel_d: float | None = None) -> dict:
     """Plan + Blender build of a blank; without ``kind`` the catalog of blanks.
 
     Args:
         kind: automobile, bike, boat, heli, plane, prop_box, prop_cyl or building_box (omit to list them).
         like: vanilla model whose class dimensions, wheel dummies and wheel scale are the numbers (model:426); no vertex is read.
         name: model name (a-z 0-9 _, at most 17); the pieces are named <name>_<piece>; use the kit model's name.
-        dims: L,W,H in metres; replaces the class (or --like) dimensions.
+        dims: L,W,H in metres (length along Y, width across X, height; the same order as kit template --dims);
+            replaces the class (or --like) dimensions.
         tier: sa_plus (default) or vanilla: the density of loops and segments.
-        body: automobile body profile (sedan, coupe, sports, suv, van); default from --like, else sedan.
+        body: automobile body (sedan, coupe, sports, suv, van, hatchback, wagon, suv_boxy, pickup) or bike body
+            (sport, scooter); default from --like, else sedan / sport.
         split: cut the parts out at once (kit.blank_split) instead of keeping one shell with part regions.
         fill: with --split, move the parts into the kit slots of the template of the same name.
         interior: automobile only: also build seat and dash boxes (they join the chassis).
@@ -249,6 +253,7 @@ def kit_blank(kind: str | None = None, like: str | None = None, name: str | None
         replace: rebuild the blank when it is already in the scene.
         profile: game profile that resolves --like.
         timeout: seconds to wait for Blender.
+        wheel_d: wheel diameter in metres (vehicles); default the like model's wheel scale or the body's.
     """
     import json
     import time
@@ -262,8 +267,10 @@ def kit_blank(kind: str | None = None, like: str | None = None, name: str | None
                 for n, v in B.kinds()["kinds"].items()]
         return table(["kind", "group", "kit_kind", "parts_cut", "what"], rows, total=len(rows))
     t0 = time.perf_counter()
+    if wheel_d is not None and not 0.2 <= float(wheel_d) <= 2.5:
+        raise SatkError("BAD_PARAMS", f"wheel_d must be 0.2..2.5 m, got {wheel_d}")
     plan = B.blank_plan(kind, name=name, like=like, dims=dims, tier=tier, body=body, interior=interior,
-                        profile=profile)
+                        profile=profile, wheel_d=wheel_d)
     d = out_dir(plan["name"], out)
     d.mkdir(parents=True, exist_ok=True)
     warn = list(plan.get("warn") or [])

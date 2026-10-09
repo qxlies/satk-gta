@@ -24,7 +24,7 @@ from . import resource as R
 
 __all__ = ["PORT", "HTTP_PORT", "ingame_dir", "state_path", "load_state", "save_state", "resources_dir",
            "preflight", "write_scripts", "play_info", "Bridge", "ensure_server", "resource_states",
-           "start_resources", "wait_applied", "log_marks"]
+           "start_resources", "wait_applied", "log_marks", "ensure_bench"]
 
 PORT, HTTP_PORT = 22040, 22045
 _START_ORDER = (R.CONTENT, R.LOGIC)
@@ -196,23 +196,32 @@ class Bridge:
             raise SatkError("EXTERNAL_TOOL", f"Lua error on the {side}: {err.get('msg')}{where}")
         return list(r.get("values") or []) if isinstance(r, dict) else []
 
-    def _call(self, side: str, fn: str, cmd: str, args: dict | None) -> Any:
+    def _call(self, side: str, fn: str, cmd: str, args: dict | None, resource: str = R.LOGIC) -> Any:
         # the client knows only running resources; the server also knows stopped ones (getResourceState)
-        code = (f"local r = getResourceFromName({R.lua(R.LOGIC)}) "
+        code = (f"local r = getResourceFromName({R.lua(resource)}) "
                 "if not r or (getResourceState and getResourceState(r) ~= 'running') then "
-                f"return {{error = {R.lua(R.LOGIC + ' is not running')}, not_running = true}} end "
+                f"return {{error = {R.lua(resource + ' is not running')}, not_running = true}} end "
                 f"return call(r, {R.lua(fn)}, {R.lua(cmd)}, {_lit(args)})")
         vals = self.exec(code, side)
         out = vals[0] if vals else None
         if isinstance(out, dict) and out.get("not_running"):
-            raise SatkError("NOT_READY", f"{R.LOGIC} is not running on the {side}",
+            raise SatkError("NOT_READY", f"{resource} is not running on the {side}",
                             hint="satk ingame start" if side == "server" else
                             "the client has not loaded the resources yet: wait, or reconnect")
         if out is None or out is False:
-            raise SatkError("NOT_READY", f"{R.LOGIC} did not answer {cmd!r} on the {side}")
+            raise SatkError("NOT_READY", f"{resource} did not answer {cmd!r} on the {side}")
         if isinstance(out, dict) and out.get("error"):
-            raise SatkError("EXTERNAL_TOOL", f"{R.LOGIC} {cmd}: {out['error']}")
+            raise SatkError("EXTERNAL_TOOL", f"{resource} {cmd}: {out['error']}")
         return out
+
+    def rcall(self, side: str, resource: str, fn: str, cmd: str, args: dict | None = None) -> Any:
+        """Call export ``fn(cmd, args)`` of a running resource (``satk-bench`` exports ``bench``)."""
+        return self._call(side, fn, cmd, args, resource)
+
+    def console(self, line: str) -> bool:
+        """Run a console line through the agent's ``console_exec``; ``True`` when a command handler took it."""
+        r = self.b.call("console_exec", {"line": line})
+        return bool(isinstance(r, dict) and r.get("accepted"))
 
     def server(self, cmd: str, args: dict | None = None) -> Any:
         return self._call("server", "td", cmd, args)
@@ -242,13 +251,19 @@ class Bridge:
 # --------------------------------------------------------------------------- server and resources
 
 
-def ensure_server(port: int, httpport: int, timeout: float) -> tuple[dict, list[str]]:
-    """Start the loopback server with the test resources, or reuse the running ``game`` server."""
+def ensure_server(port: int, httpport: int, timeout: float,
+                  conf: dict[str, str] | None = None) -> tuple[dict, list[str]]:
+    """Start the loopback server with the test resources, or reuse the running ``game`` server.
+
+    ``conf``: ``mtaserver.conf`` overrides (``--conf``); a running server that was started with other values is
+    ``NOT_READY`` (stop it first).
+    """
     from ..viewer.backends import mta_lua
 
     warn: list[str] = []
     st = mta_lua.status(probe=True)
     if st.get("up"):
+        mta_lua.check_conf_reuse(st, conf)
         st["reused"] = True
         return st, warn
     p, hp = port, httpport
@@ -256,7 +271,9 @@ def ensure_server(port: int, httpport: int, timeout: float) -> tuple[dict, list[
         p, hp = None, None
         warn.append(f"PORT_BUSY: 127.0.0.1:{port}/{httpport} is taken by another program; the server uses free "
                     "ports (see 'connect' in the answer)")
-    up = mta_lua.start_server(timeout=timeout, port=p, httpport=hp, extra=list(_START_ORDER))
+    up = mta_lua.start_server(timeout=timeout, port=p, httpport=hp, extra=[*_START_ORDER, R.BENCH], conf=conf)
+    if up.get("template_note"):
+        warn.append("STALE_TEMPLATE: " + up["template_note"])
     return up, warn
 
 
@@ -343,3 +360,47 @@ def log_marks() -> dict[str, int]:
         except OSError:
             out[f"{src}:{p.name}"] = 0
     return out
+
+
+def _resource_state(bridge: Bridge, name: str) -> str:
+    vals = bridge.exec(f"local r = getResourceFromName({R.lua(name)}) return r and getResourceState(r) or 'missing'",
+                       "server")
+    return str(vals[0]) if vals else "missing"
+
+
+def ensure_bench(bridge: Bridge, timeout: float = 60.0) -> dict[str, Any]:
+    """Install ``satk-bench`` into the server, start (or restart after a change) and wait until the client answers.
+
+    Returns ``{installed: [changed files], server: state, hello: <client hello>}``; ``NOT_READY`` when the client
+    does not load the resource in time.
+    """
+    inst = R.install_bench(resources_dir())
+    deadline = time.monotonic() + timeout
+    state = _resource_state(bridge, R.BENCH)
+    if state == "missing":
+        bridge.exec("refreshResources(false) return true", "server")
+        while state == "missing":
+            if time.monotonic() > deadline:
+                raise SatkError("NOT_READY", f"the MTA server did not find {R.BENCH}",
+                                hint="satk ingame logs --source server")
+            time.sleep(0.3)
+            state = _resource_state(bridge, R.BENCH)
+    name = R.lua(R.BENCH)
+    if state != "running":
+        bridge.exec(f"return startResource(getResourceFromName({name}), true)", "server")
+    elif inst["changed"]:
+        bridge.exec(f"return restartResource(getResourceFromName({name}))", "server")
+    while _resource_state(bridge, R.BENCH) != "running":
+        if time.monotonic() > deadline:
+            raise SatkError("TIMEOUT", f"{R.BENCH} did not start", hint="satk ingame logs --source scripts")
+        time.sleep(0.3)
+    last: SatkError | None = None
+    while time.monotonic() < deadline:
+        try:
+            hello = bridge.rcall("client", R.BENCH, "bench", "hello")
+            return {"installed": inst["changed"], "server": "running", "hello": hello}
+        except SatkError as e:
+            last = e
+            time.sleep(0.5)
+    raise SatkError("NOT_READY", f"the client has not loaded {R.BENCH}: {last.msg if last else 'no answer'}",
+                    hint="the client downloads the resource after it starts; wait and retry, or reconnect")

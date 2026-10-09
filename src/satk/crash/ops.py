@@ -76,7 +76,8 @@ def crash_analyze(path: str | None, last: bool = False, limit: int = 10, thread:
     """Crash report (frames table + crash summary + advice).
 
     Frames come from the instruction pointer, the EBP chain and a stack scan for return addresses
-    preceded by a CALL (``via``: ip, ebp, scan; ``?`` = code bytes unknown, unverified). Advice keys:
+    preceded by a CALL (``via``: ip, ebp, scan; ``?`` = code bytes unknown, unverified; ``/pdb`` = a
+    matching local PDB supplies the function and source line). Advice keys:
     ``known`` (CrashInfo entries), ``solution``, ``suspects``, ``culprit``, ``logs``.
 
     Args:
@@ -87,7 +88,8 @@ def crash_analyze(path: str | None, last: bool = False, limit: int = 10, thread:
         thread: thread id to walk (default: the crashing thread).
         block: crash report of a file with several (0 = auto: newest MTA block, first single-player report;
             -1 = newest, 1 = oldest).
-        images: directories with module files of the crashed build (for exports and CALL checks).
+        images: directories with module files and PDBs of the crashed build (symbols and CALL checks);
+            a fork Bin or its mta/mods/deathmatch subdirectories are accepted.
         dir: directories searched by --last (default: those of 'satk crash list').
         scan_kb: KiB of stack scanned for return addresses.
         game: the game folder that crashed (its modloader folder and logs give suspects and the culprit;

@@ -1,0 +1,87 @@
+{
+ "kind": "prop",
+ "version": 1,
+ "summary": "Close-up review regions of a street or small static prop.",
+ "leak": {
+  "cull": true,
+  "gap": true,
+  "inside": false,
+  "see_through_block": true,
+  "floor_exclude": [],
+  "floor_pct": 0.5
+ },
+ "regions": [
+  {
+   "name": "sides",
+   "summary": "the four sides",
+   "cameras": [
+    {
+     "az": 0,
+     "el": 8
+    },
+    {
+     "az": 90,
+     "el": 8
+    },
+    {
+     "az": 180,
+     "el": 8
+    },
+    {
+     "az": -90,
+     "el": 8
+    }
+   ]
+  },
+  {
+   "name": "top",
+   "summary": "top: caps, edges, what stands on it",
+   "cameras": [
+    {
+     "az": 30,
+     "el": 65
+    }
+   ]
+  },
+  {
+   "name": "base",
+   "summary": "base: how it meets the ground, feet, plinth",
+   "box": {
+    "z": [
+     0.0,
+     0.3
+    ]
+   },
+   "cameras": [
+    {
+     "az": 45,
+     "el": 12
+    },
+    {
+     "az": 225,
+     "el": 12
+    }
+   ]
+  },
+  {
+   "name": "details",
+   "summary": "details at mid height, three-quarter close-ups",
+   "box": {
+    "z": [
+     0.25,
+     0.85
+    ]
+   },
+   "cameras": [
+    {
+     "az": 35,
+     "el": 20
+    },
+    {
+     "az": 215,
+     "el": 20
+    }
+   ]
+  }
+ ]
+}

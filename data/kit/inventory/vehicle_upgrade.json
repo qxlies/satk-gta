@@ -1,0 +1,100 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "vehicle_upgrade",
+ "summary": "tuning part attached at a ug_* frame: the part's form, mounts that touch the car body, the paint key colour.",
+ "regions": {
+  "overall": {
+   "summary": "the part on the car, 3/4 views",
+   "views": []
+  },
+  "mount": {
+   "summary": "where it touches the car",
+   "views": [
+    "mount"
+   ]
+  },
+  "body": {
+   "summary": "the part's form",
+   "views": [
+    "sides",
+    "top"
+   ]
+  },
+  "details": {
+   "summary": "close-ups",
+   "views": [
+    "top",
+    "sides"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "body",
+   "name": "Part body",
+   "region": "body",
+   "category": "shell",
+   "construction": "the main form (spoiler blade, skirt, scoop, pipe) lofted or swept, soft",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "mounts",
+   "name": "Mounts",
+   "region": "mount",
+   "category": "structure",
+   "construction": "feet or brackets touching the car body at the ug_* frame",
+   "attaches_to": "body",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "paint_surface",
+   "name": "Paint key colour",
+   "region": "body",
+   "category": "decal",
+   "construction": "paint faces on the vehicle key colour",
+   "attaches_to": "body",
+   "stage": "G4",
+   "detail": "simple",
+   "verify": "paint"
+  },
+  {
+   "key": "end_caps",
+   "name": "End caps and edges",
+   "region": "details",
+   "category": "trim",
+   "construction": "end plates, lips and edges",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "details",
+   "name": "Vents, bolts, tips",
+   "region": "details",
+   "category": "detail",
+   "construction": "small closed details",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "underside",
+   "name": "Underside finish",
+   "region": "body",
+   "category": "shell",
+   "construction": "underside and inner faces closed",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "hero"
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/vehicle_upgrade.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

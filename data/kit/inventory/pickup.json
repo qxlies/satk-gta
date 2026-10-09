@@ -1,0 +1,71 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "pickup",
+ "summary": "pickup icon object: a tiny readable shape of closed rounded pieces with one soft texture.",
+ "regions": {
+  "overall": {
+   "summary": "the icon, 3/4 views",
+   "views": []
+  },
+  "body": {
+   "summary": "the main shape",
+   "views": [
+    "sides"
+   ]
+  },
+  "details": {
+   "summary": "close-ups",
+   "views": [
+    "details"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "body",
+   "name": "Body",
+   "region": "body",
+   "category": "shell",
+   "construction": "the icon shape as closed rounded pieces, readable at 10 m",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "details",
+   "name": "Details",
+   "region": "details",
+   "category": "detail",
+   "construction": "cap, label, handle: the secondary shape",
+   "attaches_to": "body",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "texture",
+   "name": "Texture",
+   "region": "overall",
+   "category": "decal",
+   "construction": "one small soft texture",
+   "attaches_to": "body",
+   "stage": "G4",
+   "detail": "simple"
+  },
+  {
+   "key": "trim",
+   "name": "Rims and outlines",
+   "region": "details",
+   "category": "trim",
+   "construction": "rims and edge bands",
+   "attaches_to": "body",
+   "stage": "G3",
+   "detail": "standard"
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/pickup.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

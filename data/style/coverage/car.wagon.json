@@ -1,0 +1,195 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "car.wagon",
+ "ref": "style_vehicle",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (4; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "headlamps",
+   "what": "headlamps on the headlight key colours of vehiclelights128",
+   "how": {
+    "keys": [
+     "255,175,0",
+     "0,255,200"
+    ]
+   },
+   "fix": "give the headlamp lenses the key colour 255,175,0 (left) / 0,255,200 (right) on vehiclelights128, set into a recess",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "tail_lamps",
+   "what": "tail lamps on the taillight key colours",
+   "how": {
+    "keys": [
+     "185,255,0",
+     "255,60,0"
+    ]
+   },
+   "fix": "give the tail lamp lenses the key colour 185,255,0 (left) / 255,60,0 (right) on vehiclelights128",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "glass",
+   "what": "windows: glass with alpha below 255 (windscreen part, doors or body)",
+   "how": {
+    "glass": true
+   },
+   "fix": "glass panes on the generic glass region of vehiclegeneric256 with alpha 128 (windscreen_ok, door and body windows)",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "wheels",
+   "what": "wheel geometry",
+   "how": {
+    "frame_geom": "^wheel"
+   },
+   "fix": "build the wheel (tyre + rim) as the atomic 'wheel' under a wheel dummy; the game copies it to the others",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "mirrors",
+   "what": "door mirrors standing out of the body side",
+   "how": {
+    "mirrors": 0.05
+   },
+   "fix": "add mirrors on short stalks that touch the doors, head 18-32 cm, glass on vehiclelights128",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "door_handles",
+   "what": "door handles as small pieces on the doors",
+   "how": {
+    "small_pieces": {
+     "parts": "^door_[lr][fr]_ok$",
+     "max_tris": 24
+    }
+   },
+   "fix": "add handles (6-14 triangles, about 3 x 18 x 8 cm) sitting on the door skins",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "doors",
+   "what": "opening doors (door_*_ok)",
+   "how": {
+    "frame_geom": "^door_[lr][fr]_ok$"
+   },
+   "fix": "cut the doors from the shell as door_lf_ok / door_rf_ok (and rear doors) under their dummies",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "bonnet",
+   "what": "an opening bonnet (bonnet_ok)",
+   "how": {
+    "frame_geom": "^bonnet_ok$"
+   },
+   "fix": "cut the bonnet from the shell as bonnet_ok",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "boot",
+   "what": "an opening boot or tailgate (boot_ok)",
+   "how": {
+    "frame_geom": "^boot_ok$"
+   },
+   "fix": "cut the boot lid or tailgate as boot_ok",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "bumpers",
+   "what": "front and rear bumper parts",
+   "how": {
+    "parts": "^bump_(front|rear)_ok$"
+   },
+   "fix": "build wrap-around bumpers as bump_front_ok / bump_rear_ok, joined to the body along a line",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "plates",
+   "what": "number plates",
+   "how": {
+    "texture": [
+     "plate",
+     "carpback"
+    ]
+   },
+   "fix": "add 4-8 triangle plate cards on carplate / carpback, set on the bumpers",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "interior",
+   "what": "an interior (seats, dashboard) inside the cabin",
+   "how": {
+    "region": {
+     "name": "cabin",
+     "min_tris": 60,
+     "skip": "^(door|windscreen|bonnet|boot|bump)"
+    }
+   },
+   "fix": "build shaped seats, a dashboard with a gauge hood and door cards on a dark interior atlas",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "steering_wheel",
+   "what": "a steering wheel on vehiclesteering128",
+   "how": {
+    "texture": [
+     "vehiclesteering128"
+    ]
+   },
+   "fix": "add a steering wheel card or ring on vehiclesteering128 at the driver's side",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "gauges",
+   "what": "gauges on vehicledash32",
+   "how": {
+    "texture": [
+     "vehicledash32"
+    ]
+   },
+   "fix": "add a gauge card on vehicledash32 in the dashboard",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "engine_bay",
+   "what": "an engine block and inner walls under the bonnet",
+   "how": {
+    "region": {
+     "name": "engine_bay",
+     "min_tris": 20,
+     "skip": "^(bonnet|bump|windscreen|door)"
+    }
+   },
+   "fix": "put an engine block (and an air cleaner) under the bonnet so an open bonnet is not empty",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "exhaust",
+   "what": "an exhaust pipe at the exhaust dummy",
+   "how": {
+    "frame_near": {
+     "frame": "exhaust",
+     "radius": 0.25
+    }
+   },
+   "fix": "build the exhaust pipe (16-32 triangles) ending at the exhaust dummy",
+   "vanilla": "4/4"
+  },
+  {
+   "id": "arch_liners",
+   "what": "closed wheel arches (liners, no see-through)",
+   "how": {
+    "lined_arches": true
+   },
+   "fix": "close every arch with a short return face and a liner plate",
+   "vanilla": "4/4"
+  }
+ ]
+}

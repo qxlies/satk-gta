@@ -12,6 +12,7 @@ mod_sa logs, pasted text). It produces a report of at most 30 lines:
 
 - the exception, the accessed address, registers and the stack; `gta_sa.exe` addresses are symbolized with sa-re
   ([re.md](re.md)): function, `file:line` in gta-reversed, MTA patches;
+- functions and source lines in fork modules from matching local PDBs;
 - `known` and `solution`: the matching entry of the CrashInfo crash list (crash addresses, SCRLog commands,
   scripts, modules) with a ready solution;
 - `suspects` and `culprit`: model IDs from the registers and from `scrlog.log` → who defines them: a mod in the
@@ -74,13 +75,38 @@ satk crash bisect "C:\Program Files (x86)\Rockstar Games\GTA San Andreas\modload
 | `satk crash sample [--kind mta\|sp]` | — | a synthetic crash: MTA (dump and `core.log`) or single-player (dump, `modloader`, `scrlog.log`, `cleo.log`) |
 
 The `via` column: `ip` = instruction pointer; `ebp` = frame chain; `scan` = a stack value preceded by a CALL; `log` =
-a stack line from a log; `?` = the code bytes are unknown (warning `UNVERIFIED`). The `mta` column names an MTA
+a stack line from a log; `?` = the code bytes are unknown (warning `UNVERIFIED`); `/pdb` means the symbol came
+from a matching PDB, for example `ip/pdb` or `scan?/pdb`. The `mta` column names an MTA
 patch at that address (for a return address: on the CALL right before it).
 
 `--last` takes the newest crash from the folders of `crash list`: `work\dumps`, `Bin\MTA\dumps\private` and <!-- linkcheck: ignore -->
 `Bin\server\dumps\private` of the MTA fork, installed MTA builds (from the registry), `modloader\modloader.log` <!-- linkcheck: ignore -->
 of the configured game. If a log is newer than a dump but was written together with it (MTA writes both), the dump
 is taken. The `crash sample` files are used only when there is nothing else.
+
+## Fork module symbols (PDB)
+
+On Windows, frames in `client.dll`, `core.dll`, `game_sa.dll`, `multiplayer_sa.dll` and other modules use their
+local PDBs. The report shows `function+offset` in `fn`, `file:line` in `src` when line information is available,
+and `/pdb` in `via`. `gta_sa.exe` continues to use the sa-re symbol database. Return addresses are looked up
+one byte earlier to select the calling function and source line; the displayed offset still refers to the
+original return address.
+
+Images are searched at the paths recorded in the dump, in `--images DIR…`, and in the configured fork's `Bin`
+(including `mta`, `mods/deathmatch` and server folders). PDBs are searched beside those images and in the same
+directories. Thus `satk crash analyze --last` picks up the normal fork build automatically; for an archived build,
+use `satk crash analyze crash.dmp --images <build>/Bin`. Keep the DLLs and PDBs from the build that crashed.
+
+An image used for code bytes must match the dump's timestamp, size and available CodeView id. The PDB's actual
+GUID/signature and age must match the dump's PDB id, or the local image's CodeView id for a text log. A mismatch
+emits `REVISION` and that PDB's symbols are ignored; another matching candidate can still be used. A dump with a
+PDB id can use a saved PDB even when the old DLL is gone; CALL checks still need the matching image or captured
+memory. Text logs without a module list require the local image. No PDB (for example `netc.dll`) means an export
+name when available, otherwise just `module+offset`.
+
+DbgHelp is taken from the Visual Studio installation used by `satk engine`, falling back to Windows `System32`.
+It uses `ctypes`, needs no additional Python package, and does not download symbols or start the game. If DbgHelp
+cannot read an available PDB, the report retains the address/export and emits `EXTERNAL_TOOL`.
 
 ## How it works
 

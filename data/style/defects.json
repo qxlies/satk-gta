@@ -1,0 +1,548 @@
+{
+ "format": "satk.style-defects/1",
+ "_comment": [
+  "Mesh defect checks of asset.check (section mesh, satk.style.defects): cracks, z-fighting, flipped",
+  "faces, degenerate and stray geometry, UV smear and texel outliers, collision vs mesh. 'limits' are the",
+  "detection limits (a finding above them is a real flaw at the place given: verdict warn, blocking in",
+  "asset.check --strict); '<check>_defect' (per class in 'classes') is the vanilla range of the class:",
+  "beyond it the finding is a defect (review). '<check>_warn': false = information below the defect",
+  "level (vanilla uses the pattern on purpose). Calibration: see 'calibration'."
+ ],
+ "limits": {
+  "crack_mm": 25.0,
+  "crack_open_mm": 1.0,
+  "crack_min_mm": 20.0,
+  "crack_len_mm": 50.0,
+  "crack_back_m": 2.0,
+  "zfight_mm": 1.0,
+  "zfight_deg": 3.0,
+  "zfight_cm2": 4.0,
+  "flip_cm2": 10.0,
+  "inside_out_m3": 1e-06,
+  "normal_flip_share": 0.05,
+  "normal_flip_cm2": 50.0,
+  "degen_share": 0.01,
+  "degen_min": 8,
+  "unused_share": 0.02,
+  "unused_min": 16,
+  "stray_mm": 5.0,
+  "stray_min": 1,
+  "far_m": 5.0,
+  "far_rel": 1.0,
+  "uv_solid_px": 2.0,
+  "uv_stretch": 100.0,
+  "uv_share": 0.5,
+  "uv_cm2": 2000.0,
+  "texel_ratio": 16.0,
+  "texel_share": 0.25,
+  "texel_cm2": 2000.0,
+  "col_out_m": 0.5,
+  "col_out_rel": 0.1,
+  "col_gap_m": 0.5,
+  "col_gap_rel": 0.1,
+  "col_share": 0.1,
+  "mesh_uv_smear_warn": false,
+  "mesh_texel_warn": false
+ },
+ "classes": {
+  "interior_shell": {
+   "inside_ok": true,
+   "mesh_crack_defect": 40000,
+   "mesh_zfight_defect": 66000,
+   "mesh_flipped_defect": 510000,
+   "mesh_degenerate_defect": 93,
+   "mesh_far_defect": 280,
+   "col_outside_defect": 170,
+   "col_uncovered_defect": 1.2
+  },
+  "car": {
+   "mesh_crack_defect": 2900,
+   "mesh_zfight_defect": 4500,
+   "mesh_flipped_defect": 1100,
+   "mesh_normals_defect": 0.38,
+   "col_outside_defect": 0.64
+  },
+  "vehicle": {
+   "mesh_crack_defect": 3400,
+   "mesh_zfight_defect": 17000,
+   "mesh_flipped_defect": 550,
+   "mesh_inside_out_defect": 0.026,
+   "mesh_normals_defect": 0.25,
+   "col_outside_defect": 1.4,
+   "col_uncovered_defect": 0.17
+  },
+  "animated": {
+   "mesh_crack_defect": 470,
+   "mesh_zfight_defect": 4900,
+   "mesh_degenerate_defect": 55,
+   "col_outside_defect": 7.3,
+   "col_uncovered_defect": 0.69
+  },
+  "building": {
+   "mesh_crack_defect": 30000,
+   "mesh_zfight_defect": 3700000,
+   "mesh_flipped_defect": 2100000,
+   "mesh_inside_out_defect": 13,
+   "mesh_degenerate_defect": 280,
+   "mesh_far_defect": 130,
+   "col_outside_defect": 270,
+   "col_uncovered_defect": 1.3
+  },
+  "interior_prop": {
+   "mesh_crack_defect": 13000,
+   "mesh_zfight_defect": 20000,
+   "mesh_flipped_defect": 1600,
+   "mesh_inside_out_defect": 0.0052,
+   "mesh_normals_defect": 0.37,
+   "mesh_degenerate_defect": 380,
+   "col_outside_defect": 260,
+   "col_uncovered_defect": 1.3
+  },
+  "lod": {
+   "mesh_crack_defect": 140000,
+   "mesh_zfight_defect": 12000000,
+   "mesh_flipped_defect": 23000000,
+   "mesh_inside_out_defect": 21,
+   "mesh_degenerate_defect": 140,
+   "mesh_far_defect": 180,
+   "col_uncovered_defect": 1.1
+  },
+  "overlay": {
+   "mesh_crack_defect": 81000,
+   "mesh_zfight_defect": 580,
+   "mesh_degenerate_defect": 13,
+   "mesh_far_defect": 37
+  },
+  "ped": {
+   "mesh_crack_defect": 130,
+   "mesh_zfight_defect": 6.5,
+   "mesh_normals_defect": 0.095,
+   "col_outside_defect": 8.4,
+   "col_uncovered_defect": 1.2
+  },
+  "pickup": {
+   "mesh_normals_defect": 0.16
+  },
+  "procedural": {
+   "mesh_degenerate_defect": 20
+  },
+  "prop": {
+   "mesh_crack_defect": 3100,
+   "mesh_zfight_defect": 9900,
+   "mesh_flipped_defect": 21000,
+   "mesh_inside_out_defect": 0.00013,
+   "mesh_degenerate_defect": 220,
+   "mesh_far_defect": 86,
+   "col_outside_defect": 18,
+   "col_uncovered_defect": 1.3
+  },
+  "seabed": {
+   "col_outside_defect": 290,
+   "col_uncovered_defect": 0.64
+  },
+  "terrain": {
+   "mesh_crack_defect": 63000,
+   "mesh_zfight_defect": 2200000,
+   "mesh_flipped_defect": 770000,
+   "mesh_degenerate_defect": 78,
+   "mesh_far_defect": 180,
+   "col_outside_defect": 140,
+   "col_uncovered_defect": 1.3
+  },
+  "time_object": {
+   "mesh_crack_defect": 19000,
+   "mesh_far_defect": 55,
+   "col_outside_defect": 2.4,
+   "col_uncovered_defect": 1.3
+  },
+  "upgrade": {
+   "mesh_crack_defect": 5300,
+   "mesh_zfight_defect": 38
+  },
+  "vegetation": {
+   "mesh_far_defect": 25,
+   "col_outside_defect": 23,
+   "col_uncovered_defect": 1.3
+  },
+  "weapon": {
+   "mesh_zfight_defect": 67,
+   "mesh_degenerate_defect": 15
+  }
+ },
+ "calibration": {
+  "_comment": [
+   "Vanilla SA 1.0 US, every model of every class (14790 models): asset.check shows 0 defects; the",
+   "counts are models with warnings (real, located flaws vanilla also has; --strict blocks them) and",
+   "models missing a required checklist item (coverage_required_missing; each required item is in 95 % of the class)."
+  ],
+  "animated": {
+   "models": 53,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 3,
+    "col.uncovered": 6,
+    "form.floating": 12,
+    "mesh.crack": 1,
+    "mesh.degenerate": 1,
+    "mesh.zfight": 1
+   }
+  },
+  "bike": {
+   "models": 10,
+   "defects": 0,
+   "warn_models": {
+    "mesh.zfight": 2
+   }
+  },
+  "bmx": {
+   "models": 3,
+   "defects": 0,
+   "warn_models": {
+    "mesh.crack": 1,
+    "mesh.zfight": 1
+   }
+  },
+  "boat": {
+   "models": 10,
+   "defects": 0,
+   "warn_models": {
+    "col.uncovered": 1,
+    "form.floating": 3,
+    "mesh.crack": 4,
+    "mesh.normals": 1,
+    "mesh.zfight": 2
+   }
+  },
+  "building": {
+   "models": 3170,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 127,
+    "col.uncovered": 74,
+    "coverage_required_missing": 177,
+    "form.floating": 344,
+    "mesh.crack": 89,
+    "mesh.degenerate": 37,
+    "mesh.far": 16,
+    "mesh.flipped": 22,
+    "mesh.inside_out": 1,
+    "mesh.zfight": 104
+   }
+  },
+  "car.coupe_muscle": {
+   "models": 28,
+   "defects": 0,
+   "warn_models": {
+    "coverage_required_missing": 3,
+    "mesh.crack": 14,
+    "mesh.flipped": 2,
+    "mesh.zfight": 7
+   }
+  },
+  "car.emergency": {
+   "models": 13,
+   "defects": 0,
+   "warn_models": {
+    "form.floating": 2,
+    "mesh.crack": 4,
+    "mesh.zfight": 1
+   }
+  },
+  "car.rc": {
+   "models": 3,
+   "defects": 0,
+   "warn_models": {
+    "mesh.normals": 1
+   }
+  },
+  "car.sedan": {
+   "models": 24,
+   "defects": 0,
+   "warn_models": {
+    "mesh.crack": 6,
+    "mesh.flipped": 1,
+    "mesh.zfight": 2
+   }
+  },
+  "car.sports": {
+   "models": 19,
+   "defects": 0,
+   "warn_models": {
+    "mesh.crack": 3,
+    "mesh.zfight": 8
+   }
+  },
+  "car.suv_pickup": {
+   "models": 13,
+   "defects": 0,
+   "warn_models": {
+    "mesh.crack": 4,
+    "mesh.zfight": 4
+   }
+  },
+  "car.truck_bus": {
+   "models": 15,
+   "defects": 0,
+   "warn_models": {
+    "form.floating": 3,
+    "mesh.crack": 5,
+    "mesh.flipped": 1,
+    "mesh.zfight": 1
+   }
+  },
+  "car.utility_small": {
+   "models": 12,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 1,
+    "form.floating": 6,
+    "form.see_through": 1,
+    "mesh.crack": 2,
+    "mesh.zfight": 2
+   }
+  },
+  "car.van": {
+   "models": 13,
+   "defects": 0,
+   "warn_models": {
+    "mesh.crack": 1,
+    "mesh.normals": 2,
+    "mesh.zfight": 3
+   }
+  },
+  "car.wagon": {
+   "models": 4,
+   "defects": 0,
+   "warn_models": {
+    "mesh.zfight": 2
+   }
+  },
+  "cutscene": {
+   "models": 5,
+   "defects": 0,
+   "warn_models": {}
+  },
+  "heli": {
+   "models": 11,
+   "defects": 0,
+   "warn_models": {
+    "col.uncovered": 2,
+    "mesh.crack": 2,
+    "mesh.flipped": 2,
+    "mesh.inside_out": 1,
+    "mesh.normals": 7,
+    "mesh.zfight": 6
+   }
+  },
+  "interior_prop": {
+   "models": 1404,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 58,
+    "col.uncovered": 25,
+    "form.floating": 33,
+    "mesh.crack": 35,
+    "mesh.degenerate": 26,
+    "mesh.flipped": 1,
+    "mesh.inside_out": 4,
+    "mesh.normals": 12,
+    "mesh.zfight": 39
+   }
+  },
+  "interior_shell": {
+   "models": 723,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 38,
+    "col.uncovered": 59,
+    "coverage_required_missing": 2,
+    "form.floating": 84,
+    "mesh.crack": 38,
+    "mesh.degenerate": 8,
+    "mesh.far": 11,
+    "mesh.flipped": 7,
+    "mesh.zfight": 48
+   }
+  },
+  "lod": {
+   "models": 4349,
+   "defects": 0,
+   "warn_models": {
+    "col.uncovered": 1,
+    "coverage_required_missing": 99,
+    "form.floating": 171,
+    "mesh.crack": 64,
+    "mesh.degenerate": 63,
+    "mesh.far": 9,
+    "mesh.flipped": 27,
+    "mesh.inside_out": 8,
+    "mesh.zfight": 49
+   }
+  },
+  "mtruck": {
+   "models": 5,
+   "defects": 0,
+   "warn_models": {
+    "fit.dummy": 2,
+    "form.floating": 2,
+    "mesh.crack": 1
+   }
+  },
+  "overlay": {
+   "models": 630,
+   "defects": 0,
+   "warn_models": {
+    "coverage_required_missing": 27,
+    "form.floating": 5,
+    "mesh.crack": 8,
+    "mesh.degenerate": 4,
+    "mesh.far": 6,
+    "mesh.zfight": 1
+   }
+  },
+  "ped": {
+   "models": 265,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 2,
+    "col.uncovered": 1,
+    "form.floating": 1,
+    "mesh.crack": 2,
+    "mesh.normals": 4,
+    "mesh.zfight": 2
+   }
+  },
+  "pickup": {
+   "models": 28,
+   "defects": 0,
+   "warn_models": {
+    "coverage_required_missing": 1,
+    "form.floating": 2,
+    "mesh.normals": 1
+   }
+  },
+  "plane": {
+   "models": 13,
+   "defects": 0,
+   "warn_models": {
+    "form.floating": 1,
+    "mesh.crack": 1,
+    "mesh.inside_out": 1,
+    "mesh.normals": 3,
+    "mesh.zfight": 3
+   }
+  },
+  "procedural": {
+   "models": 27,
+   "defects": 0,
+   "warn_models": {
+    "mesh.degenerate": 1
+   }
+  },
+  "prop": {
+   "models": 914,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 38,
+    "col.uncovered": 27,
+    "coverage_required_missing": 64,
+    "form.floating": 22,
+    "mesh.crack": 5,
+    "mesh.degenerate": 15,
+    "mesh.far": 2,
+    "mesh.flipped": 2,
+    "mesh.inside_out": 1,
+    "mesh.zfight": 32
+   }
+  },
+  "quad": {
+   "models": 1,
+   "defects": 0,
+   "warn_models": {}
+  },
+  "seabed": {
+   "models": 163,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 15,
+    "col.uncovered": 3,
+    "form.floating": 2
+   }
+  },
+  "terrain": {
+   "models": 2159,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 26,
+    "col.uncovered": 8,
+    "coverage_required_missing": 6,
+    "form.floating": 41,
+    "mesh.crack": 48,
+    "mesh.degenerate": 41,
+    "mesh.far": 3,
+    "mesh.flipped": 11,
+    "mesh.zfight": 22
+   }
+  },
+  "time_object": {
+   "models": 136,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 1,
+    "col.uncovered": 1,
+    "form.floating": 5,
+    "mesh.crack": 3,
+    "mesh.far": 1
+   }
+  },
+  "trailer": {
+   "models": 9,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 2,
+    "form.floating": 1,
+    "mesh.crack": 1,
+    "mesh.normals": 1,
+    "mesh.zfight": 1
+   }
+  },
+  "train": {
+   "models": 6,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 1,
+    "fit.dummy": 1,
+    "form.floating": 4,
+    "mesh.zfight": 1
+   }
+  },
+  "upgrade": {
+   "models": 194,
+   "defects": 0,
+   "warn_models": {
+    "form.floating": 25,
+    "mesh.crack": 13,
+    "mesh.zfight": 2
+   }
+  },
+  "vegetation": {
+   "models": 308,
+   "defects": 0,
+   "warn_models": {
+    "col.outside": 30,
+    "col.uncovered": 49,
+    "coverage_required_missing": 6,
+    "mesh.far": 1
+   }
+  },
+  "weapon": {
+   "models": 50,
+   "defects": 0,
+   "warn_models": {
+    "form.floating": 6,
+    "mesh.degenerate": 4,
+    "mesh.zfight": 3
+   }
+  }
+ }
+}

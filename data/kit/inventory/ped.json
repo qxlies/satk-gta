@@ -1,0 +1,183 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "ped",
+ "summary": "ped re-skin: the like ped's skinned mesh and 32-bone skeleton stay as they are (kit export cannot write a skin, and an unskinned ped crashes the game); every item is a part of the new atlas painted for the design, proven by the texture on the faces that show it: import the like ped with the new TXD into the session and tag the faces of each region. A reviewer judges the painting.",
+ "regions": {
+  "overall": {
+   "summary": "the whole ped front, back, side",
+   "views": [
+    "front",
+    "back"
+   ]
+  },
+  "head": {
+   "summary": "face, hair, ears",
+   "views": [
+    "face"
+   ]
+  },
+  "torso": {
+   "summary": "chest, back, collar",
+   "views": [
+    "front",
+    "back"
+   ]
+  },
+  "arms": {
+   "summary": "arms and shoulders",
+   "views": [
+    "left",
+    "right"
+   ]
+  },
+  "hands": {
+   "summary": "hands and fingers",
+   "views": [
+    "front",
+    "left",
+    "right"
+   ]
+  },
+  "legs": {
+   "summary": "hips and legs",
+   "views": [
+    "front",
+    "back"
+   ]
+  },
+  "feet": {
+   "summary": "shoes",
+   "views": [
+    "feet"
+   ]
+  },
+  "accessories": {
+   "summary": "glasses, hats, jewellery, bags",
+   "views": [
+    "front",
+    "face"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "head",
+   "name": "Head and face",
+   "region": "head",
+   "category": "body_part",
+   "construction": "the like ped's head kept as it is; the face painted on the atlas: eyes, brows, mouth and soft skin shading from the reference",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "verify": "texture"
+  },
+  {
+   "key": "hair",
+   "name": "Hair",
+   "region": "head",
+   "category": "decal",
+   "construction": "hair painted on the head's texture with soft strands and a hairline (or the like ped's hair mesh repainted)",
+   "attaches_to": "head",
+   "stage": "G4",
+   "detail": "simple"
+  },
+  {
+   "key": "torso_garment",
+   "name": "Top garment",
+   "region": "torso",
+   "category": "decal",
+   "construction": "the top garment painted on the torso: collar, seams, buttons, folds and the print of the design",
+   "attaches_to": "head",
+   "stage": "G4",
+   "detail": "simple"
+  },
+  {
+   "key": "arms",
+   "name": "Sleeves and arms",
+   "region": "arms",
+   "category": "decal",
+   "construction": "sleeves (or skin) painted on the arms with cuffs and elbow folds",
+   "attaches_to": "torso_garment",
+   "stage": "G4",
+   "detail": "simple"
+  },
+  {
+   "key": "hands",
+   "name": "Hands",
+   "region": "hands",
+   "category": "decal",
+   "construction": "hands painted with knuckle shading and nails (gloves when the design has them)",
+   "attaches_to": "arms",
+   "stage": "G4",
+   "detail": "simple"
+  },
+  {
+   "key": "legs_garment",
+   "name": "Trousers or skirt",
+   "region": "legs",
+   "category": "decal",
+   "construction": "trousers or skirt painted on the legs: seams, belt, knee folds",
+   "attaches_to": "torso_garment",
+   "stage": "G4",
+   "detail": "simple"
+  },
+  {
+   "key": "shoes",
+   "name": "Shoes",
+   "region": "feet",
+   "category": "decal",
+   "construction": "shoes painted with soles, laces or straps and a dark gap at the sole",
+   "attaches_to": "legs_garment",
+   "stage": "G4",
+   "detail": "simple"
+  },
+  {
+   "key": "garment_details",
+   "name": "Garment details",
+   "region": "torso",
+   "category": "decal",
+   "construction": "pockets, stitching, creases and labels painted where the design has them",
+   "attaches_to": "torso_garment",
+   "stage": "G4",
+   "detail": "standard"
+  },
+  {
+   "key": "skin_shading",
+   "name": "Shading and contact shadows",
+   "region": "overall",
+   "category": "decal",
+   "construction": "soft dark at the neck, armpits, elbows and knees baked into the atlas",
+   "attaches_to": "torso_garment",
+   "stage": "G4",
+   "detail": "standard"
+  },
+  {
+   "key": "accessories",
+   "name": "Accessories",
+   "region": "accessories",
+   "category": "decal",
+   "construction": "glasses, watch, chain or bag painted where the design has them",
+   "attaches_to": "torso_garment",
+   "stage": "G4",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "wear",
+   "name": "Wear and dirt",
+   "region": "overall",
+   "category": "decal",
+   "construction": "wear, dirt and fading that fit the character, soft",
+   "attaches_to": "torso_garment",
+   "stage": "G4",
+   "detail": "hero",
+   "required": false
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/ped.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

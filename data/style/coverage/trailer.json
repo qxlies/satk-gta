@@ -1,0 +1,33 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "trailer",
+ "ref": "style_vehicle",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (9; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "wheels",
+   "what": "wheel geometry",
+   "how": {
+    "frame_geom": "^wheel"
+   },
+   "fix": "build the wheel (tyre + rim) as the atomic 'wheel' under a wheel dummy; the game copies it to the others",
+   "vanilla": "9/9"
+  },
+  {
+   "id": "hookup",
+   "what": "the hookup frame (the tow point)",
+   "how": {
+    "frames": "^hookup$"
+   },
+   "fix": "add the hookup frame at the king pin or tow eye",
+   "vanilla": "9/9"
+  }
+ ]
+}

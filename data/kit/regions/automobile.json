@@ -1,0 +1,228 @@
+{
+ "kind": "automobile",
+ "version": 1,
+ "summary": "Close-up review regions of a car, van, truck or bus.",
+ "leak": {
+  "cull": false,
+  "gap": true,
+  "inside": true,
+  "inside_regions": [
+   "wheels"
+  ],
+  "floor_exclude": [
+   "wheel*"
+  ],
+  "floor_pct": 1.0,
+  "slit": false
+ },
+ "regions": [
+  {
+   "name": "front",
+   "summary": "nose: bumper, grille, lamps, plate, bonnet edge",
+   "box": {
+    "y": [
+     0.62,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 0,
+     "el": 8
+    },
+    {
+     "az": 38,
+     "el": 16
+    },
+    {
+     "az": -38,
+     "el": 16
+    }
+   ]
+  },
+  {
+   "name": "rear",
+   "summary": "tail: bumper, lamps, plate, boot or tailgate, exhaust",
+   "box": {
+    "y": [
+     0.0,
+     0.38
+    ]
+   },
+   "cameras": [
+    {
+     "az": 180,
+     "el": 8
+    },
+    {
+     "az": 142,
+     "el": 16
+    },
+    {
+     "az": -142,
+     "el": 16
+    }
+   ]
+  },
+  {
+   "name": "left",
+   "summary": "left side: profile, doors, sills, arches, mirror",
+   "cameras": [
+    {
+     "az": -90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": -90,
+     "el": 22
+    }
+   ]
+  },
+  {
+   "name": "right",
+   "summary": "right side: profile, doors, sills, arches, mirror",
+   "cameras": [
+    {
+     "az": 90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": 90,
+     "el": 22
+    }
+   ]
+  },
+  {
+   "name": "wheels",
+   "summary": "each wheel in its arch: liner behind the tyre, clearance, no see-through above the tyre",
+   "frames": [
+    "wheel_*_dummy"
+   ],
+   "radius_h": 0.42,
+   "cameras": [
+    {
+     "az": "out",
+     "el": 6,
+     "az_off": 15
+    },
+    {
+     "az": "out",
+     "el": 20,
+     "az_off": -30
+    }
+   ]
+  },
+  {
+   "name": "underside",
+   "summary": "underbody seen from below: floor, axles, exhaust, tank; nothing open into the body",
+   "ground": false,
+   "leak_inside": false,
+   "cameras": [
+    {
+     "az": 30,
+     "el": -50
+    },
+    {
+     "az": 210,
+     "el": -50
+    }
+   ]
+  },
+  {
+   "name": "interior",
+   "summary": "cabin with doors and glass hidden: seats, dash, wheel, door cards, floor, headliner",
+   "box": {
+    "x": [
+     0.12,
+     0.88
+    ],
+    "y": [
+     0.28,
+     0.78
+    ],
+    "z": [
+     0.3,
+     1.0
+    ]
+   },
+   "hide": [
+    "door_*",
+    "windscreen*"
+   ],
+   "leak": false,
+   "glass": "hide",
+   "cameras": [
+    {
+     "az": -90,
+     "el": 30
+    },
+    {
+     "az": 0,
+     "el": 40
+    },
+    {
+     "az": 160,
+     "el": 35
+    }
+   ]
+  },
+  {
+   "name": "engine_bay",
+   "summary": "engine bay with the bonnet hidden (hero detail): engine block, radiator, battery, bay walls; no see-through into the cabin or onto the road",
+   "box": {
+    "x": [
+     0.1,
+     0.9
+    ],
+    "y": [
+     0.62,
+     1.0
+    ],
+    "z": [
+     0.2,
+     0.9
+    ]
+   },
+   "hide": [
+    "bonnet*"
+   ],
+   "leak": false,
+   "cameras": [
+    {
+     "az": 0,
+     "el": 55
+    },
+    {
+     "az": 35,
+     "el": 40
+    },
+    {
+     "az": -35,
+     "el": 40
+    }
+   ]
+  },
+  {
+   "name": "roof",
+   "summary": "roof and glass seen from above: crown, gutters, rails, pillars",
+   "box": {
+    "z": [
+     0.55,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 30,
+     "el": 62
+    },
+    {
+     "az": 210,
+     "el": 62
+    }
+   ]
+  }
+ ]
+}

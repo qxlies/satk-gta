@@ -323,7 +323,8 @@ def cmd_preview(req: dict, args: dict) -> dict:
     stats = {"seconds_import": res["seconds"]["import"], "seconds_render": res["seconds"]["render"],
              "cells": len(res["cells"]), "cell_s": res["seconds"].get("cells")}
     return {"stats": stats, "warnings": res["warnings"], "files": files,
-            "extra": {"preview": {k: res[k] for k in ("cells", "rows", "cols", "stats", "env", "seconds")}}}
+            "extra": {"preview": {k: res[k] for k in ("cells", "rows", "cols", "stats", "env", "seconds", "views", "leak")
+                                  if k in res}}}
 
 
 HANDLERS = {"doctor": cmd_doctor, "import_model": cmd_import_model, "import_area": cmd_import_area,

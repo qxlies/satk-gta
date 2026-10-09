@@ -1,9 +1,11 @@
-"""``style.brief_check``: wording in a task brief that prescribes a known anti-pattern.
+"""``style.brief_check``: wording in a task brief that leads to known mistakes of agent-built SA assets.
 
-Terms come from ``data/style/brief_terms.json`` ('crisp', 'clean shapes', 'flat colour', 'never photographs',
-'close to real scale', 'deliberate hard edges', '_dam never heavier', 'rebuild from nothing') plus triangle
-floors above the vanilla p50 of the brief's class. A brief should name the asset, the tier and the
-``--like`` model and cite the style help topics, never restate numbers.
+Terms come from ``data/style/brief_terms.json``: box words ('boxy', 'slab', 'squared-off', 'flat sides',
+'voxel'), "style = numbers" phrases ('measured bands, not adjectives', 'inside the class band'), any triangle
+number or budget, 'low-poly', pixel measuring of photos, painted grime, 'detail is texture, not geometry', plus
+the older texture and shape terms ('crisp', 'clean shapes', 'flat colour', 'never photographs', 'close to real
+scale', 'deliberate hard edges', '_dam never heavier', 'rebuild from nothing'). A brief describes the design in
+words and cites the style help topics; it has no budget section.
 """
 
 from __future__ import annotations
@@ -40,45 +42,14 @@ def _excerpt(flat: str, a: int, b: int) -> str:
     return re.sub(r"\s+", " ", flat[s:e]).strip()[:90]
 
 
-def _num(s: str) -> int:
-    return int(s.replace(",", ""))
-
-
 def check_text(text: str, *, label: str = "brief", p50: dict | None = None) -> list[list]:
-    """Rows ``[term, where, excerpt, why, fix, ref]`` for one brief text.
-
-    ``p50`` maps budget metrics (``veh.hd_tris``, ``part.tris[chassis]``, ...) to the vanilla p50 of the
-    brief's class; triangle ranges whose floor is above it are flagged as ``tri_floor``.
-    """
+    """Rows ``[term, where, excerpt, why, fix, ref]`` for one brief text (``p50`` is accepted for older callers
+    and ignored: any triangle number is flagged, whatever its size)."""
     flat, starts = _flat(text)
-    t = terms()
     rows = []
-    for name, d in t["terms"].items():
+    for name, d in terms()["terms"].items():
         for m in re.finditer(d["pattern"], flat, flags=re.I):
             rows.append([name, f"{label}:{_line(starts, m.start())}", _excerpt(flat, m.start(), m.end()), d["why"],
                          d["fix"], d["ref"]])
-    if p50:
-        b = t["budget"]
-        lines = text.splitlines()
-        for i, ln in enumerate(lines, 1):
-            low = ln.lower()
-            if not re.search(b["context"], low) and not any(k in low for k in b["parts"]):
-                continue
-            for m in re.finditer(b["pattern"], ln):
-                floor = _num(m.group(1))
-                head = low[:m.start()]
-                metric = None
-                best = -1
-                for key, met in b["parts"].items():
-                    pos = head.rfind(key)
-                    if pos > best:
-                        best, metric = pos, met
-                if metric is None or metric not in p50:
-                    metric = "geo.tris" if "geo.tris" in p50 and "veh.hd_tris" not in p50 else metric
-                if metric is None or metric not in p50 or floor < 10:
-                    continue
-                if floor > float(p50[metric]):
-                    rows.append(["tri_floor", f"{label}:{i}", re.sub(r"\s+", " ", ln.strip())[:90],
-                                 f"{b['why']} ({metric} vanilla p50 {p50[metric]}, floor {floor})", b["fix"], b["ref"]])
     rows.sort(key=lambda r: (int(r[1].rsplit(":", 1)[1]), r[0]))
     return rows

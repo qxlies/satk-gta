@@ -1,23 +1,66 @@
 {
-  "format": "satk.style-brief-terms/1",
+  "format": "satk.style-brief-terms/2",
   "_comment": [
-    "Wording of task briefs that prescribes a known anti-pattern of agent-made SA assets (satk.style.brief).",
+    "Wording of task briefs that leads agents to known mistakes when they build SA assets (satk.style.brief).",
     "pattern = case-insensitive regular expression on the brief with line breaks joined to spaces; why = what",
-    "vanilla does instead (measured); fix = what the brief should say. A brief names the asset, the tier and the",
-    "--like model and points to the style help topics; it never restates style numbers."
+    "vanilla does instead and what went wrong; fix = what the brief should say. A brief DESCRIBES the design in",
+    "words (proportions, signature features, how the parts meet) and points to the style topics; it never sets",
+    "polygon numbers and never defines the style as numbers."
   ],
   "terms": {
+    "box_risk": {
+      "pattern": "\\b(boxy|blocky|slab[- ]?sided|slabs?|squared[- ]off|square[- ]edged|flat[- ]sided|flat sides|voxel\\w*|box[- ]shaped|brick[- ]shaped|cuboid)\\b",
+      "why": "box words made agents build cubes with one chamfer: a 90s SUV came out as a rectangle in plan with hard 90-degree corners, flat sides and slab flares; vanilla turns every corner in 2-3 smooth steps, crowns roof and bonnet and leans the glasshouse in",
+      "fix": "describe the shape the SA way: 'an upright body with soft, rounded corners in plan and section, crowned roof and bonnet, the glasshouse leaning in'",
+      "ref": "style_construction"
+    },
+    "style_numbers": {
+      "pattern": "\\b(san andreas\\s+)?style\\W{0,3}\\s+(means|is|=)\\s+(the\\s+)?(measured|numbers|bands|data|metrics)\\b|\\bmeasured (bands|data, not adjectives)\\b|\\bnot adjectives\\b|\\bin numbers\\b|\\b(inside|within) the (class |tier |sa_plus |vanilla )?bands?\\b|\\bclass bands? (decide|decides)\\b|\\bout-of-band\\b|\\bevery metric\\b",
+      "why": "'style = numbers' made agents chase bands: one dissolved coplanar faces to move shade and dihedral numbers into band (no pixel changed) and capped the car's length at a class percentile; the SA look is a description (soft, rounded, simplified forms; small soft photo textures), vanilla numbers are reference only",
+      "fix": "describe the look and cite the style topics; say 'vanilla numbers are reference, never targets'",
+      "ref": "style"
+    },
+    "tri_numbers": {
+      "pattern": "\\b\\d[\\d,.]*\\s*k?\\s*(tris|triangles|polys|polygons|faces)\\b|\\b(triangle|tri|poly|polygon)\\s*(budgets?|caps?|ceilings?|floors?|limits?|counts? per part)\\b|\\bbudgets? per part\\b|\\bpolycount\\b",
+      "why": "triangle numbers turn style into counting: a 4,500 cap made an agent re-box a rounded bumper (bevel segments 2 -> 1) and a band floor kept another from adding detail; counts are a result, never a target",
+      "fix": "describe the detail wanted (interior, engine bay, lamp housings) and let the forms take what they need",
+      "ref": "style"
+    },
+    "low_poly": {
+      "pattern": "\\blow[- ]?poly\\b",
+      "why": "'low-poly' reads as faceted boxes; vanilla is soft and rounded, with density only where the outline turns",
+      "fix": "say 'soft, rounded, simplified surfaces; detail where it reads at game distance'",
+      "ref": "style_construction"
+    },
+    "measure_photo": {
+      "pattern": "\\b(measure|read|scale)\\w*\\s+(the\\s+|from\\s+the\\s+)?(pixels?|photos?|reference photos?|images?)\\b|\\bpixel[- ]?grids?\\b|\\bgrid (copy|sheet)\\b|\\bblueprint from (the\\s+)?photos?\\b|\\bback[- ]?project\\w*|\\bcamera solv\\w*",
+      "why": "measuring pixels of a three-quarter photo (grids, solved cameras, back-projection) gave wrong local proportions; SA keeps the silhouette lines, simplifies and widens",
+      "fix": "describe the references (a features list per photo); measure only true side, front or rear views",
+      "ref": "style_references"
+    },
+    "dirty": {
+      "pattern": "\\b(grime|dirt|dirty)\\s+(is\\s+)?painted\\s+in\\b|\\bpainted[- ]in\\s+(grime|dirt)\\b|\\bdirty textures?\\b|\\btextures? (are|is) (small, )?(photo-like and )?dirty\\b",
+      "why": "painted grime made a car look filthy at every dirt level; vanilla paint is a clean key colour times vehiclegrunge256 and the engine adds the dirt",
+      "fix": "say 'small, soft, photo-like textures with light and folds painted in; car paint a clean key colour'",
+      "ref": "style_texture"
+    },
+    "detail_texture": {
+      "pattern": "\\bdetail (is|belongs) (in(to)? )?(the )?texture,? not (in )?(the )?geometry\\b|\\b(are|is) texture or flush details?, not geometry\\b",
+      "why": "'detail is texture, not geometry' left vehicles without lamp housings, grille surrounds and interiors; richer modelled detail in the same soft style is welcome",
+      "fix": "say 'model what reads at game distance (lamps in recesses, grille surround, mirrors, handles, interior, engine bay); paint what is fine or flat'",
+      "ref": "style_construction"
+    },
     "crisp": {
       "pattern": "\\bcrisp\\b",
-      "why": "vanilla textures are small, soft and photo-like (hundreds of colours, painted grime); 'crisp' produces vector-art textures with a few flat colours",
-      "fix": "say 'photo-like textures with shading and grime painted in' and cite style_texture",
+      "why": "vanilla textures are small, soft and photo-like (hundreds of colours, soft light); 'crisp' produces vector-art textures with a few flat colours",
+      "fix": "say 'small, soft, photo-like textures with light and folds painted in' and cite style_texture",
       "ref": "style_texture"
     },
     "clean_shapes": {
       "pattern": "\\bclean\\b(,?\\s+(and\\s+)?(readable|slightly simplified|simple|simplified))?\\s+(shapes|surfaces|lines|forms)\\b",
-      "why": "vanilla bodies carry trim, panel lines, lamps and grime in geometry and texture; 'clean shapes' gives bare, under-detailed models",
-      "fix": "say 'silhouette first, detail where the outline turns' and cite the class topic",
-      "ref": "style_vehicle"
+      "why": "'clean shapes' gave bare, under-detailed models made of plain primitives; vanilla bodies are soft and rounded and carry lamps, trim, mirrors and handles",
+      "fix": "describe the forms ('soft, rounded, simplified forms joined into one body') and the details that must be modelled",
+      "ref": "style_construction"
     },
     "flat_colour": {
       "pattern": "\\bflat\\s+(material\\s+)?colou?rs?\\b",
@@ -28,25 +71,25 @@
     "no_photos": {
       "pattern": "\\b(no|never|without|avoid|not)\\b[^.]{0,24}\\bphoto(graph)?s?\\b",
       "why": "vanilla textures are photo-sourced; a ban on photographs pushes agents to vector art",
-      "fix": "allow licensed photographs or name the photo-free recipe of style_texture",
+      "fix": "allow licensed photographs or name the photo-like recipe of style_texture",
       "ref": "style_texture"
     },
     "real_scale": {
       "pattern": "\\b(close to|true to|exact|1:1)\\s+(the\\s+)?real(-world|\\s+world|\\s+life)?\\s+(scale|size|dimensions)\\b|\\breal[- ]world\\s+scale\\b",
-      "why": "SA vehicles are about 1.1-1.2x their real counterparts with real-size wheels; real-world specs made the benchmark car 4.98 m, below every vanilla 4-door",
-      "fix": "say 'scale from the class anchor (wheel size or ped height); the class band decides'",
+      "why": "SA vehicles are about 1.1-1.2x their real counterparts and relatively wider, with real-size wheels; real-world specs made the benchmark car 4.98 m, below every vanilla 4-door",
+      "fix": "say 'scale from the anchor (the wheel of the class or the ped height); keep the real car's ratios, a little larger and wider'",
       "ref": "style_vehicle"
     },
     "hard_edges": {
       "pattern": "\\b(deliberate|crisp|sharp|many)\\s+hard\\s+(edges|creases)\\b|\\bmany\\s+hard\\s+creases\\b|\\bsharp\\s+edges\\b",
-      "why": "vanilla cars are soft (normal bend about 10 deg, about 10 % flat triangles); 83-92 % of their hard edges sit on material or UV seams",
+      "why": "vanilla cars are soft (normal bend about 10 deg); 80-93 % of their hard edges sit on material or UV seams and 22-45 % of their 60-90 deg folds stay smooth",
       "fix": "say 'smooth inside a material, split normals at seams and designed creases' and cite style_shading",
       "ref": "style_shading"
     },
     "dam_lighter": {
       "pattern": "_dam\\b[^.]{0,60}\\b(not more than|no more than|never (more|heavier)( than)?|fewer (triangles )?than|lighter than|less than)\\b",
-      "why": "vanilla _dam parts are 0.8-1.1x their _ok part; a 'never heavier' rule makes agents decimate the damage states",
-      "fix": "say 'damage parts of comparable density' (dam.ok_ratio of the class)",
+      "why": "vanilla _dam parts are dented copies of their _ok part; a 'never heavier' rule makes agents decimate the damage states",
+      "fix": "say 'damage parts built from the _ok parts (kit.damage), visibly dented'",
       "ref": "style_vehicle"
     },
     "from_nothing": {
@@ -55,21 +98,5 @@
       "fix": "say 'model in the live Blender session; asset.json, the journal and checkpoints make it reproducible'",
       "ref": "authoring"
     }
-  },
-  "budget": {
-    "pattern": "(\\d[\\d,]*)\\s*(?:-|to|\\u2013)\\s*(\\d[\\d,]*)",
-    "context": "tri|triangle|poly|budget",
-    "parts": {
-      "chassis_vlo": "part.tris[chassis_vlo]",
-      "vlo": "part.tris[chassis_vlo]",
-      "chassis": "part.tris[chassis]",
-      "wheel": "part.tris[wheel]",
-      "_ok": "veh.hd_tris",
-      "whole": "veh.hd_tris",
-      "total": "veh.hd_tris"
-    },
-    "why": "a triangle floor above the vanilla p50 of the class asks for a heavier model than vanilla without naming the tier",
-    "fix": "name the tier (sa_plus or vanilla) and let style.profile give the band; do not set triangle floors in the brief",
-    "ref": "style"
   }
 }

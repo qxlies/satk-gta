@@ -1,0 +1,482 @@
+{
+ "schema": "satk-bench/1",
+ "run": "fixture",
+ "scene": "S2",
+ "title": "LS flyover",
+ "label": "sae",
+ "started": "2026-10-07T12:00:00",
+ "request": {
+  "preset": null,
+  "profile": null,
+  "duration": 12.0,
+  "warmup": 1.0,
+  "set": [],
+  "console": []
+ },
+ "client": {
+  "version": 1,
+  "features": {
+   "createPed": true,
+   "createVehicle": true,
+   "dxCreateTexture": true,
+   "dxGetStatus": true,
+   "engineLoadDFF": true,
+   "engineStreamingGetBufferSize": false,
+   "engineStreamingGetUsedMemory": true,
+   "getDrawDistanceInfo": true,
+   "getEngineLimits": true,
+   "getEnginePatchReport": true,
+   "getEngineSettings": true,
+   "getEngineStats": true,
+   "getGroundPosition": true,
+   "getProcessMemoryStats": true,
+   "setFPSLimit": true,
+   "setMinuteDuration": true
+  },
+  "screen": [
+   1280,
+   720
+  ],
+  "sae": true,
+  "preset": "classic",
+  "profile": "sae",
+  "settings": {
+   "sae_limits": {
+    "source": "custom",
+    "value": "sae"
+   }
+  }
+ },
+ "stages": [
+  {
+   "camera": {
+    "end_pos": [
+     1416,
+     -852.5,
+     150
+    ]
+   },
+   "clock": {
+    "frame_counter": 360.222,
+    "frame_counter_hz": 30,
+    "game_ms": 11983.385,
+    "ratio": 0.998,
+    "tick_ms": 12007.4,
+    "timer_mode": "real"
+   },
+   "counts": {
+    "spawned": {
+     "failed": 0,
+     "peds": 0,
+     "vehicles": 0
+    },
+    "streamed_end": {
+     "object": 0,
+     "ped": 0,
+     "vehicle": 0
+    },
+    "streamed_max": {
+     "object": 0,
+     "ped": 0,
+     "vehicle": 0
+    }
+   },
+   "features": {
+    "createPed": true,
+    "createVehicle": true,
+    "dxCreateTexture": true,
+    "dxGetStatus": true,
+    "engineLoadDFF": true,
+    "engineStreamingGetBufferSize": false,
+    "engineStreamingGetUsedMemory": true,
+    "getDrawDistanceInfo": true,
+    "getEngineLimits": true,
+    "getEnginePatchReport": true,
+    "getEngineSettings": true,
+    "getEngineStats": true,
+    "getGroundPosition": true,
+    "getProcessMemoryStats": true,
+    "setFPSLimit": true,
+    "setMinuteDuration": true
+   },
+   "finish": {
+    "draw": {
+     "farClip": 1000,
+     "preset": "classic"
+    },
+    "dx": {
+     "AllowScreenUpload": true,
+     "VideoCardName": "Sim GPU",
+     "VideoCardRAM": 8192,
+     "VideoMemoryFreeForMTA": 4000
+    },
+    "engine": {
+     "avgFps": 60,
+     "cefLoaded": false,
+     "frameCounter": 390.384,
+     "gameTimeMs": 12986.774,
+     "p50": 16.7,
+     "timerMode": "real",
+     "vaGuard": "ok",
+     "vaUsedMiB": 1520
+    },
+    "limits": {
+     "capacity": {
+      "lodList": 4000,
+      "visibleEntities": 1000
+     },
+     "coronas": {
+      "native": 12,
+      "script": 3
+     },
+     "counters": {
+      "lodList": 100,
+      "visibleEntities": 227
+     }
+    },
+    "mem": {
+     "private_mib": 912,
+     "resident_mib": 608,
+     "virtual_mib": 1520
+    },
+    "stream_mib": 200.1,
+    "streamed": {
+     "object": 0,
+     "ped": 0,
+     "vehicle": 0
+    },
+    "tick": 113012.8,
+    "time": [
+     12,
+     0
+    ],
+    "va_mib": 1520
+   },
+   "fps_limit": [],
+   "frames": {
+    "avg_ms": 8.522,
+    "fps_avg": 117.34,
+    "fps_wall": 117.34,
+    "integer_share": 0,
+    "low1_fps": 48.08,
+    "max_ms": 20.8,
+    "n": 1409,
+    "p50_ms": 8.2,
+    "p95_ms": 8.2,
+    "p999_ms": 20.8,
+    "p99_ms": 20.8,
+    "q": [
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     8.2,
+     20.8,
+     20.8,
+     20.8
+    ],
+    "sum_ms": 12007.4,
+    "wall_ms": 12007.4
+   },
+   "id": "flyover",
+   "index": 1,
+   "limits_last": {
+    "capacity": {
+     "lodList": 4000,
+     "visibleEntities": 1000
+    },
+    "coronas": {
+     "native": 12,
+     "script": 3
+    },
+    "counters": {
+     "lodList": 100,
+     "visibleEntities": 227
+    }
+   },
+   "limits_max": {
+    "capacity.lodList": 4000,
+    "capacity.visibleEntities": 1000,
+    "coronas.native": 12,
+    "coronas.script": 3,
+    "counters.lodList": 100,
+    "counters.visibleEntities": 242
+   },
+   "sample_s": 12.01,
+   "series": [
+    [
+     1,
+     118,
+     8.52,
+     20.8,
+     1520,
+     200
+    ],
+    [
+     2,
+     117,
+     8.523,
+     20.8,
+     1520,
+     200
+    ],
+    [
+     3,
+     118,
+     8.52,
+     20.8,
+     1520,
+     200
+    ],
+    [
+     4,
+     117,
+     8.523,
+     20.8,
+     1520,
+     200.1
+    ],
+    [
+     5,
+     117,
+     8.523,
+     20.8,
+     1520,
+     200.1
+    ],
+    [
+     6,
+     118,
+     8.52,
+     20.8,
+     1520,
+     200.1
+    ],
+    [
+     7,
+     117,
+     8.523,
+     20.8,
+     1520,
+     200.1
+    ],
+    [
+     8,
+     117,
+     8.523,
+     20.8,
+     1520,
+     200.1
+    ],
+    [
+     9,
+     118,
+     8.52,
+     20.8,
+     1520,
+     200.1
+    ],
+    [
+     10,
+     117,
+     8.523,
+     20.8,
+     1520,
+     200.1
+    ],
+    [
+     11,
+     117,
+     8.523,
+     20.8,
+     1520,
+     200.1
+    ],
+    [
+     12,
+     118,
+     8.52,
+     20.8,
+     1520,
+     200.1
+    ]
+   ],
+   "start": {
+    "draw": {
+     "farClip": 1000,
+     "preset": "classic"
+    },
+    "dx": {
+     "AllowScreenUpload": true,
+     "VideoCardName": "Sim GPU",
+     "VideoCardRAM": 8192,
+     "VideoMemoryFreeForMTA": 4000
+    },
+    "engine": {
+     "avgFps": 60,
+     "cefLoaded": false,
+     "frameCounter": 30.162,
+     "gameTimeMs": 1003.389,
+     "p50": 16.7,
+     "timerMode": "real",
+     "vaGuard": "ok",
+     "vaUsedMiB": 1520
+    },
+    "limits": {
+     "capacity": {
+      "lodList": 4000,
+      "visibleEntities": 1000
+     },
+     "coronas": {
+      "native": 12,
+      "script": 3
+     },
+     "counters": {
+      "lodList": 100,
+      "visibleEntities": 218
+     }
+    },
+    "mem": {
+     "private_mib": 912,
+     "resident_mib": 608,
+     "virtual_mib": 1520
+    },
+    "stream_mib": 200,
+    "streamed": {
+     "object": 0,
+     "ped": 0,
+     "vehicle": 0
+    },
+    "tick": 101005.4,
+    "time": [
+     12,
+     0
+    ],
+    "va_mib": 1520
+   },
+   "stream": {
+    "end_mib": 200.1,
+    "peak_mib": 200.1,
+    "start_mib": 200
+   },
+   "title": "LS flyover at 120 m",
+   "va": {
+    "end_mib": 1520,
+    "growth_mib": 0,
+    "peak_mib": 1520,
+    "start_mib": 1520
+   },
+   "warmup_s": 1,
+   "warn": []
+  }
+ ],
+ "summary": {
+  "stages": 1,
+  "frames": 1409,
+  "fps_avg": 117.34,
+  "p50_ms": 8.2,
+  "p95_ms": 8.2,
+  "p99_ms": 20.8,
+  "max_ms": 20.8,
+  "low1_fps": 48.08,
+  "va_peak_mib": 1520,
+  "va_growth_mib": 0.0,
+  "stream_peak_mib": 200.1,
+  "clock_ratio_min": 0.998,
+  "clock_ratio_max": 0.998
+ },
+ "planned_stages": 1
+}

@@ -437,25 +437,20 @@ def _simplify(obj, target: int, angle: float) -> dict:
 
 
 def reduce_method(ctx, params: dict) -> dict:
-    """Planar dissolve then collapse to the style budget, preserving material/UV seams; plan=<plan.json>."""
+    """Planar dissolve, then collapse only above the engine safety cap (no triangle target), preserving material/UV seams; plan=<plan.json>."""
     plan, folder, key, state = C.load(ctx, params, "clean")
     coll = bpy.data.collections[state["collection"]]
     source = C.objects(state["source"])
     groups = _group_sources(source, plan, coll)
     total = sum(C.tris(o) for o in groups.values())
-    # Reserve the kit wheel budget when this scaffold contains a generated wheel.
-    wheel = any(f.get("part") == "wheel" for f in plan["template"]["frames"])
-    reserve = math.ceil(plan["bands"].get("part.tris[wheel]", {}).get("hi", 0))
-    target = max(4, plan["budget"]["target"] - (reserve if wheel else 0))
-    # A rigid automobile source fills one chassis slot, so its part band also limits the allocation.
-    chassis = plan["bands"].get("part.tris[chassis]")
-    if plan["kind"] == "automobile" and chassis:
-        target = min(target, max(4, math.floor(chassis["hi"])))
+    # Triangle counts are never a target: the source keeps its detail and only a mesh above the engine cap
+    # (65,535 vertices per geometry, 3 per triangle at worst) is collapsed, each role by its share.
+    cap = int(plan["limit"]["max_tris"])
     rows, targets = {}, {}
     for role, hi in groups.items():
         low = bpy.data.objects.new(hi.name[:-3] + "_lo", hi.data.copy())
         coll.objects.link(low)
-        count = max(4, math.floor(target * C.tris(hi) / total))
+        count = max(4, math.floor(cap * C.tris(hi) / total)) if total > cap else max(4, C.tris(hi))
         rows[role] = _simplify(low, count, plan["presets"]["dissolve_degrees"])
         targets[role] = low.name
         hi.hide_render = True
@@ -464,10 +459,9 @@ def reduce_method(ctx, params: dict) -> dict:
         obj.hide_render = True
         obj.hide_set(True)
     state.update(high={r: o.name for r, o in groups.items()}, low=targets)
-    count = sum(v["after"] for v in rows.values()) + (reserve if wheel else 0)
-    code = "INFO" if count <= plan["budget"]["hi"] else "CHECK_FAILED"
-    warnings = [f"{code}: {r} needs {v['after']} triangles to preserve its seam samples (aim {v['target']})"
-                for r, v in rows.items() if not v["reached"]]
+    count = sum(v["after"] for v in rows.values())
+    warnings = [f"CHECK_FAILED: {r} keeps {v['after']} triangles to preserve its seam samples, above the engine "
+                f"safety share {v['target']}" for r, v in rows.items() if not v["reached"] and count > cap]
     warnings += [f"CHECK_FAILED: {r} reduction deviates {v['surface_error']:.4f} m from the source; "
                  "review the silhouette in the saved blend" for r, v in rows.items()
                  if v["surface_error"] > max(plan["dims"]) * 0.04]

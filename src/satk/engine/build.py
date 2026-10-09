@@ -9,6 +9,10 @@
   ``client`` (Win32 solution), ``all`` (solution, both platforms unless ``--platform``),
   ``changed`` (projects touched since the last successful build of that platform).
   Errors come back as rows ``file, line, code, msg``; full logs stay in ``work\\engine\\build\\logs``.
+* ``fork`` (``--fork PATH``): every function also works on a second checkout of the fork (a worktree
+  under ``work/wt``, see ``satk.engine.worktree``). It shares ``engine/deps``, the premake wrapper and the
+  shims with the configured fork; logs, build state, lock and TEMP are its own (``Layout.fork_id``). Without
+  ``fork`` nothing changes.
 * :func:`rc_test` — compiles the 4 client ``.rc`` with the Windows SDK ``rc.exe`` and the
   ``afxres.h`` shim (V5 inside the fork); ``control=True`` also proves the failure without it.
 """
@@ -32,6 +36,7 @@ from .common import (
     find_msbuild,
     find_premake,
     find_rc,
+    fork_profile,
     git,
     layout,
     read_json,
@@ -45,6 +50,7 @@ __all__ = [
     "RC_FILES",
     "PLATFORMS",
     "ARTIFACTS",
+    "SERVER_PROFILE_ARTIFACTS",
     "parse_msbuild_log",
     "parse_sln",
     "project_index",
@@ -68,6 +74,8 @@ ARTIFACTS = {
               "mta/cefweb.dll", "mods/deathmatch/client.dll"),
     "x64": ("server/MTA Server64.exe", "server/x64/core.dll", "server/x64/deathmatch.dll"),
 }
+#: Key outputs of a fork checked out with the ``server`` sparse profile (no client sources in the tree).
+SERVER_PROFILE_ARTIFACTS = {"Win32": ("tests/Tests_Client.exe",), "x64": ARTIFACTS["x64"]}
 _SRC_EXT = (".c", ".cc", ".cpp", ".cxx", ".rc", ".asm")
 
 
@@ -236,25 +244,40 @@ def _guard_build_paths(L: Layout) -> None:
         ensure_writable(path)
 
 
+def _premake_generate(L: Layout, premake: Path, log: Path):
+    """Run ``premake5 vs2026``. The configured fork runs its own ``premake5.lua`` as before; a second
+    fork goes through the engine wrapper ``satk-premake.lua`` (``SATK_FORK`` = that checkout,
+    ``SATK_OFFLINE=1``: the actions read ``engine/deps`` and never download)."""
+    if L.is_default:
+        return run([premake, "vs2026"], cwd=L.fork, env=build_env(), log=log, timeout=600)
+    if not L.wrapper.is_file():
+        raise SatkError("NOT_READY", f"premake wrapper missing: {jpath(L.wrapper)}", hint="satk engine setup")
+    env = build_env({"SATK_OFFLINE": "1", "SATK_FORK": str(L.fork), "SATK_DEPS_LOCK": str(L.lock)}, L=L)
+    return run([premake, f"--file={L.wrapper}", "vs2026"], cwd=L.fork, env=env, log=log, timeout=600)
+
+
 def gen(L: Layout | None = None) -> dict:
     """Run ``premake5 vs2026`` (DXSDK_DIR set before premake) and record the fingerprint."""
     L = L or layout()
     _guard_build_paths(L)
     if not (L.fork / "premake5.lua").is_file():
-        raise SatkError("NOT_READY", f"fork not set up: {jpath(L.fork)}", hint="satk engine setup")
+        raise SatkError("NOT_READY", f"fork not set up: {jpath(L.fork)}",
+                        hint="satk engine setup" if L.is_default else "satk engine worktree create")
     premake = find_premake(L.fork)
     if premake is None:
         raise SatkError("NOT_READY", "premake5.exe not found", hint="satk engine doctor")
     pres = _dep_presence(L)
     warn = []
-    if not pres["dxfiles"]:
-        warn.append("NO_DXFILES: engine/deps/DXFiles missing; client projects will not compile (satk engine setup --deps)")
-    if not pres["cef"] or not pres["discord"]:
-        warn.append("NO_CLIENT_DEPS: CEF/discord-rpc not installed; generated client projects lack their sources "
-                    "(server builds are fine; satk engine setup --deps, then gen again)")
+    if fork_profile(L) != "server":
+        if not pres["dxfiles"]:
+            warn.append("NO_DXFILES: engine/deps/DXFiles missing; client projects will not compile "
+                        "(satk engine setup --deps)")
+        if not pres["cef"] or not pres["discord"]:
+            warn.append("NO_CLIENT_DEPS: CEF/discord-rpc not installed; generated client projects lack their sources "
+                        "(server builds are fine; satk engine setup --deps, then gen again)")
     log = L.logs / f"{stamp()}-premake-vs2026.log"
     ensure_writable(log)
-    r = run([premake, "vs2026"], cwd=L.fork, env=build_env(), log=log, timeout=600)
+    r = _premake_generate(L, premake, log)
     if r.code != 0 or not L.sln.is_file():
         raise SatkError("EXTERNAL_TOOL", f"premake vs2026 failed (exit {r.code})", hint=f"see {jpath(log)}",
                         data={"tail": r.out[-1500:]})
@@ -264,6 +287,8 @@ def gen(L: Layout | None = None) -> dict:
     _update_state(L, "gen", state)
     out = {"sln": jpath(L.sln), "projects": nproj, "seconds": r.seconds, "dxsdk_dir": jpath(L.dxfiles) + "/",
            "cef": pres["cef"], "discord": pres["discord"], "log": jpath(log)}
+    if not L.is_default:
+        out["fork"] = jpath(L.fork)
     if warn:
         out["warn"] = warn
     return out
@@ -306,6 +331,7 @@ class Step:
     label: str  # "sln" or a project name
     target: Path  # .sln or .vcxproj
     platform: str
+    covers: bool = False  # a project step that stands for "the whole checkout" (sparse fork: see _whole)
 
 
 def _canon_platform(p: str | None) -> str | None:
@@ -321,6 +347,32 @@ def _canon_platform(p: str | None) -> str | None:
 
 def _platforms_of(entry: dict, config: str) -> list[str]:
     return [p for p in PLATFORMS if f"{config}|{p}" in entry["builds"]]
+
+
+def _profile_projects(L: Layout) -> set[str] | None:
+    """Projects whose sources are in a sparse fork (recorded by ``engine worktree create``); ``None`` when the
+    fork is a full checkout, which builds through its solution as always."""
+    if fork_profile(L) != "server":
+        return None
+    names = (read_json(L.meta, {}) or {}).get("projects")
+    return set(names) if names else None
+
+
+def _whole(L: Layout, platform: str, config: str, notes: dict) -> list[Step]:
+    """Steps that build "everything" of a platform. A full checkout: its solution. A sparse fork: the solution
+    also holds projects without sources (the client libraries), so build the executables and DLLs of the
+    projects that are present; MSBuild builds their static libraries through the project references."""
+    names = _profile_projects(L)
+    if names is None:
+        return [Step("sln", L.sln, platform)]
+    projects = parse_sln(L.sln)
+    _, kinds = project_index(L.fork / "Build")
+    steps = [Step(n, L.fork / "Build" / e["path"], platform, covers=True) for n, e in sorted(projects.items())
+             if n in names and f"{config}|{platform}" in e["builds"]
+             and kinds.get(n, "") in ("Application", "DynamicLibrary")]
+    if not steps:
+        notes.setdefault("warn", []).append(f"no {platform} executable or DLL of this sparse checkout is in the solution")
+    return steps
 
 
 def changed_files(L: Layout, since: str | None, after: float | None = None) -> list[str]:
@@ -377,14 +429,17 @@ def plan(project: str, platform: str | None, config: str, L: Layout | None = Non
     low = key.lower()
     if low in ("all", "sln", "solution"):
         plats = [plat] if plat else list(PLATFORMS)
-        return [Step("sln", sln, p) for p in plats], notes
+        return [s for p in plats for s in _whole(L, p, config, notes)], notes
     if low == "server":
         if plat == "Win32":
             notes["warn"] = ["the Win32 solution builds only legacy x86 server libraries; the server is x64"]
-        return [Step("sln", sln, plat or "x64")], notes
+        return _whole(L, plat or "x64", config, notes), notes
     if low == "client":
         if plat == "x64":
             raise SatkError("BAD_PARAMS", "the client is Win32 only", hint="--platform Win32")
+        if fork_profile(L) == "server":
+            raise SatkError("BAD_PARAMS", "this checkout has the sparse 'server' profile: it holds no client sources",
+                            hint="build the client in the configured fork, or create a worktree with --profile full")
         return [Step("sln", sln, "Win32")], notes
     projects = parse_sln(sln)
     if low == "changed":
@@ -397,7 +452,7 @@ def plan(project: str, platform: str | None, config: str, L: Layout | None = Non
             prev = builds.get(f"{config}|{p}", {})
             last = prev.get("rev")
             if not last:
-                steps.append(Step("sln", sln, p))
+                steps.extend(_whole(L, p, config, notes))
                 notes["changed"][p] = "no previous successful build: whole solution"
                 continue
             files = [f for f in changed_files(L, last, prev.get("ts")) if p in _path_platforms(f)]
@@ -422,7 +477,7 @@ def plan(project: str, platform: str | None, config: str, L: Layout | None = Non
                 whole = True  # dependents must relink
             what = f"{len(files)} file(s)" + (f", regenerated {', '.join(regen)}" if regen else "")
             if whole:
-                steps.append(Step("sln", sln, p))
+                steps.extend(_whole(L, p, config, notes))
                 notes["changed"][p] = f"{what}: headers/static libs/unknown files -> whole solution"
             elif not projs:
                 notes["changed"][p] = f"{what}: none built for {p}"
@@ -459,9 +514,10 @@ def plan(project: str, platform: str | None, config: str, L: Layout | None = Non
 def artifacts(L: Layout | None = None, config: str = "Release", platforms: tuple[str, ...] = PLATFORMS) -> list[list]:
     """Rows ``[platform, path, exists, size, mtime]`` for the key outputs."""
     L = L or layout()
+    names = SERVER_PROFILE_ARTIFACTS if fork_profile(L) == "server" else ARTIFACTS
     rows = []
     for p in platforms:
-        for rel in ARTIFACTS[p]:
+        for rel in names[p]:
             if config == "Debug":
                 stem, dot, ext = rel.rpartition(".")
                 rel = f"{stem}_d.{ext}" if dot else rel
@@ -491,6 +547,10 @@ def _msbuild_cmd(msbuild: Path, step: Step, config: str, target: str | None, job
            f"-flp:logfile={lg['log']};verbosity=normal;encoding=utf-8",
            f"-flp1:logfile={lg['errors']};errorsonly;encoding=utf-8",
            f"-flp2:logfile={lg['warnings']};warningsonly;encoding=utf-8"]
+    if not L.is_default and L.targets.is_file():
+        # engine\Directory.Build.targets sits above the configured fork only; a second checkout imports it
+        # explicitly and moves its "fork root" (the afxres.h shim for the client .rc files) to itself.
+        cmd += [f"-p:DirectoryBuildTargetsPath={L.targets}", f"-p:SatkForkRoot={L.fork}\\"]
     if step.target.suffix == ".vcxproj":
         cmd.append(f"-p:SolutionDir={L.fork / 'Build'}\\")
         if no_deps:
@@ -506,16 +566,18 @@ def _msbuild_cmd(msbuild: Path, step: Step, config: str, target: str | None, job
 
 def build(project: str = "all", platform: str | None = None, config: str = "Release", target: str | None = None,
           jobs: int | None = None, toolset: str | None = None, no_deps: bool = False, regen: str = "auto",
-          max_errors: int = 30, timeout: float = 3600) -> dict:
-    """Build with MSBuild; returns summary rows, errors and artifacts (see module doc)."""
-    L = layout()
+          max_errors: int = 30, timeout: float = 3600, fork: str | None = None) -> dict:
+    """Build with MSBuild; returns summary rows, errors and artifacts (see module doc).
+
+    ``fork``: another checkout of the fork (``--fork PATH``); default = the configured fork."""
+    L = layout() if fork is None else layout(fork)
     _guard_build_paths(L)
     msbuild = find_msbuild()
     if msbuild is None:
         raise SatkError("DEPENDENCY", "MSBuild.exe not found", hint="set [paths] msbuild in satk.toml")
     if config not in ("Release", "Debug", "Nightly"):
         raise SatkError("BAD_PARAMS", f"unknown config {config!r}", did_you_mean=["Release", "Debug", "Nightly"])
-    with exclusive("build"):
+    with exclusive(L.lock_name):
         regenerated = _ensure_generated(L, regen)
         steps, notes = plan(project, platform, config, L, touched=(regenerated or {}).get("touched"))
         head = git("rev-parse", "HEAD", cwd=L.fork)
@@ -535,7 +597,8 @@ def build(project: str = "all", platform: str | None = None, config: str = "Rele
                 ensure_writable(path)
             log.parent.mkdir(parents=True, exist_ok=True)
             cmd = _msbuild_cmd(msbuild, step, config, target, jobs, toolset, no_deps, base, L)
-            r = run(cmd, cwd=L.fork, env=build_env(), log=lg["console"], timeout=timeout)
+            r = run(cmd, cwd=L.fork, env=build_env() if L.is_default else build_env(L=L), log=lg["console"],
+                    timeout=timeout)
             try:
                 text = lg["errors"].read_text(encoding="utf-8-sig", errors="replace")
             except OSError:
@@ -557,7 +620,7 @@ def build(project: str = "all", platform: str | None = None, config: str = "Rele
         # Remember "everything of this platform is built as of <rev, started>" for --project changed:
         # after a whole-solution build, or after a 'changed' build that covered its platform.
         if ok and target in (None, "Build", "Rebuild"):
-            covered = {s.platform for s in steps if s.label == "sln"}
+            covered = {s.platform for s in steps if s.label == "sln" or s.covers}
             if project.strip().lower() == "changed":
                 covered |= {s.platform for s in steps}
             upd = {f"{config}|{p}": {"rev": head, "ts": started,
@@ -581,6 +644,8 @@ def build(project: str = "all", platform: str | None = None, config: str = "Rele
         "artifacts": [r for r in artifacts(L, config, plats)],
         "rev": head[:9],
     }
+    if not L.is_default:
+        out["fork"] = jpath(L.fork)
     if regenerated:
         out["regenerated"] = {"projects": regenerated["projects"], "seconds": regenerated["seconds"],
                               "touched": regenerated.get("touched", [])}

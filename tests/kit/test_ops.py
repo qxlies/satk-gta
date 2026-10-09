@@ -27,7 +27,7 @@ def test_kit_ops_are_cli_only_with_english_summaries():
 def test_kinds_cli(run_cli):
     code, env = _run(run_cli, "kit", "kinds")
     assert code == 0, env
-    assert env["total"] == 20 and env["cols"][0] == "kind"
+    assert env["total"] == 21 and env["cols"][0] == "kind"
     kinds = {row[0]: row for row in env["rows"]}
     assert kinds["automobile"][2] == "model:426" and kinds["weapon"][3] == "colt45"
 

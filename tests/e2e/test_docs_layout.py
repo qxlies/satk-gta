@@ -33,7 +33,7 @@ COMPONENT_PAGES = ("game", "formats", "index", "media", "texmod", "rw", "models"
                    "idmgr", "mapconv", "paths", "crash", "re", "kb", "describe", "viewer", "saap", "mta-agent",
                    "blender", "engine", "mcp", "ai", "bugreport", "release", "workspace-gta", "install",
                    "addon", "script", "scriptapi", "txdopt", "batch", "fx2d", "colgen", "studio", "style", "kit",
-                   "look", "shader", "spbridge", "worldfiles")
+                   "look", "shader", "spbridge", "worldfiles", "asset-pipeline")
 #: Required headings of a component page, by language (docs/<lang>/_template.md).
 REQUIRED = {"en": ("## Commands",), "ru": ("## Команды",)}
 #: Pages whose quick example is skipped as a whole (docs-smoke skip): a release build takes a minute and

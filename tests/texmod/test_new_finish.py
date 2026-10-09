@@ -217,3 +217,50 @@ def test_finish_lands_in_the_real_prop_band(tmp_path, tm):
         p10, _p50, p90 = peer[metric][:3]
         assert p10 <= st[metric] <= p90, (metric, st[metric], (p10, p90))
     assert env["style"]["rows"][0][3] == "in"
+
+
+# ----------------------------------------------------------------------------- a3: clean vehicle textures, soft, 4x
+
+
+def test_vehicle_roles_are_clean_by_default_and_grime_is_a_knob(run_cli, satk_home, tmp_path, tm):
+    """Vehicle textures get no grime and no edge wear unless asked (the engine's dirt level dirties a car)."""
+    src = tm.write_png(tmp_path / "seat.png", _flat(64, 64, (90, 84, 76)))
+    clean = _ok(run_cli(["texture", "finish", str(src), "--preset", "interior", "--out", str(tmp_path / "a"),
+                         "--json"]))
+    assert clean["grime"] == 0.0 and clean["wear"] == 0.0 and clean["soft"] == 0.5
+    dirty = _ok(run_cli(["texture", "finish", str(src), "--preset", "interior", "--grime", "0.3", "--wear", "0.2",
+                         "--out", str(tmp_path / "b"), "--json"]))
+    assert dirty["grime"] == 0.3 and dirty["wear"] == 0.2
+    wall = tm.write_png(tmp_path / "wall.png", _flat(64, 64, (150, 140, 120)))
+    assert _ok(run_cli(["texture", "finish", str(wall), "--preset", "wall", "--out", str(tmp_path / "c"),
+                        "--json"]))["grime"] == 0.2                      # map textures keep their grime
+    r = run_cli(["texture", "finish", str(src), "--grime", "2", "--json"])
+    assert r.code != 0 and r.json["error"]["code"] == "BAD_PARAMS"
+
+
+def test_grime_darkens_the_bottom_and_soft_blurs():
+    from satk.texmod import finish as F
+
+    img = _flat(64, 64, (150, 140, 130))
+    img[:, 30:34, :3] = 20                                               # a hard dark stripe
+    p = dict(F.PRESETS["photo_like"], grime=0.0, soft=0.0)
+    clean = F._apply(img, None, p, 3, 1.0).astype(float)
+    grimy = F._apply(img, None, dict(p, grime=0.4), 3, 1.0).astype(float)
+    assert grimy[48:, :, :3].mean() < clean[48:, :, :3].mean() - 3
+    soft = F._apply(img, None, dict(p, soft=1.5), 3, 1.0).astype(float)
+    edge = lambda a: np.abs(np.diff(a[..., :3].mean(-1), axis=1)).max()  # noqa: E731
+    assert edge(soft) < edge(clean)                                     # the stripe's edges are softer
+
+
+def test_supersample_paints_big_and_finishes_small(run_cli, satk_home, tmp_path, tm):
+    """The 4x method: a 256 px painting becomes a 64 px texture through the soft filter."""
+    big = _flat(256, 256, (120, 110, 100))
+    big[:, 128:, :3] = (60, 70, 90)
+    src = tm.write_png(tmp_path / "door.png", big)
+    env = _ok(run_cli(["texture", "finish", str(src), "--supersample", "4", "--role", "body", "--out",
+                       str(tmp_path / "s"), "--json"]))
+    assert env["size"] == "64x64" and env["supersample"] == 4 and env["grime"] == 0.0
+    out = _px(env["file"])
+    assert out.shape == (64, 64, 4) and out[:, :28, :3].mean() > out[:, 36:, :3].mean() + 10   # both halves survive
+    r = run_cli(["texture", "finish", str(src), "--supersample", "3", "--json"])
+    assert r.code != 0 and r.json["error"]["code"] == "BAD_PARAMS"

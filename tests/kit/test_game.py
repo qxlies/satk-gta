@@ -109,7 +109,7 @@ def test_every_kind_has_a_plan(vanilla, kind, checks):
         assert c["bones"] == checks["bones"] and p["anchors"]["ped_height"] == 1.84
         assert {f.get("bone_id") for f in p["frames"]} >= {0, 1, 2, 5, 24, 34}
     if checks.get("lod"):
-        assert p["lod"]["name"] == "lodtest" and p["lod"]["like_name"].lower().startswith("lod")
+        assert p["lod"]["name"] == "lodkittest" and p["lod"]["like_name"].lower().startswith("lod")
         assert 0.1 < p["lod"]["ratio_tris"][1] < 0.3
     for f in p["frames"]:
         assert f["parent"] < f["i"], f                                   # parents before children
@@ -117,14 +117,14 @@ def test_every_kind_has_a_plan(vanilla, kind, checks):
 
 
 def test_a_prop_can_ask_for_a_lod_slot(vanilla):
-    """``--lod`` gives a prop the LOD name of a building (``lod`` + the name without its first 3 characters)."""
+    """``--lod`` gives a prop the LOD name of a building (``lod`` + the whole name: unique like the name)."""
     from satk.core.errors import SatkError
 
     plain = template_plan(kind="prop", name="sa_bin1")
     assert not plain["lod"].get("name")
     p = template_plan(kind="prop", name="sa_bin1", lod=True)
-    assert p["lod"]["name"] == "lodbin1" and p["kind"] == "prop" and p["counts"]["slots"] == 1
-    assert template_plan(kind="building", name="kitbuilding")["lod"]["name"] == "lodbuilding"
+    assert p["lod"]["name"] == "lodsa_bin1" and p["kind"] == "prop" and p["counts"]["slots"] == 1
+    assert template_plan(kind="building", name="kitbuilding")["lod"]["name"] == "lodkitbuilding"
     with pytest.raises(SatkError) as e:
         template_plan(kind="automobile", name="mycar", lod=True)
     assert e.value.code == "BAD_PARAMS" and "map models" in e.value.msg
@@ -135,4 +135,4 @@ def test_template_cli_takes_lod(vanilla, run_cli):
     r = run_cli(["kit", "template", "--kind", "prop", "--name", "sa_bin1", "--lod", "--plan-only", "--json"])
     assert r.code == 0, r.out + r.err
     plan = json.loads(Path(r.json["plan"]).read_text(encoding="utf-8"))
-    assert plan["lod"]["name"] == "lodbin1"
+    assert plan["lod"]["name"] == "lodsa_bin1"

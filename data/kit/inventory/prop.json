@@ -1,0 +1,151 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "prop",
+ "summary": "street or small static prop: closed pieces that touch or push into each other, chamfered caps, a base that meets the ground; no gaps, no floating parts.",
+ "regions": {
+  "overall": {
+   "summary": "the whole object, 3/4 views",
+   "views": []
+  },
+  "base": {
+   "summary": "where it meets the ground",
+   "views": [
+    "base"
+   ]
+  },
+  "body": {
+   "summary": "the main volume and its sides",
+   "views": [
+    "sides"
+   ]
+  },
+  "top": {
+   "summary": "cap, top and what sits on it",
+   "views": [
+    "top"
+   ]
+  },
+  "details": {
+   "summary": "close-ups of the small parts",
+   "views": [
+    "details"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to.",
+  "This starter is generic: rename every item to the real part ('bin body', 'lid', 'wheel pair') and split the body into the pieces the design has."
+ ],
+ "items": [
+  {
+   "key": "main_body",
+   "name": "Main body",
+   "region": "body",
+   "category": "shell",
+   "construction": "the main volume as closed pieces: chamfered box, 8-sided cylinder (mesh.lathe) or a lofted shape",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "base",
+   "name": "Base or feet",
+   "region": "base",
+   "category": "structure",
+   "construction": "plinth, footing or feet whose bottom is flat on the ground (z = 0)",
+   "attaches_to": "main_body",
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "top",
+   "name": "Cap or top",
+   "region": "top",
+   "category": "shell",
+   "construction": "cap with a lip or a chamfer that sits on or pushes into the body",
+   "attaches_to": "main_body",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "secondary_parts",
+   "name": "Secondary parts",
+   "region": "details",
+   "category": "detail",
+   "construction": "the parts the design needs (door, lid, handle, slot, post, brace) as closed pieces touching the body",
+   "attaches_to": "main_body",
+   "stage": "G2",
+   "detail": "simple",
+   "notes": "split into one item per real part"
+  },
+  {
+   "key": "edge_trim",
+   "name": "Rims and lips",
+   "region": "details",
+   "category": "trim",
+   "construction": "rims, lips and chamfer bands where parts meet",
+   "attaches_to": "main_body",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "fixings",
+   "name": "Fixings",
+   "region": "details",
+   "category": "detail",
+   "construction": "bolts, hinges and brackets as small closed pieces touching the body",
+   "attaches_to": [
+    "main_body",
+    "base"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "inner_faces",
+   "name": "Inside faces of openings",
+   "region": "body",
+   "category": "shell",
+   "construction": "inside of mouths, slots and doors closed: nothing see-through",
+   "attaches_to": "main_body",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "signage",
+   "name": "Labels and signs",
+   "region": "details",
+   "category": "sign",
+   "construction": "sign plates standing off the surface (a thin card or a box on the body)",
+   "attaches_to": "main_body",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "lamp",
+   "name": "Light source",
+   "region": "top",
+   "category": "lamp",
+   "construction": "lens or bulb housing (with a 2dfx light)",
+   "attaches_to": "main_body",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "wear",
+   "name": "Stickers, scuffs and stains",
+   "region": "body",
+   "category": "decal",
+   "construction": "in the texture on own faces, soft",
+   "attaches_to": "main_body",
+   "stage": "G4",
+   "detail": "hero",
+   "required": false
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/prop.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

@@ -149,7 +149,7 @@ def start(name: str | None = DEFAULT_NAME, *, blend: str | os.PathLike | None = 
           checkpoint_every: int = CHECKPOINT_EVERY) -> dict:
     """Start the session ``name`` (or reuse the running one). ``blend`` is opened at start.
 
-    With ``project`` the session journals into the project, takes its class bands and target size, and
+    With ``project`` the session journals into the project, takes its target size, and
     (``resume``) opens the project's newest checkpoint when no ``blend`` is given.
     """
     from ..blender import runner

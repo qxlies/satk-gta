@@ -1,0 +1,122 @@
+{
+ "kind": "train",
+ "version": 1,
+ "summary": "Close-up review regions of a train car or locomotive.",
+ "leak": {
+  "cull": false,
+  "gap": true,
+  "inside": true,
+  "floor_exclude": [
+   "wheel*",
+   "bogie*"
+  ],
+  "floor_pct": 1.0,
+  "slit": false
+ },
+ "regions": [
+  {
+   "name": "front",
+   "summary": "front end: cab or coupler, lamps, buffers",
+   "box": {
+    "y": [
+     0.8,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 0,
+     "el": 8
+    },
+    {
+     "az": 35,
+     "el": 15
+    }
+   ]
+  },
+  {
+   "name": "rear",
+   "summary": "rear end: coupler, lamps, gangway",
+   "box": {
+    "y": [
+     0.0,
+     0.2
+    ]
+   },
+   "cameras": [
+    {
+     "az": 180,
+     "el": 8
+    },
+    {
+     "az": 145,
+     "el": 15
+    }
+   ]
+  },
+  {
+   "name": "left",
+   "summary": "left side: body, doors, windows",
+   "cameras": [
+    {
+     "az": -90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": -90,
+     "el": 18
+    }
+   ]
+  },
+  {
+   "name": "right",
+   "summary": "right side: body, doors, windows",
+   "cameras": [
+    {
+     "az": 90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": 90,
+     "el": 18
+    }
+   ]
+  },
+  {
+   "name": "bogies",
+   "summary": "bogies and wheels: frames, axles, springs",
+   "frames": [
+    "bogie_*"
+   ],
+   "radius_h": 0.45,
+   "cameras": [
+    {
+     "az": -90,
+     "el": 6
+    },
+    {
+     "az": 90,
+     "el": 6
+    }
+   ]
+  },
+  {
+   "name": "roof",
+   "summary": "roof: vents, horns, pantograph or exhausts",
+   "box": {
+    "z": [
+     0.6,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 30,
+     "el": 60
+    }
+   ]
+  }
+ ]
+}

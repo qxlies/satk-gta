@@ -2,7 +2,7 @@
 
 Bytes come from the dump's captured memory first, else from the module file on disk when it is the
 same build (PE ``TimeDateStamp`` and ``SizeOfImage`` equal the module record): the path recorded in
-the dump, ``--images`` directories, and for ``gta_sa.exe`` the configured game copies. Files are only
+the dump, ``--images`` directories, the configured fork's Bin, and for ``gta_sa.exe`` the game copies. Files are only
 read (``paths.open_ro``). Standard library only; PE32 and PE32+.
 """
 
@@ -14,7 +14,7 @@ import struct
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .minidump import Minidump, Module
+from .minidump import Minidump, Module, _codeview
 from .mta import is_gta
 
 __all__ = ["PeFile", "Images", "call_before"]
@@ -36,6 +36,8 @@ class PeFile:
     is64: bool
     sections: list[tuple[int, int, int, int, int]]        # (rva, vsize, raw_off, raw_size, flags)
     export_dir: tuple[int, int] = (0, 0)
+    debug_dir: tuple[int, int] = (0, 0)
+    _cv: tuple[str | None, str | None] | None = None
     _exports: list[tuple[int, str]] | None = None
     _export_rvas: list[int] = field(default_factory=list)
     _pages: dict[int, bytes | None] = field(default_factory=dict)
@@ -69,6 +71,11 @@ class PeFile:
                     return None
                 (soi,) = struct.unpack_from("<I", head, opt + 56)
                 exp = struct.unpack_from("<II", head, dd) if dd + 8 <= len(head) else (0, 0)
+                debug = (0, 0)
+                if dd + 7 * 8 <= min(len(head), opt + opt_size):
+                    (ndirs,) = struct.unpack_from("<I", head, dd - 4)
+                    if ndirs >= 7:
+                        debug = struct.unpack_from("<II", head, dd + 6 * 8)
                 tbl = opt + opt_size
                 if nsec > 96:
                     return None
@@ -82,10 +89,29 @@ class PeFile:
                     secs.append((va, vsize, roff, rsize, flags))
         except (OSError, struct.error):
             return None
-        return cls(Path(path), ts, soi, base, magic == 0x20B, secs, exp)
+        return cls(Path(path), ts, soi, base, magic == 0x20B, secs, exp, debug)
 
     def matches(self, mod: Module) -> bool:
         return self.timestamp == mod.timestamp and self.size_of_image == mod.size
+
+    def codeview(self) -> tuple[str | None, str | None]:
+        """PDB filename and GUID/signature + age from the image's debug directory."""
+        if self._cv is None:
+            self._cv = (None, None)
+            rva, size = self.debug_dir
+            raw = self.read(rva, size) if rva and 28 <= size <= 28 * 1024 else None
+            if raw is not None:
+                for off in range(0, len(raw) - 27, 28):
+                    kind, count, data_rva, data_off = struct.unpack_from("<IIII", raw, off + 12)
+                    if kind != 2 or not 16 <= count <= 65536:
+                        continue
+                    data = self._read_file(data_off, count) if data_off else self.read(data_rva, count)
+                    if data:
+                        cv = _codeview(data)
+                        if cv[1]:
+                            self._cv = cv
+                            break
+        return self._cv
 
     def section_of(self, rva: int) -> tuple[int, int, int, int, int] | None:
         for s in self.sections:
@@ -198,18 +224,49 @@ class Images:
         self.dump = dump
         self.dirs = [Path(d) for d in dirs or []]
         self.game_exes = game_exes if game_exes is not None else _game_exes()
-        self._pe: dict[int, PeFile | None] = {}
+        self._pe: dict[Module, PeFile | None] = {}
+        self._named: dict[str, Module | None] = {}
+        self._pdb = None
+        self.warn: list[str] = []
         self.used: dict[str, str] = {}                         # module name -> file used
 
+    def __enter__(self) -> "Images":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
+
+    def close(self) -> None:
+        if self._pdb is not None:
+            self._pdb.close()
+            self._pdb = None
+
+    def search_dirs(self) -> list[Path]:
+        """Explicit image directories, then the known module folders of the configured fork."""
+        roots = list(self.dirs)
+        from ..core.paths import cfg
+
+        engine = cfg().paths.get("engine")
+        if engine:
+            roots.append(Path(engine) / "Bin")
+        out = []
+        for root in roots:
+            for rel in ("", "mta", "mods/deathmatch", "server", "server/x64", "server/mods/deathmatch",
+                        "server/x64/mods/deathmatch"):
+                p = root / rel
+                if p not in out:
+                    out.append(p)
+        return out
+
     def _candidates(self, mod: Module) -> list[Path]:
-        out = [Path(mod.path)] if mod.path else []
-        out += [d / mod.name for d in self.dirs]
+        out = [Path(mod.path.replace("\\", "/"))] if mod.path else []
+        out += [d / mod.name for d in self.search_dirs()]
         if is_gta(mod.name):
             out += self.game_exes
         return out
 
     def pe(self, mod: Module) -> PeFile | None:
-        key = mod.base
+        key = mod
         if key not in self._pe:
             self._pe[key] = None
             for p in self._candidates(mod):
@@ -220,10 +277,54 @@ class Images:
                     continue
                 pe = PeFile.load(p)
                 if pe is not None and pe.matches(mod):
+                    image_id = pe.codeview()[1] if mod.pdb_id else None
+                    if image_id and mod.pdb_id.upper() != image_id.upper():
+                        self.warn.append(f"REVISION: {mod.name} image PDB id {image_id} does not match the dump's "
+                                         f"{mod.pdb_id} (GUID/signature + age); image ignored")
+                        continue
                     self._pe[key] = pe
                     self.used[mod.name] = p.as_posix()
                     break
         return self._pe[key]
+
+    def named_module(self, name: str) -> Module | None:
+        """Module+RVA frames in logs may have no load address; use a recorded module or a local image."""
+        key = name.replace("\\", "/").rsplit("/", 1)[-1].lower()
+        if self.dump is not None:
+            return next((m for m in self.dump.modules if m.name.lower() == key), None)
+        if key not in self._named:
+            self._named[key] = None
+            for path in self._candidates(Module(0, 0, name)):
+                pe = PeFile.load(path)
+                if pe is not None:
+                    mod = Module(pe.image_base, pe.size_of_image, str(path), pe.timestamp)
+                    self._pe[mod] = pe
+                    self._named[key] = mod
+                    self.used[mod.name] = path.as_posix()
+                    break
+        return self._named[key]
+
+    def pdb_candidates(self, mod: Module, pe: PeFile | None) -> list[Path]:
+        names = [n for n in (pe.codeview()[0] if pe else None, mod.pdb, Path(mod.name).with_suffix(".pdb").name) if n]
+        directories = ([pe.path.parent] if pe else []) + [Path(mod.path.replace("\\", "/")).parent, *self.search_dirs()]
+        out = []
+        for directory in directories:
+            for name in names:
+                path = directory / name.replace("\\", "/").rsplit("/", 1)[-1]
+                if path not in out:
+                    try:
+                        if path.is_file():
+                            out.append(path)
+                    except OSError as e:
+                        self.warn.append(f"EXTERNAL_TOOL: cannot access PDB {path.as_posix()}: {e}")
+        return out
+
+    def pdb_symbol(self, mod: Module, off: int, *, ret: bool = False) -> dict:
+        from .pdb import PdbSymbols
+
+        if self._pdb is None:
+            self._pdb = PdbSymbols(self)
+        return self._pdb.resolve(mod, off, ret=ret)
 
     def module_at(self, va: int) -> Module | None:
         return self.dump.module_at(va) if self.dump is not None else None

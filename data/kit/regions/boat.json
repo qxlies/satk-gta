@@ -1,0 +1,151 @@
+{
+ "kind": "boat",
+ "version": 1,
+ "summary": "Close-up review regions of a boat.",
+ "leak": {
+  "cull": false,
+  "gap": true,
+  "inside": true,
+  "floor_exclude": [
+   "*prop*"
+  ],
+  "floor_pct": 1.0,
+  "slit": false
+ },
+ "regions": [
+  {
+   "name": "bow",
+   "summary": "bow: stem, deck edge, rails, lights",
+   "box": {
+    "y": [
+     0.65,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 0,
+     "el": 10
+    },
+    {
+     "az": 35,
+     "el": 20
+    },
+    {
+     "az": -35,
+     "el": 20
+    }
+   ]
+  },
+  {
+   "name": "stern",
+   "summary": "stern: transom, engine or outdrive, props, swim platform",
+   "box": {
+    "y": [
+     0.0,
+     0.35
+    ]
+   },
+   "cameras": [
+    {
+     "az": 180,
+     "el": 10
+    },
+    {
+     "az": 145,
+     "el": 20
+    },
+    {
+     "az": -145,
+     "el": 20
+    }
+   ]
+  },
+  {
+   "name": "left",
+   "summary": "left side: hull line, rub rail, windows",
+   "cameras": [
+    {
+     "az": -90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": -90,
+     "el": 22
+    }
+   ]
+  },
+  {
+   "name": "right",
+   "summary": "right side: hull line, rub rail, windows",
+   "cameras": [
+    {
+     "az": 90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": 90,
+     "el": 22
+    }
+   ]
+  },
+  {
+   "name": "deck",
+   "summary": "deck from above: cockpit, seats, hatches, rails",
+   "cameras": [
+    {
+     "az": 0,
+     "el": 75
+    },
+    {
+     "az": 225,
+     "el": 45
+    }
+   ]
+  },
+  {
+   "name": "cockpit",
+   "summary": "helm: wheel, dash, windscreen, seats",
+   "box": {
+    "y": [
+     0.25,
+     0.75
+    ],
+    "z": [
+     0.4,
+     1.0
+    ]
+   },
+   "leak": false,
+   "glass": "hide",
+   "cameras": [
+    {
+     "az": -60,
+     "el": 35
+    },
+    {
+     "az": 120,
+     "el": 35
+    }
+   ]
+  },
+  {
+   "name": "underside",
+   "summary": "hull bottom: keel line, strakes, props and rudder; no holes into the hull",
+   "ground": false,
+   "leak_inside": false,
+   "cameras": [
+    {
+     "az": 45,
+     "el": -35
+    },
+    {
+     "az": 225,
+     "el": -35
+    }
+   ]
+  }
+ ]
+}

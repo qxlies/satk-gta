@@ -1,0 +1,131 @@
+{
+ "_comment": "satk pack census over the stock 1.0 US copy (profile vanilla): numbers only, checked by tests/pack/test_game.py. mip0 = base-level bytes (the index data_size), chain = all mip levels computed from format, size and level count. keys: texel = (base-level hash); texel_name = (hash, name); full = (hash, name, format, width, height, mip count). exact = the whole mip chain hashed from the TXD files.",
+ "exact": {
+  "chain_bytes": 737954704,
+  "chain_formula_mismatch": 0,
+  "copies_histogram": {
+   "1": 10599,
+   "11+": 317,
+   "2": 2324,
+   "3-5": 1892,
+   "6-10": 597
+  },
+  "duplicated_groups": 5130,
+  "exact_vs_index": {
+   "lost_chain_bytes": 24327008,
+   "lost_mip0_bytes": 18239488,
+   "split_groups": 530
+  },
+  "full_key_within_txd_only": {
+   "saved_chain_bytes": 0,
+   "saved_pct_chain": 0.0,
+   "unique_chain_bytes": 737954704
+  },
+  "keys": {
+   "full": {
+    "distinct": 15729,
+    "saved_chain_bytes": 377954120,
+    "saved_mip0_bytes": 324560048,
+    "saved_pct_chain": 51.2,
+    "saved_pct_mip0": 49.5,
+    "unique_chain_bytes": 360000584,
+    "unique_mip0_bytes": 330545112
+   },
+   "texel": {
+    "distinct": 15478,
+    "saved_chain_bytes": 380563880,
+    "saved_mip0_bytes": 327033136,
+    "saved_pct_chain": 51.6,
+    "saved_pct_mip0": 49.9,
+    "unique_chain_bytes": 357390824,
+    "unique_mip0_bytes": 328072024
+   },
+   "texel_name": {
+    "distinct": 15729,
+    "saved_chain_bytes": 377954120,
+    "saved_mip0_bytes": 324560048,
+    "saved_pct_chain": 51.2,
+    "saved_pct_mip0": 49.5,
+    "unique_chain_bytes": 360000584,
+    "unique_mip0_bytes": 330545112
+   }
+  },
+  "mip0_bytes": 655105160,
+  "name_key_splits": {},
+  "textures": 32874,
+  "txds": 3979
+ },
+ "index": {
+  "chain_bytes": 737954704,
+  "chain_formula_mismatch": 0,
+  "copies_histogram": {
+   "1": 10157,
+   "11+": 345,
+   "2": 2222,
+   "3-5": 1894,
+   "6-10": 581
+  },
+  "duplicated_groups": 5042,
+  "full_key_within_txd_only": {
+   "saved_chain_bytes": 0,
+   "saved_pct_chain": 0.0,
+   "unique_chain_bytes": 737954704
+  },
+  "keys": {
+   "full": {
+    "distinct": 15199,
+    "saved_chain_bytes": 402281128,
+    "saved_mip0_bytes": 342799536,
+    "saved_pct_chain": 54.5,
+    "saved_pct_mip0": 52.3,
+    "unique_chain_bytes": 335673576,
+    "unique_mip0_bytes": 312305624
+   },
+   "texel": {
+    "distinct": 14559,
+    "saved_chain_bytes": 419642552,
+    "saved_mip0_bytes": 358750512,
+    "saved_pct_chain": 56.9,
+    "saved_pct_mip0": 54.8,
+    "unique_chain_bytes": 318312152,
+    "unique_mip0_bytes": 296354648
+   },
+   "texel_name": {
+    "distinct": 14811,
+    "saved_chain_bytes": 417000024,
+    "saved_mip0_bytes": 356244656,
+    "saved_pct_chain": 56.5,
+    "saved_pct_mip0": 54.4,
+    "unique_chain_bytes": 320954680,
+    "unique_mip0_bytes": 298860504
+   }
+  },
+  "mip0_bytes": 655105160,
+  "name_key_splits": {
+   "levels": {
+    "groups": 388,
+    "lost_chain_bytes": 20573584,
+    "lost_mip0_bytes": 13445120
+   }
+  },
+  "textures": 32874,
+  "txds": 3979
+ },
+ "top_groups": [
+  [
+   "ws_rooftarmac1",
+   181,
+   181
+  ],
+  [
+   "tar_1line256hv",
+   32,
+   32
+  ],
+  [
+   "snpedtest1",
+   30,
+   30
+  ]
+ ]
+}

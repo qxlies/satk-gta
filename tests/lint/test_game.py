@@ -56,7 +56,7 @@ def test_lone_replacement_dff_is_link_checked_through_the_index(tmp_path: Path):
 NEW_RULES = ("dff.flat_shading", "dff.vert_sharing", "veh.frames", "veh.dummy_side", "veh.wheel_scale",
              "veh.shadow_mesh", "veh.env_uv2", "veh.light_key_tex", "veh.paint_dirt", "veh.hd_tris",
              "veh.part_tris", "veh.dam_ratio", "ped.skin", "weap.flash", "col.face_light_zero",
-             "ide.draw_bigbuilding")
+             "ide.draw_bigbuilding", "dff.clump_ext_dup")
 
 
 def test_vanilla_preset_quiet_on_vehicle_txds_and_new_rules_rare(clean_root: Path):

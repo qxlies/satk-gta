@@ -21,7 +21,7 @@ from dataclasses import dataclass
 
 from ..formats.dff import F_COL, F_NIGHT, F_SKIN, GEO_NATIVE, GEO_NORMALS, GEO_PRELIT, DffInfo, decode_geometries, \
     find_embedded_col, scan_dff
-from ..formats.rw import FormatError
+from ..formats.rw import FormatError, find_child, iter_children, read_chunk
 from .col import check_col
 from .rules import Collector
 
@@ -34,6 +34,7 @@ MAP_LIKE = frozenset({"map", "upgrade", "pickup", "interior_prop", "interior_she
 #: Classes lit by prelight (vertex colours) instead of dynamic lights.
 PRELIT = MAP_LIKE | {"lod"}
 _COL_MAGIC = (b"COLL", b"COL2", b"COL3")          # what ClumpCollisionStreamRead switches on
+_CLUMP, _EXT, _UVANIMDICT, _COLMODEL = 0x10, 0x03, 0x2B, 0x253F2FA
 _SEC_CLASS = {"cars": "cars", "peds": "peds", "weap": "weap", "anim": "other", "hier": "other"}
 
 
@@ -172,6 +173,7 @@ def check_dff(c: Collector, label: str, data: bytes, d: ModelDef | None, *, arch
         c.add("dff.rw_version", label, ver=ver)
     if info.atomics == 0:
         c.add("dff.no_atomics", label)
+    _clump_ext(c, label, data)
     fmax = int(c.rules.param("dff.frame_name_len", "max", 23))
     for f in info.frames:
         if f.name and len(f.name) > fmax:
@@ -244,6 +246,31 @@ def check_dff(c: Collector, label: str, data: bytes, d: ModelDef | None, *, arch
     tex = tuple(m.texture.lower() for m in info.materials if m.texture)
     alpha = any((m.rgba & 0xFF) < 255 for m in info.materials)
     return DffFacts(stem, label, archive, loose, tex, tuple(info.bbox) if info.bbox else None, cls, alpha)
+
+
+def _clump_ext(c: Collector, label: str, data: bytes) -> None:
+    """``dff.clump_ext_dup``: more than one Extension chunk directly in a clump."""
+    if not c.on("dff.clump_ext_dup"):
+        return
+    try:
+        off, n, idx = 0, len(data), 0
+        while off + 12 <= n:
+            ch = read_chunk(data, off)
+            if ch.type != _CLUMP:
+                if ch.type == _UVANIMDICT:
+                    off = ch.end
+                    continue
+                break
+            exts = [k for k in iter_children(data, ch.data_off, ch.end) if k.type == _EXT]
+            c.seen("dff.clump_ext_dup")
+            if len(exts) > 1:
+                cols = [i for i, e in enumerate(exts) if find_child(data, e.data_off, e.end, _COLMODEL) is not None]
+                where = "in Extension " + ", ".join(str(i + 1) for i in cols) if cols else "none"
+                c.add("dff.clump_ext_dup", label, clump=idx, n=len(exts), where=where)
+            idx += 1
+            off = ch.end
+    except FormatError:
+        return
 
 
 def _beyond(pos, sphere, tol: float = 0.0) -> float:

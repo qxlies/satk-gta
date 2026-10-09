@@ -1,0 +1,220 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "interior_shell",
+ "summary": "interior room shell: single-sided walls, floor and ceiling facing in with no gaps at the corners, doorways and windows with depth; fixtures and trim at standard and hero.",
+ "regions": {
+  "overall": {
+   "summary": "the room from its corners",
+   "views": [
+    "overview"
+   ]
+  },
+  "walls": {
+   "summary": "each wall straight on",
+   "views": [
+    "walls"
+   ]
+  },
+  "floor": {
+   "summary": "the floor and skirting",
+   "views": [
+    "floor"
+   ]
+  },
+  "ceiling": {
+   "summary": "the ceiling and its fixtures",
+   "views": [
+    "ceiling"
+   ]
+  },
+  "openings": {
+   "summary": "doorways, windows, stairs",
+   "views": [
+    "walls"
+   ]
+  },
+  "fixtures": {
+   "summary": "lights, vents, counters, close-ups",
+   "views": [
+    "walls",
+    "ceiling"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "floor",
+   "name": "Floor",
+   "region": "floor",
+   "category": "shell",
+   "construction": "floor faces at z of the interior, welded to the walls",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "walls",
+   "name": "Walls",
+   "region": "walls",
+   "category": "shell",
+   "construction": "inner walls facing in, corners closed (no light leaks)",
+   "attaches_to": "floor",
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "ceiling",
+   "name": "Ceiling",
+   "region": "ceiling",
+   "category": "shell",
+   "construction": "ceiling faces closing the room",
+   "attaches_to": "walls",
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "doorways",
+   "name": "Doorways",
+   "region": "openings",
+   "category": "opening",
+   "construction": "door frames with depth to other rooms and the exit marker",
+   "attaches_to": "walls",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "windows",
+   "name": "Windows",
+   "region": "openings",
+   "category": "opening",
+   "construction": "window openings with depth or window cards",
+   "attaches_to": "walls",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "wall_textures",
+   "name": "Wall, floor and ceiling textures",
+   "region": "walls",
+   "category": "decal",
+   "construction": "textures aligned to the room, prelight baked",
+   "attaches_to": "walls",
+   "stage": "G4",
+   "detail": "simple"
+  },
+  {
+   "key": "skirting",
+   "name": "Skirting boards",
+   "region": "floor",
+   "category": "trim",
+   "construction": "boards along the wall bases",
+   "attaches_to": [
+    "walls",
+    "floor"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "ceiling_lights",
+   "name": "Ceiling lights",
+   "region": "ceiling",
+   "category": "lamp",
+   "construction": "light fittings (2dfx lights)",
+   "attaches_to": "ceiling",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "door_leaves",
+   "name": "Door leaves",
+   "region": "openings",
+   "category": "panel",
+   "construction": "doors in the frames",
+   "attaches_to": "doorways",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "window_frames",
+   "name": "Window frames and sills",
+   "region": "openings",
+   "category": "trim",
+   "construction": "frames and sills",
+   "attaches_to": "windows",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "counter",
+   "name": "Counter, bar or stairs",
+   "region": "fixtures",
+   "category": "structure",
+   "construction": "the big fixed fittings of the room",
+   "attaches_to": "floor",
+   "stage": "G3",
+   "detail": "standard",
+   "required": false
+  },
+  {
+   "key": "cornices",
+   "name": "Cornices",
+   "region": "ceiling",
+   "category": "trim",
+   "construction": "bands where the walls meet the ceiling",
+   "attaches_to": [
+    "walls",
+    "ceiling"
+   ],
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "switches_vents",
+   "name": "Switches, sockets and vents",
+   "region": "fixtures",
+   "category": "fixture",
+   "construction": "small fittings on the walls",
+   "attaches_to": "walls",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "wall_decor",
+   "name": "Pictures, posters and signs",
+   "region": "walls",
+   "category": "sign",
+   "construction": "frames and posters on the walls",
+   "attaches_to": "walls",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "floor_detail",
+   "name": "Rugs and floor changes",
+   "region": "floor",
+   "category": "detail",
+   "construction": "rugs, tile borders, mats",
+   "attaches_to": "floor",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "pipes_ducts",
+   "name": "Pipes and ducts",
+   "region": "ceiling",
+   "category": "fixture",
+   "construction": "exposed pipes or ducts",
+   "attaches_to": "ceiling",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/interior_shell.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

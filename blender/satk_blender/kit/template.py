@@ -245,9 +245,21 @@ def build(plan: dict, *, plan_path: str | None = None, replace: bool = False, te
         o.matrix_parent_inverse.identity()
         o.matrix_basis = U.rw_matrix(fr["matrix"])
     root = objs.get(plan["frames"][0]["i"]) if plan["frames"] else None
+    sec = (plan.get("ide") or {}).get("sec") or ""
     if root is not None:
-        root["satk_sec"] = (plan.get("ide") or {}).get("sec") or ""
+        root["satk_sec"] = sec
         root["satk_kind"] = plan["kind"]
+        if plan["kind"] == "ped" or sec == "peds":
+            # the RW bind pose lies along +Y (head +Y): stand the skeleton up on +Z (feet down) like every other
+            # Blender view of a ped (the preview, the ped regions, the dims of asset.json); kit export refuses peds
+            # (no skin writer), so nothing is exported with this rotation
+            from mathutils import Matrix
+
+            root.matrix_basis = Matrix.Rotation(1.5707963267948966, 4, "X") @ root.matrix_basis
+            root["satk_upright"] = 1
+    if sec:                       # every frame object, so a look of the meshes alone still knows the class
+        for o in objs.values():
+            o["satk_sec"] = sec
     ccol, ncol = _col_skeleton(plan, coll)
     lod_slot = None
     lod = plan.get("lod") or {}

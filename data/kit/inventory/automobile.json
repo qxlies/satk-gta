@@ -1,0 +1,756 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "automobile",
+ "summary": "4-wheel car, van, truck or bus: one welded body shell with panels cut from it, a full cabin, wheels in lined arches; hero adds the engine bay, a complete interior and the underbody.",
+ "regions": {
+  "overall": {
+   "summary": "the whole model: 3/4 front and rear, side, front, rear, top",
+   "views": []
+  },
+  "front": {
+   "summary": "nose: bumper, grille, lamps, bonnet front edge, plate",
+   "views": [
+    "front"
+   ]
+  },
+  "rear": {
+   "summary": "tail: bumper, lamps, boot or tailgate, plate, exhaust tip",
+   "views": [
+    "rear"
+   ]
+  },
+  "sides": {
+   "summary": "flanks: doors, handles, mirrors, glass, mouldings, sills, fuel flap",
+   "views": [
+    "left",
+    "right"
+   ]
+  },
+  "roof": {
+   "summary": "roof, pillars and what sits on the roof",
+   "views": [
+    "roof"
+   ]
+  },
+  "wheels": {
+   "summary": "wheels, arches, liners, the suspension and brakes seen through the arches",
+   "views": [
+    "wheels"
+   ]
+  },
+  "underside": {
+   "summary": "from below and a low camera: floor, exhaust, tanks, axles",
+   "views": [
+    "underside"
+   ]
+  },
+  "interior": {
+   "summary": "through the glass and with the doors open: seats, dash, door cards, wheel",
+   "views": [
+    "interior"
+   ]
+  },
+  "engine_bay": {
+   "summary": "with the bonnet open: engine, radiator, battery, bay walls",
+   "views": [
+    "engine_bay"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to.",
+  "Vans and trucks: rename boot to rear doors or tailgate, add the load area, steps and mirrors arms; buses: seat rows, poles and the entrance doors as items of your own."
+ ],
+ "items": [
+  {
+   "key": "body_shell",
+   "name": "Body shell (chassis)",
+   "region": "overall",
+   "category": "shell",
+   "construction": "one welded half shell lofted from shape sections (mesh.loft, 8-10 stations, half + MIRROR): roof crown, pillars with tumblehome, fenders, quarters, nose and tail; panels are cut from it, never laid on top",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "chassis"
+  },
+  {
+   "key": "wheel",
+   "name": "Wheel (one model the game clones to the four dummies)",
+   "region": "wheels",
+   "category": "wheel",
+   "construction": "kit.wheel or mesh.lathe tyre profile with a rounded shoulder, a rim face and a hub; sized by wheel_scale",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "wheel"
+  },
+  {
+   "key": "wheel_arches",
+   "name": "Wheel arches with liners",
+   "region": "wheels",
+   "category": "shell",
+   "construction": "round arch cuts with 5-8 segments over the top, a short return face and a liner plate inside (mesh.flare liner=true, or the blank's arches); flares grow out of the shell's own faces; nothing seen through",
+   "attaches_to": "body_shell",
+   "stage": "G2",
+   "detail": "simple",
+   "count": 4
+  },
+  {
+   "key": "bonnet",
+   "name": "Bonnet",
+   "region": "front",
+   "category": "panel",
+   "construction": "cut from the shell (kit.blank_split part or the bonnet faces split off) so its edge lies on the shell; keeps the crown and the creases",
+   "attaches_to": "body_shell",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "bonnet_ok"
+  },
+  {
+   "key": "boot",
+   "name": "Boot lid or tailgate",
+   "region": "rear",
+   "category": "panel",
+   "construction": "cut from the shell along its shut lines, keeps the tail's curvature",
+   "attaches_to": "body_shell",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "boot_ok"
+  },
+  {
+   "key": "doors_front",
+   "name": "Front doors",
+   "region": "sides",
+   "category": "panel",
+   "construction": "cut from the shell along the shut lines; belt line and mouldings continue across the cut",
+   "attaches_to": "body_shell",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": [
+    "door_lf_ok",
+    "door_rf_ok"
+   ],
+   "count": 2
+  },
+  {
+   "key": "doors_rear",
+   "name": "Rear doors",
+   "region": "sides",
+   "category": "panel",
+   "construction": "cut from the shell like the front doors (waive for a two-door body)",
+   "attaches_to": "body_shell",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": [
+    "door_lr_ok",
+    "door_rr_ok"
+   ],
+   "count": 2
+  },
+  {
+   "key": "bumper_front",
+   "name": "Front bumper",
+   "region": "front",
+   "category": "panel",
+   "construction": "mesh.sweep of a soft 2-4 segment profile wrapping from arch to arch, its top on the body line (mesh.attach snap)",
+   "attaches_to": "body_shell",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "bump_front_ok"
+  },
+  {
+   "key": "bumper_rear",
+   "name": "Rear bumper",
+   "region": "rear",
+   "category": "panel",
+   "construction": "mesh.sweep of a soft profile wrapping from arch to arch under the tail",
+   "attaches_to": "body_shell",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "bump_rear_ok"
+  },
+  {
+   "key": "windscreen",
+   "name": "Windscreen",
+   "region": "front",
+   "category": "glass",
+   "construction": "glass pane filling the shell opening, its rim on the frame (alpha glass material)",
+   "attaches_to": "body_shell",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "windscreen_ok"
+  },
+  {
+   "key": "side_glass",
+   "name": "Side windows",
+   "region": "sides",
+   "category": "glass",
+   "construction": "panes set into the door and quarter openings a little inside the frame (glass material)",
+   "attaches_to": [
+    "doors_front",
+    "body_shell"
+   ],
+   "stage": "G2",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "rear_glass",
+   "name": "Rear window",
+   "region": "rear",
+   "category": "glass",
+   "construction": "pane in the rear opening or the tailgate, rim on the frame",
+   "attaches_to": [
+    "body_shell",
+    "boot"
+   ],
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "underbody",
+   "name": "Closed floor pan",
+   "region": "underside",
+   "category": "underbody",
+   "construction": "floor under the cabin and the bays welded to the sills: no hole seen from a low camera",
+   "attaches_to": "body_shell",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "cabin_floor",
+   "name": "Cabin floor and footwells",
+   "region": "interior",
+   "category": "interior",
+   "construction": "the cabin tub seen through the glass: floor, footwells, transmission tunnel",
+   "attaches_to": "body_shell",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "headlamps",
+   "name": "Headlamps",
+   "region": "front",
+   "category": "lamp",
+   "construction": "lenses set into recessed buckets (inset, then extrude inward) on the headlight key colours of vehiclelights128",
+   "attaches_to": "body_shell",
+   "stage": "G3",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "tail_lamps",
+   "name": "Tail lamps",
+   "region": "rear",
+   "category": "lamp",
+   "construction": "lenses in recessed housings on the taillight key colours, reverse and indicator sections included",
+   "attaches_to": [
+    "body_shell",
+    "boot"
+   ],
+   "stage": "G3",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "grille",
+   "name": "Grille",
+   "region": "front",
+   "category": "trim",
+   "construction": "recessed grille panel with bars or teeth (inset, extrude in, bars from sweeps) in a surround",
+   "attaches_to": [
+    "body_shell",
+    "bumper_front"
+   ],
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "mirrors",
+   "name": "Door mirrors",
+   "region": "sides",
+   "category": "trim",
+   "construction": "rounded_box head on a short stalk that touches the door (mesh.attach snap), glass face on vehiclelights128",
+   "attaches_to": [
+    "doors_front",
+    "body_shell"
+   ],
+   "stage": "G3",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "door_handles",
+   "name": "Door handles",
+   "region": "sides",
+   "category": "trim",
+   "construction": "small pieces sitting on each door skin (rounded_box + mesh.attach snap) or recessed pull pockets",
+   "attaches_to": [
+    "doors_front",
+    "doors_rear"
+   ],
+   "stage": "G3",
+   "detail": "simple",
+   "count": 2,
+   "notes": "one per door: count 4 on a four-door body"
+  },
+  {
+   "key": "number_plates",
+   "name": "Number plates",
+   "region": "rear",
+   "category": "sign",
+   "construction": "4-8 triangle cards on carplate / carpback set onto the bumpers or the tail panel",
+   "attaches_to": [
+    "bumper_rear",
+    "bumper_front",
+    "boot",
+    "body_shell"
+   ],
+   "stage": "G3",
+   "detail": "simple",
+   "count": 1
+  },
+  {
+   "key": "exhaust_tip",
+   "name": "Exhaust tip",
+   "region": "rear",
+   "category": "engine",
+   "construction": "a lathe tube end under the rear bumper at the exhaust dummy, its open end dark",
+   "attaches_to": [
+    "underbody",
+    "bumper_rear"
+   ],
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "seats_front",
+   "name": "Front seats",
+   "region": "interior",
+   "category": "interior",
+   "construction": "cushion, backrest and headrest as soft lofted or rounded_box volumes standing on the floor",
+   "attaches_to": "cabin_floor",
+   "stage": "G3",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "dashboard",
+   "name": "Dashboard",
+   "region": "interior",
+   "category": "interior",
+   "construction": "dash top swept across the cabin with an instrument binnacle and a centre stack, meeting the windscreen base and the A-pillars",
+   "attaches_to": [
+    "body_shell",
+    "cabin_floor"
+   ],
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "steering_wheel",
+   "name": "Steering wheel and column",
+   "region": "interior",
+   "category": "control",
+   "construction": "rim from mesh.lathe or a sweep around a circle, 2-3 spokes, a column into the dash",
+   "attaches_to": "dashboard",
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "seats_rear",
+   "name": "Rear seat",
+   "region": "interior",
+   "category": "interior",
+   "construction": "bench or two seats with backrest, standing on the floor (waive for a two-seater or a van)",
+   "attaches_to": "cabin_floor",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "door_cards",
+   "name": "Door inner panels",
+   "region": "interior",
+   "category": "interior",
+   "construction": "inner faces of each door with an armrest and a pull: an open door is never see-through",
+   "attaches_to": [
+    "doors_front",
+    "doors_rear"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "count": 2,
+   "notes": "one per door"
+  },
+  {
+   "key": "wipers",
+   "name": "Wipers",
+   "region": "front",
+   "category": "trim",
+   "construction": "thin arm and blade pieces resting on the scuttle below the windscreen",
+   "attaches_to": [
+    "body_shell",
+    "windscreen"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "count": 2
+  },
+  {
+   "key": "indicators",
+   "name": "Front indicators",
+   "region": "front",
+   "category": "lamp",
+   "construction": "amber lenses set 2-3 mm into the front corners or the headlamp cluster (inset, push in) on the amber lamp key colour",
+   "attaches_to": [
+    "body_shell",
+    "bumper_front"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "count": 2
+  },
+  {
+   "key": "side_trim",
+   "name": "Side mouldings and sills",
+   "region": "sides",
+   "category": "trim",
+   "construction": "rub strip or crease at one height across fenders and doors (inset strip or a sweep), a sill under the doors",
+   "attaches_to": [
+    "body_shell",
+    "doors_front"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "window_surrounds",
+   "name": "Window frames and black-outs",
+   "region": "sides",
+   "category": "trim",
+   "construction": "dark bands around the side glass and on the B-pillars standing 3-5 mm off the skin (inset, extrude out, dark trim material)",
+   "attaches_to": [
+    "body_shell",
+    "doors_front"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "fuel_cap",
+   "name": "Fuel filler flap",
+   "region": "sides",
+   "category": "trim",
+   "construction": "a shallow inset flap on a rear quarter at the petrolcap dummy",
+   "attaches_to": "body_shell",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "badges",
+   "name": "Badges and emblems",
+   "region": "rear",
+   "category": "trim",
+   "construction": "maker badge on the grille and the boot, model script: a small card standing 2-3 mm off the surface (inset, extrude out)",
+   "attaches_to": [
+    "grille",
+    "boot",
+    "body_shell"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "count": 2
+  },
+  {
+   "key": "interior_mirror",
+   "name": "Rear-view mirror",
+   "region": "interior",
+   "category": "trim",
+   "construction": "small rounded head on a stem at the top of the windscreen",
+   "attaches_to": [
+    "windscreen",
+    "body_shell"
+   ],
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "instruments",
+   "name": "Instrument dials",
+   "region": "interior",
+   "category": "control",
+   "construction": "gauge faces in the binnacle: cards or texture on own faces",
+   "attaches_to": "dashboard",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "suspension_visible",
+   "name": "Suspension seen in the arches",
+   "region": "wheels",
+   "category": "running_gear",
+   "construction": "strut or spring and a hub carrier behind each wheel, an axle beam at the rear: dark simple volumes",
+   "attaches_to": [
+    "underbody",
+    "wheel_arches"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "count": 2
+  },
+  {
+   "key": "wheel_detail",
+   "name": "Rim face detail",
+   "region": "wheels",
+   "category": "wheel",
+   "construction": "spokes or a dished face with a hub cap and wheel nuts on the rim (part of the wheel model)",
+   "attaches_to": "wheel",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "engine_bay_walls",
+   "name": "Engine bay walls and firewall",
+   "region": "engine_bay",
+   "category": "shell",
+   "construction": "inner fender walls, firewall and radiator support closing the bay: no see-through with the bonnet open",
+   "attaches_to": "body_shell",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "engine_block",
+   "name": "Engine",
+   "region": "engine_bay",
+   "category": "engine",
+   "construction": "block and head as soft rounded volumes with a cam cover, intake manifold and pulleys, seated in the bay",
+   "attaches_to": "engine_bay_walls",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "radiator",
+   "name": "Radiator and fan",
+   "region": "engine_bay",
+   "category": "engine",
+   "construction": "radiator core behind the grille with a fan shroud, upper and lower hoses",
+   "attaches_to": "engine_bay_walls",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "battery",
+   "name": "Battery",
+   "region": "engine_bay",
+   "category": "engine",
+   "construction": "rounded_box with terminals on a tray in the bay",
+   "attaches_to": "engine_bay_walls",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "air_intake",
+   "name": "Air filter and intake",
+   "region": "engine_bay",
+   "category": "engine",
+   "construction": "air box (rounded_box) and an intake hose swept to the engine",
+   "attaches_to": "engine_block",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "bay_hoses",
+   "name": "Hoses, reservoirs and wiring",
+   "region": "engine_bay",
+   "category": "engine",
+   "construction": "mesh.sweep tubes between the parts, fluid reservoirs as soft boxes on the bay walls",
+   "attaches_to": "engine_block",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "exhaust_system",
+   "name": "Exhaust system",
+   "region": "underside",
+   "category": "engine",
+   "construction": "pipe swept along a path from the engine to the tip with a muffler and hangers",
+   "attaches_to": [
+    "underbody",
+    "exhaust_tip"
+   ],
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "fuel_tank",
+   "name": "Fuel tank",
+   "region": "underside",
+   "category": "underbody",
+   "construction": "soft box tucked under the rear floor",
+   "attaches_to": "underbody",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "driveline",
+   "name": "Driveshaft, axles and differential",
+   "region": "underside",
+   "category": "running_gear",
+   "construction": "driveshaft tube along the tunnel, rear axle with a differential housing, half shafts to the hubs",
+   "attaches_to": "underbody",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "brake_discs",
+   "name": "Brake discs and calipers",
+   "region": "wheels",
+   "category": "running_gear",
+   "construction": "lathe disc and a caliper behind the rim spokes (in the wheel model)",
+   "attaches_to": "wheel",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "seat_belts",
+   "name": "Seat belts",
+   "region": "interior",
+   "category": "interior",
+   "construction": "flat strap cards from the B-pillar to the buckle beside each front seat",
+   "attaches_to": [
+    "seats_front",
+    "body_shell"
+   ],
+   "stage": "G3",
+   "detail": "hero",
+   "count": 2
+  },
+  {
+   "key": "pedals",
+   "name": "Pedals",
+   "region": "interior",
+   "category": "control",
+   "construction": "small pads on arms in the driver's footwell",
+   "attaches_to": "cabin_floor",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "centre_console",
+   "name": "Centre console",
+   "region": "interior",
+   "category": "interior",
+   "construction": "console between the front seats from the dash to the armrest",
+   "attaches_to": [
+    "dashboard",
+    "cabin_floor"
+   ],
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "gear_lever",
+   "name": "Gear lever and handbrake",
+   "region": "interior",
+   "category": "control",
+   "construction": "lever with a knob and a boot on the console, handbrake lever beside it",
+   "attaches_to": "centre_console",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "sun_visors",
+   "name": "Sun visors",
+   "region": "interior",
+   "category": "interior",
+   "construction": "thin soft panels at the top of the windscreen",
+   "attaches_to": [
+    "headliner",
+    "body_shell"
+   ],
+   "stage": "G3",
+   "detail": "hero",
+   "count": 2
+  },
+  {
+   "key": "headliner",
+   "name": "Roof lining",
+   "region": "interior",
+   "category": "interior",
+   "construction": "inside faces of the roof and pillars seen through the glass",
+   "attaches_to": "body_shell",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "load_floor",
+   "name": "Parcel shelf or load floor",
+   "region": "interior",
+   "category": "interior",
+   "construction": "shelf behind the rear seat or the floor of the load area",
+   "attaches_to": [
+    "body_shell",
+    "cabin_floor"
+   ],
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "lamp_reflectors",
+   "name": "Lamp reflectors and bezels",
+   "region": "front",
+   "category": "lamp",
+   "construction": "reflector bowls inside the lamp buckets and a chrome or black bezel around each lamp",
+   "attaches_to": "headlamps",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "roof_details",
+   "name": "Roof details",
+   "region": "roof",
+   "category": "trim",
+   "construction": "antenna, roof rails, gutter strips or a sunroof as the design shows",
+   "attaches_to": "body_shell",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "fog_lamps",
+   "name": "Fog or driving lamps",
+   "region": "front",
+   "category": "lamp",
+   "construction": "small lenses set into the bumper",
+   "attaches_to": "bumper_front",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "mud_flaps",
+   "name": "Mud flaps",
+   "region": "wheels",
+   "category": "trim",
+   "construction": "thin flaps behind the wheels on the arch lip",
+   "attaches_to": "wheel_arches",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "tow_hook",
+   "name": "Tow hook or hitch",
+   "region": "underside",
+   "category": "trim",
+   "construction": "hook or ball hitch under the rear bumper",
+   "attaches_to": "underbody",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/automobile.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

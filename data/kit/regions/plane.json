@@ -1,0 +1,184 @@
+{
+ "kind": "plane",
+ "version": 1,
+ "summary": "Close-up review regions of a fixed-wing plane (boxes relative to the chassis).",
+ "ref": [
+  "chassis"
+ ],
+ "leak": {
+  "cull": false,
+  "gap": false,
+  "inside": true,
+  "floor_exclude": [
+   "wheel*",
+   "gear*"
+  ],
+  "floor_pct": 2.0,
+  "inside_regions": [
+   "left",
+   "right",
+   "wings",
+   "tail"
+  ],
+  "slit": false
+ },
+ "regions": [
+  {
+   "name": "nose",
+   "summary": "nose: spinner or radome, prop, cowling, windscreen",
+   "box": {
+    "y": [
+     0.72,
+     1.0
+    ]
+   },
+   "cameras": [
+    {
+     "az": 0,
+     "el": 8
+    },
+    {
+     "az": 35,
+     "el": 15
+    },
+    {
+     "az": -35,
+     "el": 15
+    }
+   ]
+  },
+  {
+   "name": "tail",
+   "summary": "empennage: fin, rudder, tailplane, elevators",
+   "box": {
+    "y": [
+     0.0,
+     0.3
+    ]
+   },
+   "cameras": [
+    {
+     "az": 180,
+     "el": 10
+    },
+    {
+     "az": -130,
+     "el": 18
+    },
+    {
+     "az": 130,
+     "el": 18
+    }
+   ]
+  },
+  {
+   "name": "left",
+   "summary": "left side: fuselage, windows, doors",
+   "cameras": [
+    {
+     "az": -90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": -90,
+     "el": 20
+    }
+   ]
+  },
+  {
+   "name": "right",
+   "summary": "right side: fuselage, windows, doors",
+   "cameras": [
+    {
+     "az": 90,
+     "el": 5,
+     "ortho": true
+    },
+    {
+     "az": 90,
+     "el": 20
+    }
+   ]
+  },
+  {
+   "name": "wings",
+   "summary": "wings from above: ailerons, flaps, tips, engines; straight down: light between the wing roots and the fuselage",
+   "cameras": [
+    {
+     "az": 0,
+     "el": 80
+    },
+    {
+     "az": 210,
+     "el": 35
+    },
+    {
+     "az": 0,
+     "el": 89.5,
+     "ortho": true,
+     "slit": true
+    }
+   ]
+  },
+  {
+   "name": "gear",
+   "summary": "landing gear: legs, wheels, doors",
+   "frames": [
+    "wheel_*_dummy"
+   ],
+   "radius_h": 0.3,
+   "cameras": [
+    {
+     "az": "out",
+     "el": 6,
+     "az_off": 20
+    }
+   ]
+  },
+  {
+   "name": "cockpit",
+   "summary": "cockpit with glass hidden: seats, panel, controls",
+   "box": {
+    "y": [
+     0.5,
+     0.88
+    ],
+    "z": [
+     0.35,
+     1.0
+    ]
+   },
+   "leak": false,
+   "glass": "hide",
+   "cameras": [
+    {
+     "az": -90,
+     "el": 30
+    },
+    {
+     "az": 0,
+     "el": 35
+    }
+   ]
+  },
+  {
+   "name": "underside",
+   "summary": "belly and wing undersides",
+   "ground": false,
+   "leak_inside": false,
+   "cameras": [
+    {
+     "az": 30,
+     "el": -40
+    },
+    {
+     "az": 0,
+     "el": -89.5,
+     "ortho": true,
+     "slit": true
+    }
+   ]
+  }
+ ]
+}

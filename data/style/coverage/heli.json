@@ -1,0 +1,71 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "heli",
+ "ref": "style_vehicle",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (11; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "glass",
+   "what": "windows: glass with alpha below 255 (windscreen part, doors or body)",
+   "how": {
+    "glass": true
+   },
+   "fix": "glass panes on the generic glass region of vehiclegeneric256 with alpha 128 (windscreen_ok, door and body windows)",
+   "vanilla": "11/11"
+  },
+  {
+   "id": "rotor",
+   "what": "the main rotor (moving_rotor / static_rotor)",
+   "how": {
+    "frame_geom": "^(moving|static)_rotor$"
+   },
+   "fix": "build the blades as static_rotor and the blurred disc as moving_rotor (alpha card)",
+   "vanilla": "11/11"
+  },
+  {
+   "id": "tail_rotor",
+   "what": "the tail rotor (moving_rotor2 / static_rotor2)",
+   "how": {
+    "frame_geom": "^(moving|static)_rotor2$"
+   },
+   "fix": "build the tail rotor as static_rotor2 and moving_rotor2",
+   "optional": true,
+   "vanilla": "9/11"
+  },
+  {
+   "id": "doors",
+   "what": "doors",
+   "how": {
+    "frame_geom": "^door_"
+   },
+   "fix": "cut the doors as door_*_ok under their dummies",
+   "optional": true,
+   "vanilla": "9/11"
+  },
+  {
+   "id": "gear",
+   "what": "skids or wheels",
+   "how": {
+    "frames": "^(wheel_|gear_)"
+   },
+   "fix": "add the skids/wheels and their wheel dummies",
+   "vanilla": "11/11"
+  },
+  {
+   "id": "lights",
+   "what": "light frames (omni)",
+   "how": {
+    "frames": "^omni"
+   },
+   "fix": "add omni01/omni02 light frames",
+   "vanilla": "11/11"
+  }
+ ]
+}

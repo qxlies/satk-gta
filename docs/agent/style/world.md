@@ -4,13 +4,19 @@
      non-vehicle models of the clean 1.0 US copy (profile vanilla), 14,578 DFFs and their collision. Classes are
      heuristic: IDE section, flags, size and interior/exterior. Peds and weapons: peds-weapons.md. -->
 
-A vanilla map model has **about 100-500 triangles whatever its size**: size changes the density, not the count.
-Detail comes from **tiling 128 and 256 px DXT1 photo textures** and from **baked vertex colours**: a dark, nearly
-grey day prelight and a darker, warmer night set with lit windows and lamp pools. Map geometry carries **no
-normals**. Collision is far simpler than the mesh. Every HD model with collision is drawn to **at most 299 m**;
-its LOD has about a fifth of the triangles and 32-64 px textures and is drawn to about 800 m.
+A vanilla map model is a simple, closed form: props are kits of closed primitives that touch or push into each
+other (chamfered caps, 8-sided cylinders, boxes with a lip), buildings are one main shell with a roof slab,
+ledges and small volumes that sit on it (`construction.md`). The look comes from **tiling 128 and 256 px DXT1
+photo textures** (windows, doors, bricks, railings are texture) and from **baked vertex colours**: a dark, nearly
+grey day prelight with occlusion and a darker, warmer night set with lit windows and lamp pools. Map geometry
+carries **no normals**. Collision is far simpler than the mesh. Every HD model with collision is drawn to **at
+most 299 m** (a hard rule); its LOD is drawn to about 800 m. Vanilla models have about 100-500 triangles whatever
+their size; more modelled detail in the same style is fine (reference numbers below). Worked guidance for
+buildings with LOD, interiors, props, breakables, animated objects and pickups: `kinds.md`; what each must
+contain, the close-up regions (facades, roof, entrance, base all round, the LOD at distance, the night view;
+every room of an interior) and the strict check: `done.md`.
 
-## Budgets by size bucket
+## Vanilla reference by size bucket (not targets)
 
 Size = the largest bounding box side (`dims.size`). HD map models only (no overlays, no LODs). Cells are p50 unless
 the header says `p10 / p50 / p90`.
@@ -29,20 +35,22 @@ the header says `p10 / p50 / p90`.
 | 128-256 m | 1,697 | 71 / 280 / 1,065 | 0.04 | 9.33 | 10 / 33 / 77 | 256 | 4 | 200 | 172 |
 | over 256 m | 397 | 99 / 373 / 1,092 | 0.01 | 15.0 | 7 / 16 / 62 | 256 | 6 | 299 | 291 |
 
-`sa_plus` (proposal): triangles up to 2x the bucket p90; texel density 1.5-2x the bucket p50; texture side 256
-typical, 512 only for terrain or a landmark. LODs, collision and draw distances stay vanilla.
+`sa_plus`: more modelled detail where it reads (ledges, cornices, porches, railings with volume, prop caps and
+lips), own textures one size step larger (256 typical, 512 only for terrain or a landmark), texel density up to
+about 1.5-2x the bucket p50. LODs, collision and draw distances stay vanilla; mind the streaming memory
+(`texture.budget`, `limits.md`).
 
 Rules:
-- Stay inside p10..p90 of your size bucket; above the class p90 needs a reason (a landmark); above 2x p90 is not SA
-  style. Vanilla never goes above about 3,000 triangles in a map model (interior shells reach 2,918 at p90).
-- Spend triangles on the silhouette only. The median edge is about a tenth of the object size. No modelled window
-  frames, bolts or panel gaps on map models: they are in the texture (prop bevels: see README "Reconciled rules").
+- Model the massing and what reads at distance; windows, doors, bricks, bolts and panel gaps on map models live in
+  the tiling texture. The median vanilla edge is about a tenth of the object size.
+- Props: closed pieces that touch or push into each other, chamfered caps and vertical edges; no gaps, no floating
+  parts (`construction.md`).
 - Materials: 1-2 on props, 4-7 on buildings. One texture per material; the material colour is white (RGBA 255 on
   93-99.8 % of map materials); untextured materials are rare.
 - One geometry and one atomic per map model; several atomics only for breakables and damage states.
 - Vanilla map geometry is tristripped; triangle lists load fine (a size convention, not a look).
 
-## Budgets and look by class
+## Look by class (vanilla reference)
 
 | Class | n | `dims.size` | `geo.tris` p10 / p50 / p90 | `mat.count` | `tex.side_px` | `uv.texel_px_m` p25 / p50 / p75 | `uv.span` p10 / p50 / p90 | `ide.draw` p10 / p50 / p90 | `light.night_models_share` | `light.normal_models_share` |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -73,8 +81,8 @@ buildings and terrain tile: 65-87 % of their materials repeat more than 1.5x.
 - Window and facade textures are modular units (one bay, one storey) tiled by UVs. Districts differ: Los Santos
   stucco, peeling paint, shingles, chain-link, graffiti; San Fierro Victorian and brick facades, bay windows,
   cornices; Las Venturas concrete, desert scrub, sand, car-park asphalt, neon accents.
-- Grime is in the texture: stains below windows, water marks, dirty bases, cracks. Let the prelight do the
-  darkening; textures stay mid-grey (`tex.lum_mean` in `textures.md`).
+- Map textures carry moderate stains (below windows, water marks, dirty bases, cracks), mostly low on the
+  walls. Let the prelight do the darkening; textures stay mid-grey and soft (`tex.lum_mean` in `textures.md`).
 
 TXD organisation (every map TXD carries its own copies; there are no parent TXDs):
 
@@ -115,9 +123,9 @@ colour. Small props are 61-77 % prelit; interior props carry normals in 42 % of 
   objects (`tobj`, night window planes) are the additive version.
 - Vertex alpha is almost unused (0.3-2 % of buildings, 22 % of alpha overlays, 42 % of time objects for fades).
 
-| Metric | Peer set (n) | p10 | p50 | p90 | sa_plus (proposal) | Note |
-|---|---|---|---|---|---|---|
-| `light.night_tint` | night-coloured map models (12,877) | -4.9 | 5.1 | 29.7 | same | R - B; 50 % warm (above +5), 9.7 % cool (below -5) |
+| Metric | Peer set (n) | p10 | p50 | p90 | Note |
+|---|---|---|---|---|---|
+| `light.night_tint` | night-coloured map models (12,877) | -4.9 | 5.1 | 29.7 | R - B; 50 % warm (above +5), 9.7 % cool (below -5) |
 
 `blender.game_ready --asset-class <class>` sets these defaults (warm night prelight, texel density by size bucket, draw
 clamped for HD models with collision); check the result with `asset.check`.
@@ -146,11 +154,11 @@ clamped for HD models with collision); check the result with `asset.check`.
 - Naming: 95 % start with `lod`; the usual form is `lod` + the HD name without its first 3 characters
   (`shabbyhouse03_lvs` -> `lodbbyhouse03_lvs`), within the 23-character limit.
 
-| Metric | Peer set (n) | p10 | p50 | p90 | sa_plus (proposal) | Note |
-|---|---|---|---|---|---|---|
-| `lod.ratio` | HD/LOD pairs (4,311) | 0.05 | 0.21 | 0.70 | vanilla LOD budget | LOD tris / HD tris |
-| `ide.draw[hd with lod]` | HD models with a LOD (4,300) | 100 | 160 | 299 | same | |
-| `ide.draw[map without lod]` | map models without a LOD (2,431) | 45 | 100 | 290 | same | |
+| Metric | Peer set (n) | p10 | p50 | p90 | Note |
+|---|---|---|---|---|---|
+| `lod.ratio` | HD/LOD pairs (4,311) | 0.05 | 0.21 | 0.70 | LOD tris / HD tris |
+| `ide.draw[hd with lod]` | HD models with a LOD (4,300) | 100 | 160 | 299 |  |
+| `ide.draw[map without lod]` | map models without a LOD (2,431) | 45 | 100 | 290 |  |
 
 ## Collision
 
@@ -166,12 +174,12 @@ clamped for HD models with collision); check the result with `asset.check`.
 - Make collision with `col.gen` (box, boxes, hull, mesh; surfaces from textures; face light from the prelight) and
   check it with `col.check`; one `.col` archive per pack (`limits.md`).
 
-| Metric | Peer set (n) | p10 | p50 | p90 | sa_plus (proposal) | Note |
-|---|---|---|---|---|---|---|
-| `col.mesh_ratio[building_small]` | building_small (734) | 0.04 | 0.23 | 1.0 | same | faces / render tris |
-| `col.mesh_ratio[building_large]` | building_large (1,371) | 0.07 | 0.39 | 1.0 | same | |
-| `col.mesh_ratio[terrain_road]` | terrain_road (2,179) | 0.36 | 0.89 | 1.0 | same | |
-| `col.mesh_ratio[vegetation]` | vegetation (314) | 0.18 | 0.40 | 0.73 | same | |
+| Metric | Peer set (n) | p10 | p50 | p90 | Note |
+|---|---|---|---|---|---|
+| `col.mesh_ratio[building_small]` | building_small (734) | 0.04 | 0.23 | 1.0 | faces / render tris |
+| `col.mesh_ratio[building_large]` | building_large (1,371) | 0.07 | 0.39 | 1.0 |  |
+| `col.mesh_ratio[terrain_road]` | terrain_road (2,179) | 0.36 | 0.89 | 1.0 |  |
+| `col.mesh_ratio[vegetation]` | vegetation (314) | 0.18 | 0.40 | 0.73 |  |
 
 | Fact | Value | Source |
 |---|---|---|
@@ -191,6 +199,7 @@ range 18, far clip 200; interiors corona 0.3, range 2-6. Ped attractors (benches
 
 - Interiors: `interior_prop` and `interior_shell` rows above; interior props are lit dynamically more often (42 %
   carry normals), shells are prelit; no shadow meshes; floors use FLOORBOARD or CARPET surfaces; entry markers are
-  scarce (`limits.md`).
+  scarce (`limits.md`). Every room is closed from floor to ceiling: run the leak pass from cameras inside the
+  rooms; a wall that stops short shows the void.
 - Pickups: 0.2-1 m, 32 or 64 px DXT1, saturated (`tex.sat_mean` in `textures.md`), prelit (no night colours in
   93 %), flags 128, draw 40 or 100, one collision sphere.

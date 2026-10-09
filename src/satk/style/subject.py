@@ -38,6 +38,7 @@ class Subject:
     manifest: dict = field(default_factory=dict)   # tier / like from asset.json
     model_id: int | None = None
     path: Path | None = None
+    txd_file: Path | None = None       # the TXD read for ``tex`` (DFF files only)
     notes: list = field(default_factory=list)
     _scene: object = None
 
@@ -154,6 +155,7 @@ def load_file(path: str | os.PathLike) -> Subject:
         try:
             with paths.open_ro(txd) as f:
                 s.tex = _txd_rows(f.read())
+            s.txd_file = txd
         except Exception as e:  # noqa: BLE001
             s.notes.append(f"{txd.name}: not read ({type(e).__name__})")
     s.ide, s.sec = ide, sec

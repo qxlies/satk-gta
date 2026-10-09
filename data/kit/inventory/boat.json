@@ -1,0 +1,297 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "boat",
+ "summary": "boat: a lofted welded hull with a deck, a cockpit with a helm, an engine and a propeller; hero adds fittings, rails, a cabin and electronics.",
+ "regions": {
+  "overall": {
+   "summary": "the whole boat, 3/4 views and side",
+   "views": []
+  },
+  "bow": {
+   "summary": "bow, rails, cleats, anchor",
+   "views": [
+    "bow"
+   ]
+  },
+  "stern": {
+   "summary": "transom, engine, prop, platform",
+   "views": [
+    "stern"
+   ]
+  },
+  "sides": {
+   "summary": "topsides, rub rail, windows",
+   "views": [
+    "left",
+    "right"
+   ]
+  },
+  "deck": {
+   "summary": "deck, hatches, fittings",
+   "views": [
+    "deck"
+   ]
+  },
+  "cockpit": {
+   "summary": "helm, seats, windscreen",
+   "views": [
+    "cockpit"
+   ]
+  },
+  "underside": {
+   "summary": "hull below the waterline from a low camera",
+   "views": [
+    "underside"
+   ]
+  },
+  "engine": {
+   "summary": "engine, outboard, prop",
+   "views": [
+    "stern"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "hull",
+   "name": "Hull",
+   "region": "overall",
+   "category": "shell",
+   "construction": "one welded hull lofted from sections (keel, chines, flare at the bow), closed transom",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "deck",
+   "name": "Deck",
+   "region": "deck",
+   "category": "shell",
+   "construction": "deck welded to the hull's sheer line, cockpit well cut in",
+   "attaches_to": "hull",
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "cockpit",
+   "name": "Helm console",
+   "region": "cockpit",
+   "category": "control",
+   "construction": "console with a wheel and a throttle",
+   "attaches_to": "deck",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "windscreen",
+   "name": "Windscreen",
+   "region": "cockpit",
+   "category": "glass",
+   "construction": "curved screen on the console or the deck",
+   "attaches_to": [
+    "deck",
+    "cockpit"
+   ],
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "seats",
+   "name": "Seats",
+   "region": "cockpit",
+   "category": "interior",
+   "construction": "helm seat and bench as soft volumes",
+   "attaches_to": "deck",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "engine",
+   "name": "Engine or outboard",
+   "region": "stern",
+   "category": "engine",
+   "construction": "outboard on the transom, or an engine hatch and inboard drive",
+   "attaches_to": [
+    "hull",
+    "deck"
+   ],
+   "stage": "G2",
+   "detail": "simple",
+   "frame": "engine"
+  },
+  {
+   "key": "propeller",
+   "name": "Propeller (static and moving)",
+   "region": "stern",
+   "category": "mechanism",
+   "construction": "lathe hub with blades (static_prop) and a blurred disc card (moving_prop)",
+   "attaches_to": "engine",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": [
+    "static_prop",
+    "moving_prop"
+   ]
+  },
+  {
+   "key": "nav_lights",
+   "name": "Navigation lights",
+   "region": "bow",
+   "category": "lamp",
+   "construction": "red and green side lights, a stern light",
+   "attaches_to": [
+    "deck",
+    "hull"
+   ],
+   "stage": "G3",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "rub_rail",
+   "name": "Rub rail",
+   "region": "sides",
+   "category": "trim",
+   "construction": "swept band along the sheer line",
+   "attaches_to": "hull",
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "rudder_flaps",
+   "name": "Rudder or trim tabs",
+   "region": "stern",
+   "category": "mechanism",
+   "construction": "flaps at the transom (boat_flap / boat_rearflap frames)",
+   "attaches_to": "hull",
+   "stage": "G3",
+   "detail": "standard",
+   "required": false
+  },
+  {
+   "key": "rails",
+   "name": "Bow rail and grab rails",
+   "region": "bow",
+   "category": "structure",
+   "construction": "tubes swept on stanchions",
+   "attaches_to": "deck",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "cleats",
+   "name": "Cleats and fairleads",
+   "region": "deck",
+   "category": "trim",
+   "construction": "small closed fittings on the deck",
+   "attaches_to": "deck",
+   "stage": "G3",
+   "detail": "standard",
+   "count": 2
+  },
+  {
+   "key": "strakes",
+   "name": "Strakes and keel line",
+   "region": "underside",
+   "category": "shell",
+   "construction": "running strakes on the hull bottom (inset and extrude)",
+   "attaches_to": "hull",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "instruments",
+   "name": "Helm instruments",
+   "region": "cockpit",
+   "category": "control",
+   "construction": "gauge cards on the console",
+   "attaches_to": "cockpit",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "swim_platform",
+   "name": "Swim platform and ladder",
+   "region": "stern",
+   "category": "structure",
+   "construction": "platform at the transom",
+   "attaches_to": "hull",
+   "stage": "G3",
+   "detail": "standard",
+   "required": false
+  },
+  {
+   "key": "hatches",
+   "name": "Deck hatches",
+   "region": "deck",
+   "category": "panel",
+   "construction": "inset hatches with hinges and handles",
+   "attaches_to": "deck",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "anchor_locker",
+   "name": "Anchor and locker",
+   "region": "bow",
+   "category": "fixture",
+   "construction": "anchor at the bow roller, locker lid",
+   "attaches_to": "deck",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "cabin",
+   "name": "Cabin or cuddy",
+   "region": "deck",
+   "category": "interior",
+   "construction": "cabin interior seen through the windows",
+   "attaches_to": "deck",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "t_top",
+   "name": "T-top, canopy or arch",
+   "region": "cockpit",
+   "category": "structure",
+   "construction": "frame over the helm with a top",
+   "attaches_to": "deck",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "electronics",
+   "name": "Antennas, radar and lights",
+   "region": "cockpit",
+   "category": "fixture",
+   "construction": "antennas and a radar dome",
+   "attaches_to": [
+    "t_top",
+    "deck"
+   ],
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "fenders_lines",
+   "name": "Fenders and lines",
+   "region": "sides",
+   "category": "accessory",
+   "construction": "fender buoys and coiled lines",
+   "attaches_to": "deck",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/boat.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

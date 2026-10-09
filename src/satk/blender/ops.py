@@ -322,14 +322,15 @@ GrClass = Literal["prop", "building", "terrain", "vegetation", "interior_prop", 
 
 
 @op("blender.game_ready",
-    summary="Make a mesh (.blend/.obj/.glb/.fbx/.ply/.stl) game-ready: decimate to a triangle budget, UV at the "
-            "class texel density, bake day/warm-night prelight, COL hull/box/mesh with face light, LOD, draw <= 300 "
-            "with COL; DFF + COL via DragonFF (+ TXD) into work/out/blender/<name>, checked.",
-    summary_ru="Сделать меш (.blend/.obj/.glb/.fbx/.ply/.stl) игровым: decimate под бюджет, UV по плотности класса, "
-               "prelight день/тёплая ночь, COL со светом граней, LOD, draw <= 300 с COL; DFF + COL (+ TXD).",
+    summary="Make a mesh (.blend/.obj/.glb/.fbx/.ply/.stl) game-ready: keeps its triangles (engine cap 65,535 verts), "
+            "UV at the class texel density, day/warm-night prelight, COL hull/box/mesh with face light, LOD, draw <= "
+            "300 with COL; DFF + COL via DragonFF (+ TXD) into work/out/blender/<name>, checked.",
+    summary_ru="Сделать меш (.blend/.obj/.glb/.fbx/.ply/.stl) игровым: треугольники сохраняются (лимит движка 65 535 "
+               "вершин), UV по плотности класса, prelight день/тёплая ночь, COL со светом граней, LOD, draw <= 300 с "
+               "COL; DFF + COL (+ TXD).",
     mcp=False, long_running=True,
     examples=("satk blender game-ready <workspace>/work/tmp/crate.obj --name crate --asset-class prop",
-              "satk blender game-ready scene.blend --objects Statue --budget 600 --height 2.5 --render"))
+              "satk blender game-ready scene.blend --objects Statue --height 2.5 --render"))
 def blender_game_ready(src: str, name: str | None = None, objects: list[str] | None = None, budget: int | None = None,
                        height: float | None = None, scale: float = 1.0,
                        origin: Literal["base", "center", "keep"] = "base",
@@ -340,13 +341,14 @@ def blender_game_ready(src: str, name: str | None = None, objects: list[str] | N
                        lod: float | None = None, draw: float | None = None, out: str | None = None,
                        render: bool = False, asset_class: GrClass | None = None,
                        tier: Literal["vanilla", "sa_plus"] = "vanilla", timeout: float = 600) -> dict:
-    """Make a model game-ready (report 22 §7: budget, UV, prelight, COL, LOD, export).
+    """Make a model game-ready (report 22 §7: UV, prelight, COL, LOD, export; triangle counts are not a target).
 
     Args:
         src: source file: .blend (opened read-only, saved elsewhere), .obj, .glb, .gltf, .fbx, .ply or .stl.
         name: model name, 1-21 characters a-z 0-9 _ (default: the file name); also the TXD and COL name.
         objects: objects of a .blend to take (default: every visible mesh); children are included.
-        budget: HD triangle budget (default: the class p90, else 1040 = vanilla map p90).
+        budget: optional HD triangle reduction you ask for (default none: the mesh keeps its triangles; only the
+            engine cap of 65,535 vertices per geometry is enforced).
         height: scale the model to this height in metres (instead of scale).
         scale: uniform scale factor.
         origin: base (bottom centre), center (bounding box centre) or keep.
@@ -390,7 +392,7 @@ def blender_game_ready(src: str, name: str | None = None, objects: list[str] | N
                     "> 300 becomes a big building without collision)")
         draw_v = float(gameready.BIG_BUILDING_DRAW)
     a = _contract("game_ready", {"src": jpath(sp.resolve()), "name": name, "objects": objects,
-                                 "budget": int(budget if budget is not None else cls.get("budget") or 1040),
+                                 "budget": int(budget or 0),
                                  "height": height, "scale": scale, "origin": origin, "uv": uv, "bake": bake,
                                  "tex_size": tex_size, "prelight": prelight, "col": col_v, "surface": surface,
                                  "lod": float(lod if lod is not None else (cls.get("lod") if cls else 0.25)),

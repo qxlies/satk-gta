@@ -1,0 +1,294 @@
+{
+ "format": "satk.inventory-starter/1",
+ "kind": "heli",
+ "summary": "helicopter: a lofted cabin with a tail boom, static and moving rotors, skids or gear, doors and a cockpit; hero adds the rotor head, intakes and a full cabin.",
+ "regions": {
+  "overall": {
+   "summary": "the whole helicopter, 3/4 views",
+   "views": []
+  },
+  "front": {
+   "summary": "nose, chin windows, sensors",
+   "views": [
+    "front"
+   ]
+  },
+  "cockpit": {
+   "summary": "glass, seats, panel, controls",
+   "views": [
+    "cockpit"
+   ]
+  },
+  "cabin": {
+   "summary": "cabin, doors, seats",
+   "views": [
+    "left",
+    "right"
+   ]
+  },
+  "tail": {
+   "summary": "tail boom, fin, tail rotor",
+   "views": [
+    "tail"
+   ]
+  },
+  "rotor": {
+   "summary": "main rotor, hub, mast",
+   "views": [
+    "rotor"
+   ]
+  },
+  "skids": {
+   "summary": "skids or wheels",
+   "views": [
+    "skids"
+   ]
+  },
+  "underside": {
+   "summary": "from below",
+   "views": [
+    "underside"
+   ]
+  },
+  "engine": {
+   "summary": "engine housing, intakes, exhausts",
+   "views": [
+    "rotor"
+   ]
+  }
+ },
+ "notes": [
+  "Rename items to the real design ('Front bumper with a centre air intake'), add what the design has with keys of your own (roof rack, bull bar, side steps), split an item when a reviewer could point at its halves.",
+  "Never drop a starter item silently: delete it only with a 'waived' entry {key, why} (asset.inventory reports dropped keys; the strict check blocks them).",
+  "Tag the built geometry with scene.tag (whole objects, or faces with a select) as you build; an item counts as built only when its own geometry carries its id and touches what it attaches to."
+ ],
+ "items": [
+  {
+   "key": "fuselage",
+   "name": "Cabin fuselage",
+   "region": "overall",
+   "category": "shell",
+   "construction": "lofted welded cabin from nose to the boom root",
+   "attaches_to": null,
+   "stage": "G1",
+   "detail": "simple",
+   "frame": "chassis"
+  },
+  {
+   "key": "tail_boom",
+   "name": "Tail boom and fin",
+   "region": "tail",
+   "category": "shell",
+   "construction": "boom lofted from the cabin, fin and stabiliser at its end",
+   "attaches_to": "fuselage",
+   "stage": "G1",
+   "detail": "simple"
+  },
+  {
+   "key": "main_rotor",
+   "name": "Main rotor (static and moving)",
+   "region": "rotor",
+   "category": "mechanism",
+   "construction": "blades on a hub (static_rotor) and a blurred disc card (moving_rotor)",
+   "attaches_to": "rotor_mast",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": [
+    "static_rotor",
+    "moving_rotor"
+   ]
+  },
+  {
+   "key": "rotor_mast",
+   "name": "Rotor mast",
+   "region": "rotor",
+   "category": "mechanism",
+   "construction": "mast from the engine housing to the hub",
+   "attaches_to": [
+    "engine_housing",
+    "fuselage"
+   ],
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "tail_rotor",
+   "name": "Tail rotor (static and moving)",
+   "region": "tail",
+   "category": "mechanism",
+   "construction": "small rotor (static_rotor2) and its disc card (moving_rotor2)",
+   "attaches_to": "tail_boom",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": [
+    "static_rotor2",
+    "moving_rotor2"
+   ]
+  },
+  {
+   "key": "landing_gear",
+   "name": "Skids or wheels",
+   "region": "skids",
+   "category": "running_gear",
+   "construction": "skid tubes on cross tubes swept from the cabin floor, or gear legs",
+   "attaches_to": "fuselage",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "cockpit_glass",
+   "name": "Cockpit glass",
+   "region": "cockpit",
+   "category": "glass",
+   "construction": "glass panes fitted to the frame",
+   "attaches_to": "fuselage",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "doors",
+   "name": "Doors",
+   "region": "cabin",
+   "category": "panel",
+   "construction": "cut from the cabin along the shut lines",
+   "attaches_to": "fuselage",
+   "stage": "G2",
+   "detail": "simple",
+   "frame": [
+    "door_lf_ok",
+    "door_rf_ok"
+   ],
+   "count": 2
+  },
+  {
+   "key": "engine_housing",
+   "name": "Engine housing",
+   "region": "engine",
+   "category": "shell",
+   "construction": "cowling on the cabin roof",
+   "attaches_to": "fuselage",
+   "stage": "G2",
+   "detail": "simple"
+  },
+  {
+   "key": "seats",
+   "name": "Pilot seats",
+   "region": "cockpit",
+   "category": "interior",
+   "construction": "seats seen through the glass",
+   "attaches_to": "fuselage",
+   "stage": "G3",
+   "detail": "simple",
+   "count": 2
+  },
+  {
+   "key": "lights",
+   "name": "Lights",
+   "region": "underside",
+   "category": "lamp",
+   "construction": "beacon and navigation lights",
+   "attaches_to": [
+    "fuselage",
+    "tail_boom"
+   ],
+   "stage": "G3",
+   "detail": "simple"
+  },
+  {
+   "key": "instrument_panel",
+   "name": "Panel and controls",
+   "region": "cockpit",
+   "category": "control",
+   "construction": "panel, cyclic and collective",
+   "attaches_to": "fuselage",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "exhausts",
+   "name": "Exhausts",
+   "region": "engine",
+   "category": "engine",
+   "construction": "exhaust stubs out of the housing",
+   "attaches_to": "engine_housing",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "steps",
+   "name": "Steps",
+   "region": "skids",
+   "category": "structure",
+   "construction": "steps on the skids or below the doors",
+   "attaches_to": [
+    "landing_gear",
+    "fuselage"
+   ],
+   "stage": "G3",
+   "detail": "standard",
+   "count": 2
+  },
+  {
+   "key": "cabin_interior",
+   "name": "Cabin seats",
+   "region": "cabin",
+   "category": "interior",
+   "construction": "rear bench or seats and the floor",
+   "attaches_to": "fuselage",
+   "stage": "G3",
+   "detail": "standard"
+  },
+  {
+   "key": "rotor_head",
+   "name": "Rotor head detail",
+   "region": "rotor",
+   "category": "mechanism",
+   "construction": "swashplate, pitch links and the hub",
+   "attaches_to": "rotor_mast",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "intakes",
+   "name": "Intakes",
+   "region": "engine",
+   "category": "engine",
+   "construction": "intake grilles on the housing",
+   "attaches_to": "engine_housing",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "antennas",
+   "name": "Antennas",
+   "region": "underside",
+   "category": "fixture",
+   "construction": "blade and wire antennas",
+   "attaches_to": "fuselage",
+   "stage": "G3",
+   "detail": "hero"
+  },
+  {
+   "key": "searchlight",
+   "name": "Searchlight or camera",
+   "region": "front",
+   "category": "lamp",
+   "construction": "pod under the nose",
+   "attaches_to": "fuselage",
+   "stage": "G3",
+   "detail": "hero",
+   "required": false
+  },
+  {
+   "key": "door_hinges_handles",
+   "name": "Door handles and rails",
+   "region": "cabin",
+   "category": "trim",
+   "construction": "handles, sliding rails",
+   "attaches_to": "doors",
+   "stage": "G3",
+   "detail": "hero"
+  }
+ ],
+ "views_note": "views name the close-up regions of 'blender preview --regions' (data/kit/regions/heli.json) that show each region; 'overall' with no views = the standard preview sheet"
+}

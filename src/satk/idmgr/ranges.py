@@ -18,7 +18,8 @@ import re
 
 from ..core.errors import SatkError
 
-__all__ = ["KINDS", "KIND_SECTIONS", "MAX_ID", "DEFAULT_RANGE", "STORES", "LOW_SLOTS", "ENGINE_RESERVED", "SAMP_RESERVED",
+__all__ = ["KINDS", "KIND_SECTIONS", "MAX_ID", "DEFAULT_RANGE", "STORES", "LOW_SLOTS", "ENGINE_RESERVED", "KIND_RESERVED",
+           "WEAPON_BLOCK", "kind_reserved", "SAMP_RESERVED",
            "SAMP_DL", "VANILLA_VEHICLES", "parse_ranges", "fmt_ranges", "fmt_spec", "iter_range", "f92_max_id"]
 
 KINDS = ("vehicle", "ped", "weapon", "object")
@@ -41,6 +42,18 @@ ENGINE_RESERVED: tuple[tuple[int, int, str], ...] = (
     (300, 319, "engine: cutscene objects CUTOBJ01-20"),
     (374, 399, "engine: run-time models (TEMPCOL 374-381, CLOTHES01 384-393, hands 394-397)"),
 )
+#: (first, last, why) - taken for every kind of model except the one named (``KIND_RESERVED[kind]`` lists the
+#: blocks a kind must stay out of): the weapon block holds the weapon models the engine and weapon.dat expect.
+WEAPON_BLOCK = (321, 373, "the weapon model block 321-373 (weapon.dat, pickups): weapons only")
+KIND_RESERVED: dict[str, tuple[tuple[int, int, str], ...]] = {
+    "vehicle": (WEAPON_BLOCK,), "ped": (WEAPON_BLOCK,), "object": (WEAPON_BLOCK,), "weapon": ()}
+
+
+def kind_reserved(kind: str) -> tuple[tuple[int, int, str], ...]:
+    """Blocks a kind of model keeps out of (on top of :data:`ENGINE_RESERVED`)."""
+    return KIND_RESERVED.get(str(kind or "").lower(), (WEAPON_BLOCK,))
+
+
 #: (first, last, why) - taken when SA-MP is considered.
 SAMP_RESERVED: tuple[tuple[int, int, str], ...] = (
     (1, 6, "SA-MP: client skins (0.3.7)"), (8, 8, "SA-MP: client skin"), (42, 42, "SA-MP: client skin"),

@@ -10,7 +10,8 @@ Headless Blender 5.1 for agents and an N-panel "SATK" for people. A model or an 
 IMG archives (DFF + TXD chain + COL), imported with DragonFF's functions and saved as a `.blend` with packed
 images; that `.blend` can then be rendered from any camera pose (with the SIDs of the visible objects) or
 exported as an MTA resource or a modloader folder. `game-ready` turns any mesh of your own (`.blend`, `.obj`,
-`.glb`, `.fbx`…) into a game model: triangle budget, UVs, day/night prelight, COL, LOD, DFF, TXD.
+`.glb`, `.fbx`…) into a game model: its triangles kept (the engine cap of 65,535 vertices per geometry holds),
+UVs, day/night prelight, COL, LOD, DFF, TXD.
 Everything is written only to `work\blender\` (jobs, cache, Blender profile, DragonFF copy),
 `work\out\blender\` and `work\out\exports\` of the workspace. The game and your own Blender profile are not
 changed.
@@ -74,7 +75,7 @@ lines for the model and its LOD with ID `-1`) and `gameready.json` (arguments, s
  "files":{"dff":".../crate.dff","col":".../crate.col","txd":".../crate.txd","png":[".../tex/crate.png"],"ide":".../crate.ide"},
  "stats":{"src_tris":12,"tris":12,"uv":"keep","baked":false,"prelight":"bake","day_mean":0.337,"col":"box",
           "txd_formats":{"crate":"DXT1 64x64 mips 7"}},
- "checks":{"cols":["check","status","detail"],"rows":[["dff","ok","RW 0x36003, 12 tris (budget 1040), 28 verts"],
+ "checks":{"cols":["check","status","detail"],"rows":[["dff","ok","RW 0x36003, 12 tris, 28 verts (cap 65535)"],
    ["prelight","ok","day + night"],["txd","ok","crate DXT1 64x64 mips 7"],["col","ok","COL3 'crate': 0 faces, 1 boxes, 0 spheres"],…]},
  "warn":["LOD_SKIPPED: 12 triangles are below 48, no LOD model needed"]}
 ```
@@ -85,8 +86,10 @@ Steps (the source objects and their materials are not changed, everything works 
    imported. It takes `--objects` (with their children) or every visible mesh; modifiers are applied, the meshes
    are joined into one object. `--height` (m) or `--scale`; the origin is `--origin base` (bottom centre),
    `center` or `keep`; duplicate vertices are merged, loose edges and degenerate faces are removed.
-2. **Budget:** planar dissolve (1°, material and UV seams stay), then `COLLAPSE` down to `--budget` triangles
-   (default 1,040, the p90 of vanilla map models; the p50 is 216).
+2. **Triangles:** the mesh keeps them; triangle counts are never a target. Only an explicit `--budget N` reduces
+   it (planar dissolve at 1°, material and UV seams stay, then `COLLAPSE` down to N). Either way the engine cap
+   holds: a mesh that would export more than 65,535 vertices in one geometry is collapsed just below it
+   (`stats.vertex_cap`). Vanilla map models (p50 216, p90 1,040 triangles) are reference numbers only.
 3. **UV:** `auto` keeps the existing UVs and uses smart project when there are none; `keep` and `smart` force
    one of them; `box` is a cube projection at 32 px/m.
 4. **Textures:** a material with an image keeps it (a power of two ≤ `--tex-size`, default 256; the material
@@ -104,7 +107,7 @@ Steps (the source objects and their materials are not changed, everything works 
    its own prelight and draw distance 800 (the HD model gets `--draw`, default 150); below 48 triangles no LOD is
    needed (`LOD_SKIPPED`).
 8. **Export and checks:** DragonFF writes the DFF and the COL; satk packs the TXD, re-reads everything with its own
-   `satk.formats` and fills `checks`: budget and RW version, prelight, texture references, TXD, COL (one model,
+   `satk.formats` and fills `checks`: the vertex cap and RW version, prelight, texture references, TXD, COL (one model,
    name, ±256 m), name lengths (COL ≤ 21, DFF ≤ 23), power-of-two textures. A failed check is the warning
    `GAME_READY_CHECKS`.
 

@@ -125,9 +125,9 @@ def car_dff(*, paint_tex: str = "vehiclegrunge256", lamp_tex: str = "vehicleligh
     wheel = geometry(wP, [(a, b, c, 0) for a, b, c in wT], [material(tex="vehicletyres128")], normals=wN)
     bP, bT, bN = box_mesh(2.0, 0.3, 0.4)
     bump = geometry(bP, [(a, b, c, 0) for a, b, c in bT], [material((60, 255, 0, 255), paint_tex)], normals=bN)
-    dP, dT, dN = box_mesh(0.1, 1.2, 0.9)
+    dP, dT, dN = box_mesh(0.1, 1.2, 0.9, cy=-0.6)                  # hinged at its front edge
     door = geometry(dP, [(a, b, c, 0) for a, b, c in dT], [material((60, 255, 0, 255), paint_tex)], normals=dN)
-    c = col3("car", [(0, 1, 0, 1.0, 0), (0, -1, 0, 1.0, 2)]) if col else None
+    c = col3("car", [(0, 1.4, 0, 1.2, 0), (0, -1.4, 0, 1.2, 2)]) if col else None
     return clump([chassis, wheel, bump, door], [tuple(f) for f in frames], [(2, 0), (7, 1), (10, 2), (12, 3)], col=c)
 
 

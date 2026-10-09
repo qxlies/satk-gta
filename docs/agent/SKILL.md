@@ -34,7 +34,7 @@ find <query>`. References: `docs/agent/tools.md` (all operations), `docs/agent/s
    notes, kb, `warn` with fixes. Paths in answers are absolute with forward slashes.
 2. `satk_help(topic)` when needed: `start | ids | tools | ops | workflows | schema | errors | viewer | re |
    blender | engine | golden | notes` or an operation name (`satk_help("asset_find")`). `schema` is ~1k tokens.
-   Creating assets: `style`, `style_vehicle|world|ped_weapon|shading|texture`, `authoring`, `visual_qa` (sec. 13).
+   Assets: `creation`, `done`, `style`, `style_kinds|vehicle|world|ped_weapon|shading|texture`, `authoring` (sec. 13).
 3. Anything without its own tool: `satk_ops(query)` finds it, `satk_op(op, args)` runs it (section 5).
 4. Without MCP: the `satk` CLI (`satk -h`, `satk <group> <command> -h`). With stdout not a terminal (your
    shell tool) it prints compact JSON. Positional arguments may stand before or after options.
@@ -256,7 +256,7 @@ section 5; details and real answers in `docs/agent/workflows.md`):
 | S22 | check a mod before release | `recipe.run` check-mod-before-release (`dry_run` first) | 1-2, ~0.25-0.5k |
 | S23 | add a street light to a model | `fx2d.copy` from `model:lamppost1`, `filter` ["light"] -> `fx2d.check` | 2, ~0.25k |
 | S24 | collision for a new model | `col.gen` -> `col.check` -> `asset.lint` on the output | 2-3, ~0.2-0.3k |
-| S25-S26 | create an asset of any kind; one visual QA round | `satk_help("creation")`, then section 13 (gates G0-G5, two human checkpoints) | ~40-80 |
+| S25-S26 | create an asset of any kind; one visual QA round | `satk_help("creation")`, then section 13 (gates G0 design .. G5 finish, a sheet at every gate) | varies |
 | S27 | an MTA resource: write, lint, pack, load | `mta.resource.new` (models: `mta.pack`; animations: `anim.mta`) -> `mta.lint` -> `mta.server_check`; `mta.logs` for log files | 3-4, ~0.5k |
 | S28 | animations | `anim.list` -> `anim.extract` -> edit the JSON -> `anim.write` -> `anim.check` (`loader` mta) -> `anim.merge` or `anim.mta`; Blender: `anim.to_blender` -> `anim.from_blender` | 5-6, ~0.5k |
 | S29 | an export next to the map, then in the game | `view.vehicle`/`place`/`ped` (`watch`) -> `view_capture(marks=6)`; `ingame.start` (the user: one-time admin setup, starts the client) -> `ingame.check` -> `ingame.reload` (section 8) | 10-15, ~3-5k + frames |
@@ -273,7 +273,8 @@ section 5; details and real answers in `docs/agent/workflows.md`):
 
 - Start small: textures <= 256 px, one contact sheet instead of N images; captions from the JSON `legend`.
 - Open an image with Read only when you need to see it; `inline=true` only for small images.
-- On a frame use `marks=N` or `grid=true` + `view_pick(cells=["D3"])`; never guess pixels.
+- On a viewer frame use `marks=N` or `grid=true` + `view_pick(cells=["D3"])`; never guess pixels. Reference photos
+  are described, never measured (`style/references.md`).
 - Keep `limit` small; page with `cursor`; trim with `fields`; `satk_ops` with `limit=3`; `asset_refs` without `rel` first.
 - `index_query` for counts and joins instead of paging through lists (schema: `satk_help("schema")`).
 - Images: never open more than 1 MP; reference photos at most 1,600 px (`ref.import` resizes); one JPEG sheet per
@@ -338,8 +339,7 @@ section 5; details and real answers in `docs/agent/workflows.md`):
 - `target="game"` needs the user to start it once per session (and the one-time admin setup); `view_set` overlays
   work on Ariane, on the game only time and weather.
 - `asset_find` has no `handling`/`water`/`tcyc` kinds yet: use `asset_get` with those SIDs or `world_near(kinds=...)`.
-- Session step stats judge each object against whole-class bands: a wheel flags body rows; read its `part.*` rows and
-  `asset.check`. `id.free` and `mod.add` may hand out an id in the weapon range 321-373: check it.
+- `id.free` and `mod.add` may hand out an id in the weapon range 321-373: check it.
 
 ## 12. Error codes (same for CLI, MCP and SAAP; CLI exit code in brackets)
 
@@ -365,33 +365,35 @@ section 5; details and real answers in `docs/agent/workflows.md`):
 
 More (real examples, warnings): `docs/agent/errors.md` in the satk repository.
 
-## 13. Creating assets (vehicle, prop, building + LOD, interior, weapon, ped, pickup, upgrade)
+## 13. Creating assets (every kind: vehicles, boats, aircraft, props, buildings + LOD, interiors, weapons, peds)
 
-- Start with `satk_help("creation")`: the shortest correct path with exact commands for a car, prop, building with LOD,
-  weapon and ped re-skin (same text: `creation-quickstart.md`, repository `docs/agent/`). It starts from `kit.blank`, a
-  clean low-poly base mesh per kind (`satk kit blank` lists them) that the steps then shape.
-- Style is measured data, not adjectives: `satk_help("style")` + ONE class topic (`style_vehicle`, `style_world`,
-  `style_ped_weapon`); later `style_shading`, `style_texture`, `authoring`, `visual_qa`. Guides: `style/README.md` next
-  to this skill. Bands: `satk_op(op="style.profile", args={"like": "model:426"})`.
-- Tier: `sa_plus` (default for new assets: more budget only on silhouette and curvature) or `vanilla` (a replacement
-  that must blend in); record it with `asset.init`.
-- Model IN Blender through the live session, never with hand-typed coordinates or a private mesh library:
-  `blender.session` -> `blender.methods` -> `blender.call` (a step or a list; 2+ mutating steps = one checkpoint) ->
-  stats + optional 512 px snapshot (`look` game) per step; modifiers, reference planes (`ref.import`), `.blend`
-  checkpoints; `python` is a journaled last resort. Budgets and `TIMEOUT`/`BUSY`: section 10.
-- Workflow S25: G0 `asset.init` + `style.profile` + `asset.anatomy` + photos; G1 `kit.blank` + shaping + scale lineup
-  (`blender.preview --lineup class`) by ~15 min -> SHOW THE SHEET to the user; G2 `kit.blank_split` + `kit.shade`, shape
-  and shading in band -> show again; G3 parts, damage, LOD, COL; G4 UVs and textures (`style.texture`); G5 `kit.export`,
-  `asset.check`, `asset.lint --preset <tier>`, the package, then the hybrid loop (S29): `view.vehicle|place|ped` for
-  a context look, `ingame.check` for behaviour. S26 = one visual QA round (a project session takes `like` from
-  `asset.json`: `blender.preview session:X --lineup class`).
-- Props and buildings: `kit.template --lod`, `kit.blank --kind prop_cyl|prop_box|building_box`, `kit.lod`, then
-  `kit.export --add --place x,y,z` writes prelight, a primitive COL by the class rule, the LOD DFF, the TXD and the
-  IDE/IPL lines. Own textures: `texture.new`, `kit.bake` (any size), `texture.finish --edge --role`.
-- Scale: wheels = IDE `wheel_scale` (SA cars ~1.1-1.2x the real car), anything else = the 1.84 m ped. Shading: weld,
-  smooth every face, sharp only at seams and designed creases, weighted normals last; check `shade.normal_bend`.
-- Look: small photo-like textures (64-256 px, DXT1/DXT3), paint on `vehiclegrunge256`, lamps on `vehiclelights128`,
-  glass alpha 128; no voxel look, flat colour per mesh, vector-art textures or faceted shading; judge on the sheet.
-- `asset.check <file> --like <SID>`: advisory bands + structure/semantic rows that must pass. Brief template:
-  `briefs/asset-brief.md`. Resume from `asset.status`; no Blender session (`DEPENDENCY`): `blender_job` /
-  `blender.game_ready`, say so.
+- Start with `satk_help("creation")` (gates and exact commands; `creation-quickstart.md`), then
+  `satk_help("done")` (the definition of done) and `satk_help("style_kinds")` (frames, moving parts, items and
+  regions of every kind). Bodies come from rounded sections and sweeps; `kit.blank` is an optional quick start.
+- SA style is a LOOK, not a polygon count: soft, rounded, simplified forms composed into one joined whole, crisp
+  lines only on seams, small soft photo-like textures, clean key-colour paint, shared vehicle textures, plus the
+  engine's hard rules; detail is free in it, vanilla numbers are reference. Tier `sa_plus` (default) or `vanilla`.
+  Read `style`, `style_construction`, ONE class topic (`style_vehicle|world|ped_weapon`), `style_references`
+  for a real object. Guides: `style/README.md`, `style/done.md`, `style/kinds.md`.
+- The task is an INVENTORY: `<project>/design/inventory.json` (kind, detail `hero` by default, one item per
+  part: id, region, construction, attaches_to, stage G1-G4), from the kind's starter list plus every feature.
+  Tag each new piece with `scene.tag` in the same batch; `asset.inventory <project>` reports built / missing /
+  unattached / rejected (by a reviewer); drop a starter item only at G0 with a waiver (never "time", "budget").
+- YOU NEVER DECLARE DONE. Done = `asset.inventory` complete + `asset.check --strict` `done: true` (empty
+  `blocking`) + every region sheet reviewed (`blender.preview --regions`) + the reviewer's pass. Report open
+  items instead; a placeholder primitive is not a built item.
+- Model IN Blender: `blender.session` -> `blender.methods` -> `blender.call` (a step or a batch; 2+ mutating
+  steps = one checkpoint) -> counts, `form` defects, optional snapshot. `mesh.loft` shapes, `mesh.sweep`,
+  `mesh.lathe`, `falloff` moves; joins `mesh.attach`, `mesh.flare`. Never vertex-by-vertex meshes.
+- Workflow S25: G0 design (spec ratios, features per photo, `ref.board`, peers, the inventory); G1 form (WAIT
+  for the user); G2 compose (welded shell, cut panels, lined arches, details touching, every moving frame and
+  dummy refit; `form`/`fit` clean; `look.leak`); G3 detail (every G3 item; WAIT for the user); G4 surface (UVs,
+  keys, soft clean textures, `kit.shade`); G5 finish (damage, LOD, COL, `kit.export`, then the polish loop
+  `asset.check --strict` -> fix `blocking` -> regions, until `done`; S29 in the game). After G2, G3, G4 and at
+  the end read EVERY region sheet. S26 = one visual QA round; the critic order is in `done`.
+- Moving parts (rotors, propellers, control surfaces, forks, pedals, bogies, doors) turn about their frame
+  origin: pivot there, centred, clear through the motion. Scale: wheels = `wheel_scale`, else the 1.84 m ped.
+  Paint on `vehiclegrunge256`, lamps on `vehiclelights128`, glass alpha 128; judge paint at dirt 0-2.
+- References: spec sheet for size, features described per photo, measuring only true elevations
+  (`style/references.md`). Brief: `briefs/asset-brief.md`. Resume from `asset.status`; no Blender session
+  (`DEPENDENCY`): `blender_job` / `blender.game_ready`, say so.

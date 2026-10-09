@@ -87,7 +87,7 @@
               "group": "vehicle", "rgba": [255, 255, 255, 242], "texture": "vehiclescratch64", "shared": true,
               "surface": [0.5, 1.0, 1.0], "measured": {"n": 569, "alpha": [242, 242, 255]}},
   "shatter": {"summary": "broken glass of _dam windows: vehicleshatter128",
-              "group": "vehicle", "rgba": [255, 255, 255, 245], "texture": "vehicleshatter128", "shared": true,
+              "group": "vehicle", "rgba": [255, 255, 255, 242], "texture": "vehicleshatter128", "shared": true,
               "surface": [0.5, 1.0, 1.0], "specular": {"texture": "vehiclespecdot64", "level": 0.3},
               "measured": {"n": 473, "alpha": [242, 245, 255]}},
   "decal": {"summary": "logos and stripes: own texture <model>92decal128 (alpha)",

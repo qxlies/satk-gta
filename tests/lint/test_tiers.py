@@ -59,9 +59,14 @@ def _rules(rep) -> set[str]:
 def test_tier_presets_build_on_each_other():
     game, van, plus, strict = (Rules.load(preset=p) for p in ("game", "vanilla", "sa_plus", "strict"))
     assert van["txd.size_max"].params["max"] == plus["txd.size_max"].params["max"] == 512   # sa_plus _base vanilla
-    assert plus["veh.hd_tris"].params["budget"]["default"] > van["veh.hd_tris"].params["budget"]["default"]
-    assert plus["dff.tris_budget"].params["budget"]["map"] > van["dff.tris_budget"].params["budget"]["map"]
+    # triangle counts are never graded by the tier presets: info in vanilla, off in sa_plus
+    for rid in ("dff.tris_budget", "veh.hd_tris", "veh.part_tris"):
+        assert van[rid].sev == "info" and not plus.on(rid), rid
+        assert game[rid].sev == "warn"                    # the performance hint for third-party mods stays
+    assert not plus.on("dff.materials_budget") and van["dff.materials_budget"].sev == "info"
     assert van["dff.tris_budget"].params["budget"]["interior_shell"] > van["dff.tris_budget"].params["budget"]["map"]
+    for r in (game, van, plus, strict):                  # the engine limits stay in every preset
+        assert r.on("dff.verts_max") and r.on("dff.clump_ext_dup") and r["dff.clump_ext_dup"].sev == "error"
     assert not game.on("mat.alpha_draw_last") and plus.on("mat.alpha_draw_last") and strict.on("mat.alpha_draw_last")
     for r in (game, van, plus, strict):                  # vehicles, peds, weapons: mipmaps are never more than info
         assert {r["txd.mips_missing"].sev_for(c) for c in ("cars", "peds", "weap", "upgrade")} == {"info"}
@@ -215,8 +220,10 @@ def test_cli_like_drops_what_the_reference_triggers(run_cli, mod: Mod, monkeypat
 
 
 def test_lint_rules_lists_the_tier_presets(run_cli):
-    env = run_cli(["asset", "lint-rules", "--preset", "sa_plus", "--rule", "veh", "--ref", "--json"]).json
+    env = run_cli(["asset", "lint-rules", "--preset", "vanilla", "--rule", "veh", "--ref", "--json"]).json
     rows = {r[0]: r for r in env["rows"]}
-    assert '"default":5000' in rows["veh.hd_tris"][2]
+    assert rows["veh.hd_tris"][1] == "info" and json.loads(rows["veh.part_tris"][2])["budget"]["chassis"] == 2600
     assert rows["veh.frames"][-1].startswith("crash 0x004C7DAD")
-    assert json.loads(rows["veh.part_tris"][2])["budget"]["chassis"] == 3600
+    plus = run_cli(["asset", "lint-rules", "--preset", "sa_plus", "--rule", "veh", "--json"]).json
+    assert "veh.hd_tris" not in {r[0] for r in plus["rows"]} or \
+        any(r[0] == "veh.hd_tris" and r[1] in ("off", "info") for r in plus["rows"])

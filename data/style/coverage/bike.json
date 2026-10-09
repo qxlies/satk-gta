@@ -1,0 +1,135 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "bike",
+ "ref": "style_vehicle",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (10; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "headlamp",
+   "what": "a headlamp on the headlight key colours",
+   "how": {
+    "keys": [
+     "255,175,0",
+     "0,255,200"
+    ]
+   },
+   "fix": "give the headlamp lens the key colour 255,175,0 / 0,255,200",
+   "vanilla": "10/10"
+  },
+  {
+   "id": "tail_lamp",
+   "what": "a tail lamp on the taillight key colours",
+   "how": {
+    "keys": [
+     "185,255,0",
+     "255,60,0"
+    ]
+   },
+   "fix": "give the tail lamp lens the key colour 185,255,0 / 255,60,0",
+   "optional": true,
+   "vanilla": "9/10"
+  },
+  {
+   "id": "wheels",
+   "what": "front and rear wheels",
+   "how": {
+    "frame_geom": "^wheel_(front|rear)$"
+   },
+   "fix": "build wheel_front and wheel_rear (tyre, rim, hub, brake disc)",
+   "vanilla": "10/10"
+  },
+  {
+   "id": "seat",
+   "what": "a seat surface under ped_frontseat",
+   "how": {
+    "seat": true
+   },
+   "fix": "shape a seat whose top sits where the rider pose expects it",
+   "vanilla": "10/10"
+  },
+  {
+   "id": "handlebars",
+   "what": "handlebars",
+   "how": {
+    "parts": "^handlebars$"
+   },
+   "fix": "build the handlebars with grips, levers and the headlamp nacelle",
+   "vanilla": "10/10"
+  },
+  {
+   "id": "front_fork",
+   "what": "the front fork and fender",
+   "how": {
+    "parts": "^forks_front$"
+   },
+   "fix": "build forks_front: fork legs, fender, hub",
+   "vanilla": "10/10"
+  },
+  {
+   "id": "rear_fork",
+   "what": "the swing arm",
+   "how": {
+    "parts": "^forks_rear$"
+   },
+   "fix": "build forks_rear: the swing arm with the chain guard",
+   "vanilla": "10/10"
+  },
+  {
+   "id": "exhaust",
+   "what": "an exhaust at the exhaust dummy",
+   "how": {
+    "frame_near": {
+     "frame": "exhaust",
+     "radius": 0.25
+    }
+   },
+   "fix": "build the exhaust pipe and silencer ending at the exhaust dummy",
+   "vanilla": "10/10"
+  },
+  {
+   "id": "engine",
+   "what": "an engine at the engine dummy",
+   "how": {
+    "frame_near": {
+     "frame": "engine",
+     "radius": 0.3
+    }
+   },
+   "fix": "build the engine block, cylinders and cases at the engine dummy",
+   "vanilla": "10/10"
+  },
+  {
+   "id": "plate",
+   "what": "a number plate",
+   "how": {
+    "texture": [
+     "plate",
+     "carpback"
+    ]
+   },
+   "fix": "add a plate card on carpback behind the seat",
+   "optional": true,
+   "vanilla": "8/10"
+  },
+  {
+   "id": "gauges",
+   "what": "gauges",
+   "how": {
+    "texture": [
+     "vehicledash32",
+     "dash"
+    ]
+   },
+   "fix": "add a gauge card on vehicledash32 above the bars",
+   "optional": true,
+   "vanilla": "7/10"
+  }
+ ]
+}

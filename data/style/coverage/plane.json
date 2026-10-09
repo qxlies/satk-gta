@@ -1,0 +1,73 @@
+{
+ "format": "satk.style-coverage/1",
+ "class": "plane",
+ "ref": "style_vehicle",
+ "_comment": [
+  "Detail checklist of the class (asset.check section coverage): the definition of done of an asset",
+  "of this class. Generated from the vanilla models of the class (13; every model of the class): an item every one of them",
+  "has (95 % for classes of 20 and more) is required ('missing' blocks asset.check --strict), an item at",
+  "least a quarter of them have is optional. 'vanilla' = how many vanilla models of the class have it.",
+  "'how' names a detector of",
+  "satk.style.coverage. More detail in the same SA style is welcome; nothing here is a triangle count."
+ ],
+ "items": [
+  {
+   "id": "glass",
+   "what": "windows: glass with alpha below 255 (windscreen part, doors or body)",
+   "how": {
+    "glass": true
+   },
+   "fix": "glass panes on the generic glass region of vehiclegeneric256 with alpha 128 (windscreen_ok, door and body windows)",
+   "optional": true,
+   "vanilla": "11/13"
+  },
+  {
+   "id": "propeller",
+   "what": "a propeller (moving_prop / static_prop)",
+   "how": {
+    "frame_geom": "^(moving|static)_prop"
+   },
+   "fix": "build the blades as static_prop and the blurred disc as moving_prop",
+   "optional": true,
+   "vanilla": "9/13"
+  },
+  {
+   "id": "controls",
+   "what": "control surfaces (ailerons, elevator, rudder)",
+   "how": {
+    "frame_geom": "^(aileron|elevator|rudder)"
+   },
+   "fix": "cut the ailerons, elevator and rudder as their own atomics so the game can move them",
+   "vanilla": "13/13"
+  },
+  {
+   "id": "gear",
+   "what": "landing gear or floats",
+   "how": {
+    "frames": "^(gear_|wheel)"
+   },
+   "fix": "build the gear legs (gear_*) or floats with wheel dummies",
+   "vanilla": "13/13"
+  },
+  {
+   "id": "doors",
+   "what": "a door or canopy",
+   "how": {
+    "frame_geom": "^door_"
+   },
+   "fix": "cut the canopy or door as door_lf_ok",
+   "optional": true,
+   "vanilla": "11/13"
+  },
+  {
+   "id": "lights",
+   "what": "light frames (omni)",
+   "how": {
+    "frames": "^omni"
+   },
+   "fix": "add omni light frames",
+   "optional": true,
+   "vanilla": "12/13"
+  }
+ ]
+}

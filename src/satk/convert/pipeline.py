@@ -105,24 +105,18 @@ def _run(p: dict, path: Path, *, session: str | None, timeout: float) -> dict:
     for row in tex_checks:
         if row["verdict"] != "in":
             warnings.append(f"CHECK_FAILED: texture {row['texture']} is outside its {row['role']} style band")
-    count = metrics.get(p["budget"]["metric"])
-    budget_ok = count is not None and p["budget"]["lo"] <= count <= p["budget"]["hi"]
-    if not budget_ok:
-        warnings.append(f"CHECK_FAILED: {p['budget']['metric']}={count} is outside "
-                        f"{p['budget']['lo']}..{p['budget']['hi']}; no geometry was added to meet a minimum")
+    # the triangle count is a plain number (never a target); the engine limits are asset.check's engine rows
+    count = metrics.get(p["limit"]["metric"])
+    # the class shading numbers are a reference for the reviewer (in_band is info), never a warning
     shading = {k: {"actual": metrics[k], "lo": band["lo"], "hi": band["hi"],
                    "in_band": band["lo"] <= metrics[k] <= band["hi"]}
                for k, band in p["bands"].items() if k.startswith("shade.") and k in metrics}
-    for metric, band in shading.items():
-        if not band["in_band"]:
-            warnings.append(f"CHECK_FAILED: {metric}={band['actual']} is outside {band['lo']}..{band['hi']}; "
-                            "review the source's panel density and seams in the studio")
     from .package import mta
 
     mta_package = mta(p, exported, folder)
     result = {"name": p["name"], "kind": p["kind"], "tier": tier, "out": paths.jpath(folder),
               "plan": paths.jpath(path), "blend": paths.jpath(blend), "source": p["source"],
-              "budget": dict(p["budget"], actual=count, in_band=budget_ok),
+              "tris": count, "limit": p["limit"],
               "metrics": {k: metrics[k] for k in ("geo.tris", "veh.hd_tris", "shade.normal_bend", "shade.flat_share",
                                                     "uv.zero_area_share", "dims.L", "dims.W", "dims.H") if k in metrics},
               "package": exported, "mta": mta_package, "check": checked, "shading": shading,
